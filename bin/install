@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Install a powerup skill (and the agents it needs) into a coding tool's config.
+#
+#   install <tool> <skill>
+#
+# tool  : which coding tool to install into (currently only "claude")
+# skill : powerup | orchestrate | consult | design-doc | delivery | evolve
+#         "powerup" installs the whole bundle: all five skills + their agents.
+#
+# pult calls this as `${module.dir}/bin/install {tool} {skill}`, so the repo
+# root is the parent of this script's directory — resolved from $0, not cwd.
+set -euo pipefail
+
+tool="${1:-}"
+skill="${2:-}"
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+
+die() { echo "install: $*" >&2; exit 1; }
+
+[ -n "$tool" ]  || die "no tool given (expected: claude)"
+[ -n "$skill" ] || die "no skill given (expected: powerup | orchestrate | consult | design-doc | delivery | evolve)"
+
+# One door, OS-native behind it. pult always runs this via `sh`, so on Linux and
+# macOS the copy logic below is the whole story. On Windows (this runs under Git
+# Bash — pult still needs `sh` there) route to the PowerShell installer so there
+# is one audited Windows code path, the same one a user without Git Bash runs
+# directly. Falls through to the copy logic everywhere else.
+case "${OS:-}$(uname -s 2>/dev/null || true)" in
+  *Windows_NT* | *MINGW* | *MSYS* | *CYGWIN*)
+    ps=pwsh
+    command -v pwsh >/dev/null 2>&1 || ps=powershell
+    script="$script_dir/install.ps1"
+    command -v cygpath >/dev/null 2>&1 && script=$(cygpath -w "$script")
+    exec "$ps" -NoProfile -ExecutionPolicy Bypass -File "$script" "$tool" "$skill"
+    ;;
+esac
+
+# --- Per-tool config layout -------------------------------------------------
+case "$tool" in
+  claude)
+    src_skills="$repo_root/claude/skills"
+    src_agents="$repo_root/claude/agents"
+    dst_skills="$HOME/.claude/skills"
+    dst_agents="$HOME/.claude/agents"
+    ;;
+  *)
+    die "unknown tool '$tool' (only 'claude' is supported today)"
+    ;;
+esac
+
+# --- Which skills + agents does this selection pull in? ---------------------
+# Skills are copied as directories; agents as individual *.md files.
+skills=()
+agents=()
+case "$skill" in
+  powerup)
+    skills=(powerup orchestrate consult design-doc delivery evolve)
+    agents=(lonic-exec-medium lonic-exec-high lonic-exec-xhigh
+            lonic-advisor-medium lonic-advisor-high lonic-advisor-xhigh)
+    ;;
+  orchestrate)
+    skills=(orchestrate)
+    agents=(lonic-exec-medium lonic-exec-high lonic-exec-xhigh)
+    ;;
+  consult)
+    skills=(consult)
+    agents=(lonic-advisor-medium lonic-advisor-high lonic-advisor-xhigh)
+    ;;
+  design-doc|delivery|evolve)
+    skills=("$skill")
+    ;;
+  *)
+    die "unknown skill '$skill'"
+    ;;
+esac
+
+# --- Copy -------------------------------------------------------------------
+mkdir -p "$dst_skills" "$dst_agents"
+
+for s in "${skills[@]}"; do
+  [ -d "$src_skills/$s" ] || die "skill '$s' not found at $src_skills/$s"
+  rm -rf "${dst_skills:?}/$s"
+  cp -R "$src_skills/$s" "$dst_skills/$s"
+  echo "  skill  $s -> $dst_skills/$s"
+done
+
+for a in "${agents[@]}"; do
+  [ -f "$src_agents/$a.md" ] || die "agent '$a' not found at $src_agents/$a.md"
+  cp "$src_agents/$a.md" "$dst_agents/$a.md"
+  echo "  agent  $a -> $dst_agents/$a.md"
+done
+
+echo
+echo "Installed '$skill' for $tool."
+if [ "$skill" = "powerup" ]; then
+  echo "Start a session and run /powerup to switch on full-rigor mode."
+else
+  echo "Start a session and enable it by name: /$skill"
+fi

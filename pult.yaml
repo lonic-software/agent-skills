@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/lonic-software/pult/main/pult.schema.json
+#
+# This repo's own manifest. It pulls in the exported module so you can run the
+# published `install` command from a checkout too:
+#
+#   pult                       # guided flow: pick install -> tool -> skill
+#   pult install claude powerup
+#
+# The command is defined once, in pult.module.yaml (the single source of truth);
+# this file just surfaces it locally.
+version: 1
+name: agent-skills
+
+includes:
+  - source: ./pult.module.yaml

@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/lonic-software/pult/main/pult.schema.json
+#
+# The module consumers get. Add this repo as a pult source and you get an
+# `install` command; run it (or `pult install claude powerup`) to copy the
+# skills into your coding tool's config.
+#
+#   includes:
+#     - source: github.com/lonic-software/agent-skills@v1
+#       prefix: skills        # -> `pult skills:install`
+#
+# Real logic lives in bin/install (a directory module, so the whole tree is
+# trust-covered). `tool` is a param, not a prefix, so more tools than Claude
+# can be added later without changing the command surface.
+version: 1
+name: agent-skills
+description: Install the powerup workflow skills into your coding tool's config.
+
+commands:
+  - id: install
+    title: Install a powerup skill
+    description: >
+      Copy a workflow skill — and the agents it needs — into your coding tool's
+      config. Pick "powerup" to install the full disciplined-workflow bundle
+      (all five skills + their agents); pick a single skill for just that one.
+    params:
+      # Only "claude" today; the list grows as other tools (codex, …) are ported.
+      tool:
+        pick:
+          options: [claude]
+      # powerup first: it's the bundle and the recommended entry point.
+      skill:
+        pick:
+          options: [powerup, orchestrate, consult, design-doc, delivery, evolve]
+    run: "${module.dir}/bin/install {tool} {skill}"
