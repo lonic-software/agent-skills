@@ -7,7 +7,8 @@ disable-model-invocation: true
 
 **When this skill is enabled, open your response by telling the user, in 1–2 sentences:**
 Delivery is on — I'll ground handed-down findings before acting, route pre-merge review through
-`/code-review` (medium default; above-medium only with your approval), ship one finding per PR, and
+`/code-review` (after CI is green where a PR with checks exists; medium default; above-medium only
+with your approval), ship one finding per PR, and
 fix the class with run-and-reported revert-checks.
 
 Scope: this skill holds the doctrines that apply to shipping work regardless of which other mode
@@ -37,6 +38,16 @@ silently reinterpret them into something that does reproduce.
 `/code-review` is the standard pre-merge gate. This skill is the only place its usage policy is
 documented — routing decisions elsewhere should cite this section, not restate it.
 
+- **Where a PR is viable, let CI go green before the review gate.** When the change ships as a PR — a
+  remote forge is in play, not a local-only repo — and the project has checks that run on the PR,
+  open the PR and let the automated checks pass *before* you run the `/code-review` merge gate. A red
+  pipeline surfaces mechanical breakage (build, lint, failing tests) far more cheaply than a reviewer
+  would; reviewing a diff CI would reject spends the expensive gate on findings the cheap one already
+  owns. This **orders** the gates, it does not merge them — green CI is necessary, never sufficient,
+  and never substitutes for the review. Skip the wait when there is no forge or no CI, and don't
+  grind on a stuck or flaky pipeline: if CI can't go green for reasons unrelated to the diff, say so
+  and proceed to review rather than blocking. Design-doc reviews are exempt — they are user-launched
+  (see the design-doc bullet below) and gate the doc's content, which CI does not check.
 - **Default to medium effort.** Drop to **low** only for changes that are genuinely simple and
   small — a rename, a localized fix, boilerplate.
 - **Above-medium (high/ultra) is expensive and user-gated.** Never auto-trigger it. The routine,
