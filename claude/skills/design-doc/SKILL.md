@@ -14,7 +14,8 @@ Enabling this skill sets a rule for the rest of the session; it is **not** a req
 design doc right now. From now on: a change in the design-first class (next section) gets a design
 doc *before* the code, and every design doc you write follows the method below.
 
-When you do write one, flag it ready-for-review and **stop** — the user launches the review.
+When you do write one, flag it ready-for-review and **stop** — the user launches the review, which
+is `/code-review` run on the doc.
 
 ## When a design doc comes before code
 
@@ -31,7 +32,9 @@ is wide — and skip it when it isn't.
 - **The failure modes resist testing.** Races, crash windows, cross-process or interleaved states,
   rare error paths — anything a normal unit test won't reliably exercise. Design review catches
   "this invariant is false / these pieces don't compose"; code review catches "this line does the
-  wrong thing." They find different classes and don't substitute for each other.
+  wrong thing." Running `/code-review` on the design doc and later on the implementation diff are
+  two reviews of two artifacts, finding those two different classes — neither substitutes for the
+  other.
 - **You're choosing between genuinely different approaches** and the choice is expensive to reverse
   once built.
 
@@ -65,17 +68,34 @@ wrote is a real thing that has happened.
 
 Every load-bearing sentence carries one of three tags. Keep them visible while drafting; strip
 the tags before the doc ships only if they clutter — the discipline is in the tagging, not the
-notation.
+notation. Stripping removes tag words only: `file:line` citations and the links from each
+`ARGUED` claim to its premises are content, not notation, and stay.
 
 | Tag | Means | Requirement |
 |---|---|---|
 | `VERIFIED` | You opened `file:line` this session and it says what you claim | Cite the path and line |
-| `ARGUED` | Follows from `VERIFIED` facts by reasoning you have written down | The reasoning must be in the doc, not in your head |
+| `ARGUED` | Follows from named `VERIFIED` facts (or prior `ARGUED` claims) by reasoning you have written down | Name the premises it derives from; the reasoning must be in the doc, not in your head |
 | `ASSUMED` | Neither | **May not be load-bearing.** Either verify it, test it, or state plainly that it is unverified |
+
+An `ARGUED` claim names what it stands on — "ARGUED from the §2.1 facts," "ARGUED from the two
+`VERIFIED` reads above" — so a reviewer can walk the chain premise by premise. "Follows from
+verified facts" with no facts named is exactly where a hidden `ASSUMED` link hides. If you
+cannot point at the premises, the claim is not `ARGUED` yet.
+
+Let layout follow section shape. Where one conclusion rests on several facts — soundness, class
+analysis — lead with the `VERIFIED` facts as standalone lines and derive below them: the fact
+base becomes auditable as a set, and every premise gets an address to cite. For local,
+spec-style prose, an inline tag beside each claim serves the same discipline. Both layouts are
+sound; forcing one onto a section shaped for the other is not.
 
 A claim is *load-bearing* if the design changes when it is false. Apply the test literally: write
 the negation, and ask whether you would still ship this design. If yes, it is decoration and does
-not need a tag. If no, it needs `VERIFIED` or a falsifying test.
+not need a tag. If no, it needs `VERIFIED`, `ARGUED` with its premises named, or a falsifying test.
+
+When a whole passage is decoration — motivation, background, history — fence it once ("this
+subsection is motivation, not load-bearing") instead of tagging sentence by sentence. The fence
+is itself a claim — apply the same test: if anything inside would change the design were it false,
+move it out and tag it.
 
 ### A load-bearing unknown is an open task, not a disclosure
 
@@ -209,13 +229,16 @@ Check before flagging it:
   ground every claim in `file:line`, transcribe, and feed discrepancies back. Doing the verification
   yourself is the scribe's job done well — it does not make you the author. Check the consult skill
   for the exact contract rather than reconstructing it from memory.
-- Every load-bearing claim is `VERIFIED` or `ARGUED` — **no load-bearing `UNKNOWN` or `ASSUMED`
-  survives.** Any that remain are non-load-bearing and say so explicitly.
-- Every cited `file:line` was opened this session, at that line.
+- Every load-bearing claim is `VERIFIED` or `ARGUED` with its premises named — **no load-bearing
+  `UNKNOWN` or `ASSUMED` survives.** Any that remain are non-load-bearing and say so explicitly,
+  singly or behind a passage-level fence.
+- Every cited `file:line` was opened this session, at that line — against the current target
+  branch, re-grounded if the branch moved while the doc was in flight (a citation into a superseded
+  base is stale even though you opened it).
 - Every invariant names the mutation that reddens its test, or has a can't-build entry giving the
   mechanism.
 - The class analysis enumerates call sites with a per-site verdict, including the ones correct as
   written.
 
-Then flag it ready-for-review and stop. Do not begin implementation. The doc's job is to be wrong
-cheaply, before the code makes it expensive.
+Then flag it ready-for-review and stop — the user launches `/code-review` on the doc. Do not begin
+implementation. The doc's job is to be wrong cheaply, before the code makes it expensive.
