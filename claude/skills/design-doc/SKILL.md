@@ -232,7 +232,9 @@ Check before flagging it:
 - Every load-bearing claim is `VERIFIED` or `ARGUED` with its premises named — **no load-bearing
   `UNKNOWN` or `ASSUMED` survives.** Any that remain are non-load-bearing and say so explicitly,
   singly or behind a passage-level fence.
-- Every cited `file:line` was opened this session, at that line.
+- Every cited `file:line` was opened this session, at that line — against the current target
+  branch, re-grounded if the branch moved while the doc was in flight (a citation into a superseded
+  base is stale even though you opened it).
 - Every invariant names the mutation that reddens its test, or has a can't-build entry giving the
   mechanism.
 - The class analysis enumerates call sites with a per-site verdict, including the ones correct as

@@ -33,6 +33,16 @@ number has drifted, a described behavior doesn't reproduce. That outcome is a fi
 is exactly what grounding is for. Record refuted findings as refuted — don't quietly drop them or
 silently reinterpret them into something that does reproduce.
 
+**Current means the latest base, not the one you happen to hold.** Before you ground a task, a
+design doc, or an implementation, fetch the branch the work will merge into and ground against its
+tip — fetching is enough; grounding needs the fresh tip, not a rebase of anyone's branch. Work
+grounded on a stale base can be invalidated wholesale when the branch has moved: a cited line
+drifted, the path was refactored, the very defect was already fixed. Where there is no remote to
+sync from, local *is* latest and this is a no-op; where a fetch fails, say so and proceed on the
+base you hold rather than blocking. And if the target branch moves while you work — a long design
+especially — re-ground against the new tip before you finalize; a citation opened against a
+superseded base is stale even though you opened it.
+
 ## B. Review routing and tiers
 
 `/code-review` is the standard pre-merge gate. This skill is the only place its usage policy is
