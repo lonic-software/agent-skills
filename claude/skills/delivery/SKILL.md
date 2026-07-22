@@ -52,9 +52,13 @@ documented — routing decisions elsewhere should cite this section, not restate
   symptom of a skipped design review, not a reason to spend more on code review. Before offering
   above-medium, ask whether this was design-doc-class work that skipped its doc — if so, the fix is
   a design doc, not a bigger review.
-- **Design docs are excluded from this routing entirely.** Flagging a design doc ready-for-review
-  and stopping for the user to launch the review is the design-doc skill's rule, not a tier of
-  `/code-review` — never run `/code-review` on a design doc.
+- **Design-doc reviews are `/code-review`, but user-launched — not part of the autonomous pre-merge
+  gate.** A design doc flagged ready-for-review is reviewed by running `/code-review` on the doc;
+  the design-doc skill's flag-and-stop rule owns *when* — the user launches it, you never
+  auto-trigger it as part of the pre-merge gate. The user picks the tier at launch — the tier
+  gating above governs only reviews launched on your own authority, and a user-launched review is
+  user-approved at whatever tier the user names. If asked to recommend a tier, apply the same
+  evidence-shaped reasoning as above.
 - **Report tier choices like spawn costs.** State which tier you ran and why, the same way
   orchestrate reports every executor spawn's configuration — the user is tracking review spend the
   same way they track model spend.

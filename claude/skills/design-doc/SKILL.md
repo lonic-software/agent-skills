@@ -14,7 +14,8 @@ Enabling this skill sets a rule for the rest of the session; it is **not** a req
 design doc right now. From now on: a change in the design-first class (next section) gets a design
 doc *before* the code, and every design doc you write follows the method below.
 
-When you do write one, flag it ready-for-review and **stop** — the user launches the review.
+When you do write one, flag it ready-for-review and **stop** — the user launches the review, which
+is `/code-review` run on the doc.
 
 ## When a design doc comes before code
 
@@ -31,7 +32,9 @@ is wide — and skip it when it isn't.
 - **The failure modes resist testing.** Races, crash windows, cross-process or interleaved states,
   rare error paths — anything a normal unit test won't reliably exercise. Design review catches
   "this invariant is false / these pieces don't compose"; code review catches "this line does the
-  wrong thing." They find different classes and don't substitute for each other.
+  wrong thing." Running `/code-review` on the design doc and later on the implementation diff are
+  two reviews of two artifacts, finding those two different classes — neither substitutes for the
+  other.
 - **You're choosing between genuinely different approaches** and the choice is expensive to reverse
   once built.
 
@@ -217,5 +220,5 @@ Check before flagging it:
 - The class analysis enumerates call sites with a per-site verdict, including the ones correct as
   written.
 
-Then flag it ready-for-review and stop. Do not begin implementation. The doc's job is to be wrong
-cheaply, before the code makes it expensive.
+Then flag it ready-for-review and stop — the user launches `/code-review` on the doc. Do not begin
+implementation. The doc's job is to be wrong cheaply, before the code makes it expensive.
