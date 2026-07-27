@@ -82,6 +82,25 @@ An `ARGUED` claim names what it stands on — "ARGUED from the §2.1 facts," "AR
 verified facts" with no facts named is exactly where a hidden `ASSUMED` link hides. If you
 cannot point at the premises, the claim is not `ARGUED` yet.
 
+**Enumeration claims are tagged by their bound, not their members.** A claim that a set is
+complete — "these are the writers to X", "all call sites of Y", "every surface that does Z" —
+takes its tag from what closes the set:
+
+- `VERIFIED` means the bounding sweep was run **this session** and its output inspected. Cite the
+  command itself (e.g. `grep -rn 'Journal::' src/`) next to the enumeration, so a reviewer can
+  re-run and re-scope the bound — the citation exists to make a mis-scoped sweep visible, not to
+  certify it.
+- `ARGUED` means a verified closing mechanism is cited as the thing that closes the set — an
+  exhaustive `match` the compiler enforces, the sole accessor to a private field, a sealed schema.
+  Reasoning that merely accumulates members is not a bound.
+- A set assembled from prior reports, a subagent's findings, or recollection is `ASSUMED` no
+  matter how many of its members are individually cited. **Individually verified members never
+  upgrade the set.**
+
+This is the prose counterpart of the coverage-claim rule (an invariant claiming totality needs an
+enforcer or escape probe), and the artifact-level form of delivery §D's "fix the class, not the
+finding."
+
 Let layout follow section shape. Where one conclusion rests on several facts — soundness, class
 analysis — lead with the `VERIFIED` facts as standalone lines and derive below them: the fact
 base becomes auditable as a set, and every premise gets an address to cite. For local,

@@ -39,7 +39,11 @@ and the argument it replaces costs a rebuild when it collapses. Argument length 
 tell: when your justification for why something works keeps growing, some sentence in it is a
 checkable fact doing work a file could do — open the file instead of extending the argument.
 (Design-doc's "cite nothing you have not opened this session" is this same rule confined to doc
-authoring; this paragraph is its session-wide form, for claims that never enter a doc.)
+authoring; this paragraph is its session-wide form, for claims that never enter a doc.) For
+enumeration claims specifically — "these are all the callers/writers/surfaces" — design-doc's
+bound-not-members rule applies even when the claim never enters a doc: a set is only as verified
+as the sweep or closing mechanism that bounds it, and individually verified members never upgrade
+the set.
 
 Verification sometimes shows the finding was wrong — a cited function no longer exists, a line
 number has drifted, a described behavior doesn't reproduce. That outcome is a first-class
