@@ -6,7 +6,8 @@ disable-model-invocation: true
 # Delivery mode
 
 **When this skill is enabled, open your response by telling the user, in 1–2 sentences:**
-Delivery is on — I'll ground handed-down findings before acting, route pre-merge review through
+Delivery is on — I'll ground handed-down findings — and my own checkable claims — before acting,
+route pre-merge review through
 `/code-review` (after CI is green where a PR with checks exists; medium default; above-medium only
 with your approval), ship one finding per PR, and
 fix the class with run-and-reported revert-checks.
@@ -26,6 +27,23 @@ these describe a past state of the code or a past act of reading it; none of the
 itself. The memory system already enforces this discipline on its own output: it stamps memory
 reads with a warning to verify against current code before asserting anything as fact. Apply that
 same caution to every other secondhand claim, not just memories.
+
+**Your own freshly authored claims get the same treatment.** A claim does not need to be handed
+down to be unverified — the sentence you wrote two minutes ago about current code, a tool, or an
+environment ("every call site goes through X," "the formatter keeps chains on one line," "no status
+yet means the run finished") describes your model of the code, not the code. The trigger is
+observable, not a feeling: you are about to **act on** a load-bearing factual claim — load-bearing
+meaning the next step changes if it is false — that a single grep, file-open, or five-line run
+could settle, and you have not run that check this session. Run it first; the check costs seconds,
+and the argument it replaces costs a rebuild when it collapses. Argument length is the secondary
+tell: when your justification for why something works keeps growing, some sentence in it is a
+checkable fact doing work a file could do — open the file instead of extending the argument.
+(Design-doc's "cite nothing you have not opened this session" is this same rule confined to doc
+authoring; this paragraph is its session-wide form, for claims that never enter a doc.) For
+enumeration claims specifically — "these are all the callers/writers/surfaces" — design-doc's
+bound-not-members rule applies even when the claim never enters a doc: a set is only as verified
+as the sweep or closing mechanism that bounds it, and individually verified members never upgrade
+the set.
 
 Verification sometimes shows the finding was wrong — a cited function no longer exists, a line
 number has drifted, a described behavior doesn't reproduce. That outcome is a first-class
@@ -80,6 +98,13 @@ documented — routing decisions elsewhere should cite this section, not restate
   gating above governs only reviews launched on your own authority, and a user-launched review is
   user-approved at whatever tier the user names. If asked to recommend a tier, apply the same
   evidence-shaped reasoning as above.
+- **Hand over a paste-ready command.** Since the user launches it, the handoff *is* the deliverable:
+  end with the exact invocation, including the document's **absolute** path — e.g.
+  `/code-review medium /abs/path/to/memo.md`, with a scope suffix when only part of the doc is in
+  question (`— sections 5 and 8 only`). A repo-relative path is not enough. Design memos often live
+  outside the working repo, and a review invoked there has no diff to anchor on: it falls back to the
+  branch diff and silently reviews the wrong artifact — which reads as a completed review of the
+  thing you asked about.
 - **Report tier choices like spawn costs.** State which tier you ran and why, the same way
   orchestrate reports every executor spawn's configuration — the user is tracking review spend the
   same way they track model spend.
@@ -114,10 +139,18 @@ regression test while the class stays broken.
   that already solves it one file over.
 - **Prefer moving the guarantee into the primitive** over special-casing every call site, so future
   callers can't get it wrong.
-- **Revert-check, run and reported.** No durability or contract clause ships without a test that
-  goes red when the fix — and only the fix — is reverted. The revert must actually be **run**, and
-  its output reported; never asserted. (This is the code-side twin of design-doc's
+- **Revert-check, run and reported — both directions.** No durability or contract clause ships
+  without a test demonstrated **green with the fix in place and red when the fix — and only the fix
+  — is reverted**. Both runs must actually be **run** and their output reported; never asserted. A
+  red-only report — a pinning test committed "red for the predicted reason" — establishes nothing by
+  itself: red in both worlds pins as little as green in both. At code time both worlds exist, so
+  neither direction may be left owed at merge. (This is the code-side twin of design-doc's
   falsifying-test rule, applied after the code exists instead of before it.)
+- **A test that claims coverage names its enforcer.** A shipped check asserting "every X
+  conforms" or "no X escapes" needs the mechanism that makes its checked domain equal its claimed
+  domain — or a committed escape probe from outside its visible domain — or its name and docs
+  narrowed to the cases it actually checks. Sampled mutations going red do not establish
+  coverage. (This is the code-side twin of design-doc's coverage-claim rule.)
 - **Changed contract, changed test.** If a contract's behavior changes, its test changes with it in
   the same PR.
 - **Never sync docs to defective code.** "Code wins over docs" is dangerous exactly when the code

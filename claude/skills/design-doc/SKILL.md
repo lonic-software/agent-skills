@@ -82,6 +82,25 @@ An `ARGUED` claim names what it stands on — "ARGUED from the §2.1 facts," "AR
 verified facts" with no facts named is exactly where a hidden `ASSUMED` link hides. If you
 cannot point at the premises, the claim is not `ARGUED` yet.
 
+**Enumeration claims are tagged by their bound, not their members.** A claim that a set is
+complete — "these are the writers to X", "all call sites of Y", "every surface that does Z" —
+takes its tag from what closes the set:
+
+- `VERIFIED` means the bounding sweep was run **this session** and its output inspected. Cite the
+  command itself (e.g. `grep -rn 'Journal::' src/`) next to the enumeration, so a reviewer can
+  re-run and re-scope the bound — the citation exists to make a mis-scoped sweep visible, not to
+  certify it.
+- `ARGUED` means a verified closing mechanism is cited as the thing that closes the set — an
+  exhaustive `match` the compiler enforces, the sole accessor to a private field, a sealed schema.
+  Reasoning that merely accumulates members is not a bound.
+- A set assembled from prior reports, a subagent's findings, or recollection is `ASSUMED` no
+  matter how many of its members are individually cited. **Individually verified members never
+  upgrade the set.**
+
+This is the prose counterpart of the coverage-claim rule (an invariant claiming totality needs an
+enforcer or escape probe), and the artifact-level form of delivery §D's "fix the class, not the
+finding."
+
 Let layout follow section shape. Where one conclusion rests on several facts — soundness, class
 analysis — lead with the `VERIFIED` facts as standalone lines and derive below them: the fact
 base becomes auditable as a set, and every premise gets an address to cite. For local,
@@ -127,7 +146,7 @@ Certain phrases are where evidence gets quietly replaced by assertion. When you 
 and re-derive the claim from opened source:
 
 > by construction · structurally · trivially · cannot · compile error · deliberately · obviously ·
-> is already · there are no other · unreachable · guaranteed · never
+> is already · there are no other · unreachable · guaranteed · never · fail-closed · exhaustive
 
 None of these words are forbidden. Each is a flag that the sentence containing it is doing work
 that evidence should be doing. Before shipping, grep your own draft for them and check each hit.
@@ -138,7 +157,8 @@ You cannot know at design time how a test will behave. So do not design it — *
 
 Pick the single claim the whole design rests on and build its test *before* finalizing the doc,
 even if the fix does not exist yet. A test that fails today for the reason you predicted converts
-your central claim from `ARGUED` to `VERIFIED`. A test that fails for a *different* reason has
+the red half of your central claim from `ARGUED` to `VERIFIED` — the green half stays owed until
+the fix exists (see the pairing rule below). A test that fails for a *different* reason has
 just saved the design.
 
 Both outcomes are worth the cost, and the second is the valuable one. Expect the spike to change
@@ -151,12 +171,38 @@ No clause ships without a test that goes **red when its code is reverted**. Stat
 explicitly in the doc: *revert X → this test fails.* If you cannot name the mutation, the test is
 not pinning the clause.
 
+Naming the mutation is not demonstrating it. A falsifier is established in **both directions**:
+observed red under the named mutation, observed green under the fix — each by a run, never by
+assertion. A test red in both worlds pins nothing — it can never show the fix worked, and a
+terminal `.expect()` sitting before the real assertion is enough to cause this. A test green in
+both worlds pins nothing — the mutation survives. "Red today, for the predicted reason" establishes
+only the red half; both halves of this failure have passed review while satisfying it. When the fix
+does not yet exist, green cannot be run: say which direction has been demonstrated and which is
+still owed — the owed green run lands with the fix, and the clause is not pinned until it does.
+
 Watch for tests that pin a *proxy* rather than the claim: a unit test that exercises a primitive
 with arguments shaped like what a call site would pass does **not** pin the call site's wiring.
 If a site's wiring is load-bearing, it needs a site-level test.
 
 Watch for tests that would be **flaky in both directions**. A test that sometimes passes on
 reverted code is not a weak detector — it is a false one, and worse than a documented gap.
+Process-global state — caches, warm fixtures, memoized reads — is where "sometimes" hides:
+demonstrate the red under the state the claim actually covers, not just the state the test happens
+to construct.
+
+Watch for **coverage claims backed by samples**. When an invariant claims totality over a domain
+— "every call site," "no input escapes," "fails closed" — bidirectional falsifiers cannot
+establish it: the mutation author and the check author share one model of the domain, so sampled
+mutations only probe points that model can see, and an input the check silently never observes
+stays green under every mutation you will think to write. Name the **enforcer** that makes the
+*checked* domain equal the *claimed* domain — a compiler guarantee (cite the mechanism), an
+enumeration-totality assertion (cite the assert), or an exhaustive match with no default-pass arm
+— and confirm the enforcer is independent of the observation it certifies: a totality equation
+whose two sides are computed from the same partial parse balances exactly when the parse is
+wrong. Failing an enforcer, commit an **escape probe** — a test feeding the check an input from
+outside its visible domain and asserting it goes red rather than silently green. With neither,
+the invariant is a spot check: narrow the written claim to the cases actually checked (see
+"Downgrade claims that outran their evidence").
 
 ## Honest gaps beat invented coverage
 
@@ -235,8 +281,11 @@ Check before flagging it:
 - Every cited `file:line` was opened this session, at that line — against the current target
   branch, re-grounded if the branch moved while the doc was in flight (a citation into a superseded
   base is stale even though you opened it).
-- Every invariant names the mutation that reddens its test, or has a can't-build entry giving the
-  mechanism.
+- Every invariant names the mutation that reddens its test and records which directions — red under
+  the mutation, green under the fix — have been demonstrated by a run and which are still owed, or
+  has a can't-build entry giving the mechanism. Every invariant claiming coverage of a domain
+  additionally names its enforcer or escape probe, or has been narrowed to the cases actually
+  checked.
 - The class analysis enumerates call sites with a per-site verdict, including the ones correct as
   written.
 
