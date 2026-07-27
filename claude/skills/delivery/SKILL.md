@@ -7,7 +7,8 @@ disable-model-invocation: true
 
 **When this skill is enabled, open your response by telling the user, in 1–2 sentences:**
 Delivery is on — I'll ground handed-down findings before acting, route pre-merge review through
-`/code-review` (medium default; above-medium only with your approval), ship one finding per PR, and
+`/code-review` (after CI is green where a PR with checks exists; medium default; above-medium only
+with your approval), ship one finding per PR, and
 fix the class with run-and-reported revert-checks.
 
 Scope: this skill holds the doctrines that apply to shipping work regardless of which other mode
@@ -32,11 +33,31 @@ number has drifted, a described behavior doesn't reproduce. That outcome is a fi
 is exactly what grounding is for. Record refuted findings as refuted — don't quietly drop them or
 silently reinterpret them into something that does reproduce.
 
+**Current means the latest base, not the one you happen to hold.** Before you ground a task, a
+design doc, or an implementation, fetch the branch the work will merge into and ground against its
+tip — fetching is enough; grounding needs the fresh tip, not a rebase of anyone's branch. Work
+grounded on a stale base can be invalidated wholesale when the branch has moved: a cited line
+drifted, the path was refactored, the very defect was already fixed. Where there is no remote to
+sync from, local *is* latest and this is a no-op; where a fetch fails, say so and proceed on the
+base you hold rather than blocking. And if the target branch moves while you work — a long design
+especially — re-ground against the new tip before you finalize; a citation opened against a
+superseded base is stale even though you opened it.
+
 ## B. Review routing and tiers
 
 `/code-review` is the standard pre-merge gate. This skill is the only place its usage policy is
 documented — routing decisions elsewhere should cite this section, not restate it.
 
+- **Where a PR is viable, let CI go green before the review gate.** When the change ships as a PR — a
+  remote forge is in play, not a local-only repo — and the project has checks that run on the PR,
+  open the PR and let the automated checks pass *before* you run the `/code-review` merge gate. A red
+  pipeline surfaces mechanical breakage (build, lint, failing tests) far more cheaply than a reviewer
+  would; reviewing a diff CI would reject spends the expensive gate on findings the cheap one already
+  owns. This **orders** the gates, it does not merge them — green CI is necessary, never sufficient,
+  and never substitutes for the review. Skip the wait when there is no forge or no CI, and don't
+  grind on a stuck or flaky pipeline: if CI can't go green for reasons unrelated to the diff, say so
+  and proceed to review rather than blocking. Design-doc reviews are exempt — they are user-launched
+  (see the design-doc bullet below) and gate the doc's content, which CI does not check.
 - **Default to medium effort.** Drop to **low** only for changes that are genuinely simple and
   small — a rename, a localized fix, boilerplate.
 - **Above-medium (high/ultra) is expensive and user-gated.** Never auto-trigger it. The routine,
@@ -52,9 +73,13 @@ documented — routing decisions elsewhere should cite this section, not restate
   symptom of a skipped design review, not a reason to spend more on code review. Before offering
   above-medium, ask whether this was design-doc-class work that skipped its doc — if so, the fix is
   a design doc, not a bigger review.
-- **Design docs are excluded from this routing entirely.** Flagging a design doc ready-for-review
-  and stopping for the user to launch the review is the design-doc skill's rule, not a tier of
-  `/code-review` — never run `/code-review` on a design doc.
+- **Design-doc reviews are `/code-review`, but user-launched — not part of the autonomous pre-merge
+  gate.** A design doc flagged ready-for-review is reviewed by running `/code-review` on the doc;
+  the design-doc skill's flag-and-stop rule owns *when* — the user launches it, you never
+  auto-trigger it as part of the pre-merge gate. The user picks the tier at launch — the tier
+  gating above governs only reviews launched on your own authority, and a user-launched review is
+  user-approved at whatever tier the user names. If asked to recommend a tier, apply the same
+  evidence-shaped reasoning as above.
 - **Report tier choices like spawn costs.** State which tier you ran and why, the same way
   orchestrate reports every executor spawn's configuration — the user is tracking review spend the
   same way they track model spend.
