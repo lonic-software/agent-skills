@@ -80,6 +80,13 @@ documented — routing decisions elsewhere should cite this section, not restate
   gating above governs only reviews launched on your own authority, and a user-launched review is
   user-approved at whatever tier the user names. If asked to recommend a tier, apply the same
   evidence-shaped reasoning as above.
+- **Hand over a paste-ready command.** Since the user launches it, the handoff *is* the deliverable:
+  end with the exact invocation, including the document's **absolute** path — e.g.
+  `/code-review medium /abs/path/to/memo.md`, with a scope suffix when only part of the doc is in
+  question (`— sections 5 and 8 only`). A repo-relative path is not enough. Design memos often live
+  outside the working repo, and a review invoked there has no diff to anchor on: it falls back to the
+  branch diff and silently reviews the wrong artifact — which reads as a completed review of the
+  thing you asked about.
 - **Report tier choices like spawn costs.** State which tier you ran and why, the same way
   orchestrate reports every executor spawn's configuration — the user is tracking review spend the
   same way they track model spend.
@@ -114,10 +121,18 @@ regression test while the class stays broken.
   that already solves it one file over.
 - **Prefer moving the guarantee into the primitive** over special-casing every call site, so future
   callers can't get it wrong.
-- **Revert-check, run and reported.** No durability or contract clause ships without a test that
-  goes red when the fix — and only the fix — is reverted. The revert must actually be **run**, and
-  its output reported; never asserted. (This is the code-side twin of design-doc's
+- **Revert-check, run and reported — both directions.** No durability or contract clause ships
+  without a test demonstrated **green with the fix in place and red when the fix — and only the fix
+  — is reverted**. Both runs must actually be **run** and their output reported; never asserted. A
+  red-only report — a pinning test committed "red for the predicted reason" — establishes nothing by
+  itself: red in both worlds pins as little as green in both. At code time both worlds exist, so
+  neither direction may be left owed at merge. (This is the code-side twin of design-doc's
   falsifying-test rule, applied after the code exists instead of before it.)
+- **A test that claims coverage names its enforcer.** A shipped check asserting "every X
+  conforms" or "no X escapes" needs the mechanism that makes its checked domain equal its claimed
+  domain — or a committed escape probe from outside its visible domain — or its name and docs
+  narrowed to the cases it actually checks. Sampled mutations going red do not establish
+  coverage. (This is the code-side twin of design-doc's coverage-claim rule.)
 - **Changed contract, changed test.** If a contract's behavior changes, its test changes with it in
   the same PR.
 - **Never sync docs to defective code.** "Code wins over docs" is dangerous exactly when the code
