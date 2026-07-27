@@ -6,7 +6,8 @@ disable-model-invocation: true
 # Delivery mode
 
 **When this skill is enabled, open your response by telling the user, in 1–2 sentences:**
-Delivery is on — I'll ground handed-down findings before acting, route pre-merge review through
+Delivery is on — I'll ground handed-down findings — and my own checkable claims — before acting,
+route pre-merge review through
 `/code-review` (after CI is green where a PR with checks exists; medium default; above-medium only
 with your approval), ship one finding per PR, and
 fix the class with run-and-reported revert-checks.
@@ -26,6 +27,19 @@ these describe a past state of the code or a past act of reading it; none of the
 itself. The memory system already enforces this discipline on its own output: it stamps memory
 reads with a warning to verify against current code before asserting anything as fact. Apply that
 same caution to every other secondhand claim, not just memories.
+
+**Your own freshly authored claims get the same treatment.** A claim does not need to be handed
+down to be unverified — the sentence you wrote two minutes ago about current code, a tool, or an
+environment ("every call site goes through X," "the formatter keeps chains on one line," "no status
+yet means the run finished") describes your model of the code, not the code. The trigger is
+observable, not a feeling: you are about to **act on** a load-bearing factual claim — load-bearing
+meaning the next step changes if it is false — that a single grep, file-open, or five-line run
+could settle, and you have not run that check this session. Run it first; the check costs seconds,
+and the argument it replaces costs a rebuild when it collapses. Argument length is the secondary
+tell: when your justification for why something works keeps growing, some sentence in it is a
+checkable fact doing work a file could do — open the file instead of extending the argument.
+(Design-doc's "cite nothing you have not opened this session" is this same rule confined to doc
+authoring; this paragraph is its session-wide form, for claims that never enter a doc.)
 
 Verification sometimes shows the finding was wrong — a cited function no longer exists, a line
 number has drifted, a described behavior doesn't reproduce. That outcome is a first-class
