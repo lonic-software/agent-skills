@@ -15,7 +15,8 @@ design doc right now. From now on: a change in the design-first class (next sect
 doc *before* the code, and every design doc you write follows the method below.
 
 When you do write one, flag it ready-for-review and **stop** — the user launches the review, which
-is `/code-review` run on the doc.
+is `/code-review` run on the doc. Hand over the full paste-ready command with it, every time you
+suggest a round including repeat suggestions; `delivery` §B owns what that command must carry.
 
 ## When a design doc comes before code
 
@@ -289,5 +290,6 @@ Check before flagging it:
 - The class analysis enumerates call sites with a per-site verdict, including the ones correct as
   written.
 
-Then flag it ready-for-review and stop — the user launches `/code-review` on the doc. Do not begin
-implementation. The doc's job is to be wrong cheaply, before the code makes it expensive.
+Then flag it ready-for-review and stop — the user launches `/code-review` on the doc, so end with
+the paste-ready command per `delivery` §B. Do not begin implementation. The doc's job is to be wrong
+cheaply, before the code makes it expensive.

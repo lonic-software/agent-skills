@@ -98,13 +98,32 @@ documented — routing decisions elsewhere should cite this section, not restate
   gating above governs only reviews launched on your own authority, and a user-launched review is
   user-approved at whatever tier the user names. If asked to recommend a tier, apply the same
   evidence-shaped reasoning as above.
-- **Hand over a paste-ready command.** Since the user launches it, the handoff *is* the deliverable:
-  end with the exact invocation, including the document's **absolute** path — e.g.
-  `/code-review medium /abs/path/to/memo.md`, with a scope suffix when only part of the doc is in
-  question (`— sections 5 and 8 only`). A repo-relative path is not enough. Design memos often live
-  outside the working repo, and a review invoked there has no diff to anchor on: it falls back to the
-  branch diff and silently reviews the wrong artifact — which reads as a completed review of the
-  thing you asked about.
+- **Every review you suggest or hand off ships with its command — every time, including repeats.**
+  This holds whether you raised the review or the user asked for it, and **whether or not you gave
+  the same command in an earlier turn**. Never write "the command from before", "as above", or a
+  bare "run a review round" — restate the full invocation. The user is usually several turns and a
+  scroll-back away from the last one, the path or scope has often moved since, and friction here
+  does not produce a question, it produces a review that is skipped or run against the wrong thing.
+  Always use the **absolute** path: a repo-relative path is not enough, because design memos often
+  live outside the working repo, and a review invoked there has no diff to anchor on — it falls back
+  to the branch diff and silently reviews the wrong artifact, which reads as a completed review of
+  the thing you asked about.
+- **The command carries context, not just a path.** A bare path spends the reviewer's budget
+  re-deriving what is already settled and re-finding what four earlier rounds confirmed. Do not
+  assume the reviewer inherits your conversation: it may run in a separate context entirely, and
+  even when it forks the session, that context may have been **compacted** down to a summary. State
+  what matters rather than betting review quality on inheritance. Worth including, when each
+  applies: which round this is and what prior rounds found; the base commit; the scope, naming what
+  to skip **and why**; which parts are new or unreviewed since the last round; conventions that
+  would otherwise read as defects (a corrections log describing deliberately superseded positions, a
+  section declared the single source of truth); and known gaps you do not want re-reported.
+- **Scoping narrows effort, never permission.** An instruction may tell a reviewer where to spend
+  its budget; it must never tell it to stay silent about a defect it finds anyway. "Don't re-verify
+  the citations" is legitimate; anything that would suppress reporting a real problem is not — that
+  turns a scoped review into a review that looks clean because it was told to.
+- **Say which bets your scoping makes.** Excluding a section is a judgement the user should get to
+  overrule, so name what a skipped area could hide and what it would cost to include it. A scope
+  the user cannot see is one they cannot correct.
 - **Report tier choices like spawn costs.** State which tier you ran and why, the same way
   orchestrate reports every executor spawn's configuration — the user is tracking review spend the
   same way they track model spend.
