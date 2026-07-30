@@ -47,6 +47,11 @@ caching layer, or a permissions model.
 unit-tested changes — a rename, boilerplate, a well-understood feature with no novel contract. A
 design doc there is pure ceremony.
 
+Two shape tripwires while drafting: the mechanism sections outweigh the contract sections, or the
+doc approaches the size of the diff it will describe. Either is the same signal delivery §C reads
+from escalating review rounds — stop, cut the doc back to decisions and observables, and move the
+mechanism to the spike list or the implementation checklist.
+
 This skill exists because of one repeatedly-observed failure: a design doc states something about
 the code as a step in an argument, nobody notices it is a checkable fact rather than reasoning,
 and it survives several rounds of adversarial review intact because reviewers argue with the
@@ -163,9 +168,8 @@ wrong, and work in that medium — never substitute a cheaper one:
 
 - **An execution** — claims about mechanism behaviour: what code does on given inputs, including
   inputs from states that do not exist yet. Spike or build first; prose may *record* a mechanism
-  an execution has pinned, never assert one in advance. Name the fixture and the shipped surface
-  that constructs it; if nothing shipped can build the fixture, the claim is execution-owed, not
-  arguable.
+  an execution has pinned, never assert one in advance. If nothing shipped can build the fixture,
+  the claim is execution-owed, not arguable.
 - **A constructed attack** — claims about what an adversary can do against a specified interface.
   Prose design plus adversarial review is the right instrument.
 - **Neither** — forward contracts and format ratchets, rules for readers that do not exist yet.
@@ -179,11 +183,12 @@ case, not a conflict: it covers claims whose deterministic falsifier does not ex
 review is the best remaining instrument and a can't-build entry records why. This section asks
 for the cheapest falsifier that *exists*.
 
-## Spike the load-bearing claim
+## Spike the load-bearing claims
 
 You cannot know at design time how a test will behave. So do not design it — **write it.**
 
-Pick the single claim the whole design rests on and build its test *before* finalizing the doc,
+Collect the execution-class claims the design rests on into a spike list and run them *before*
+finalizing the doc,
 even if the fix does not exist yet. A test that fails today for the reason you predicted converts
 the red half of your central claim from `ARGUED` to `VERIFIED` — the green half stays owed until
 the fix exists (see the pairing rule below). A test that fails for a *different* reason has
@@ -199,14 +204,10 @@ No clause ships without a test that goes **red when its code is reverted**. Stat
 explicitly in the doc: *revert X → this test fails.* If you cannot name the mutation, the test is
 not pinning the clause.
 
-Naming the mutation is not demonstrating it. A falsifier is established in **both directions**:
-observed red under the named mutation, observed green under the fix — each by a run, never by
-assertion. A test red in both worlds pins nothing — it can never show the fix worked, and a
-terminal `.expect()` sitting before the real assertion is enough to cause this. A test green in
-both worlds pins nothing — the mutation survives. "Red today, for the predicted reason" establishes
-only the red half; both halves of this failure have passed review while satisfying it. When the fix
-does not yet exist, green cannot be run: say which direction has been demonstrated and which is
-still owed — the owed green run lands with the fix, and the clause is not pinned until it does.
+Naming the mutation is not demonstrating it. Demonstration — red under the mutation, green under
+the fix, each by a run — is owed when the code exists; delivery §D gates both directions at merge.
+At design time only spiked claims have runs: record those. For the rest, the doc's obligation is
+the observable and the revert, not the ledger.
 
 Watch for observables that are **printed, not asserted**. A test pins only what its assertions
 compare; anything it merely prints is a log line the test keeps passing without. When the doc
@@ -303,6 +304,17 @@ across projects:
   ships publicly — it is a pointer the reader cannot resolve. Make code comments self-contained and
   anchor them to a document that ships alongside the code.
 
+## When the design phase ends
+
+The design phase ends when a review round yields zero decision-changing findings. Per finding, ask:
+*what is the cheapest downstream instrument that would catch this?* When every answer is the
+compiler, a named test, or code review of the implementation diff, the doc is done — those findings
+are real, and they route to the instruments that own them (delivery §B owns the routing), not back
+into prose. **Ending the design phase does not predict a light code review.** Mechanism defects
+surface at the implementation gates *by design* — moving a defect from prose to a diff is what makes
+it real and fixable, not what makes it free. Budget the code-review rounds accordingly; their yield
+is the system working, not the stopping rule failing.
+
 ## When it is ready
 
 Check before flagging it:
@@ -319,9 +331,16 @@ Check before flagging it:
 - Every cited `file:line` was opened this session, at that line — against the current target
   branch, re-grounded if the branch moved while the doc was in flight (a citation into a superseded
   base is stale even though you opened it).
-- Every invariant names the mutation that reddens its test and records which directions — red under
-  the mutation, green under the fix — have been demonstrated by a run and which are still owed, or
-  has a can't-build entry giving the mechanism. Every invariant claiming coverage of a domain
+- Every load-bearing execution-class claim is settled by a run this session — a spike or an existing
+  test, on the substrate the claim names (delivery §A's substrate rule governs), result recorded —
+  or explicitly implementation-owned with one line naming the instrument that will catch it (the
+  compiler, a named test, code review of the diff), or has a can't-build entry giving the mechanism.
+  **Deferral test:** a claim whose falsity would change a decision in this doc may not be deferred —
+  spike it or verify it; only a claim whose falsity would change mechanism may be
+  implementation-owned. An implementation-owned entry is a deferred obligation with a named catcher,
+  not a load-bearing claim of the doc. Every invariant gets one line at contract depth — the
+  observable, and the revert that must red it; demonstration in both directions is owed at code time
+  and is delivery §D's merge gate, not this one. Every invariant claiming coverage of a domain
   additionally names its enforcer or escape probe, or has been narrowed to the cases actually
   checked.
 - Every run observable the doc cites is pinned by an assertion in the cited test, at the strength

@@ -143,12 +143,21 @@ documented — routing decisions elsewhere should cite this section, not restate
   what to skip **and why**; which parts are new or unreviewed since the last round; conventions
   that would otherwise read as defects (a corrections log describing deliberately superseded
   positions, a section declared the single source of truth); known gaps you do not want
-  re-reported; and the **effort tier, named explicitly even when it is the default**, so the
+  re-reported; the **depth being reviewed — contract or implementation — so mechanism findings
+  against a contract-depth doc read as routing, not as misses**; and the **effort tier, named
+  explicitly even when it is the default**, so the
   review never silently runs at a tier nobody chose. A tier written into the block is a
   recommendation the user edits at launch, not a launch — naming an above-medium tier there
   still requires the evidence-shaped case and stated cost from the bullets above. Before
   sending, read the block alone, as the reviewer will receive it: anything a stranger could not
   answer from the block is not in the handoff.
+- **Findings route by class; none are suppressed.** Every finding from a design-doc round is
+  reported. Then: a finding that changes a decision reopens the doc — revise and re-review; a
+  mechanism-level finding goes onto the implementation checklist, where the instrument that owns it
+  (the compiler, a named test, code review of the implementation diff — the §D merge gates) will
+  catch it. Design-doc owns when the design phase ends; this bullet owns only where each finding
+  goes. Routing happens after reporting, never by telling the reviewer where not to look — the
+  scoping rule below is unchanged.
 - **Scoping narrows effort, never permission.** An instruction may tell a reviewer where to spend
   its budget; it must never tell it to stay silent about a defect it finds anyway. "Don't re-verify
   the citations" is legitimate; anything that would suppress reporting a real problem is not — that
@@ -195,8 +204,8 @@ regression test while the class stays broken.
   — is reverted**. Both runs must actually be **run** and their output reported; never asserted. A
   red-only report — a pinning test committed "red for the predicted reason" — establishes nothing by
   itself: red in both worlds pins as little as green in both. At code time both worlds exist, so
-  neither direction may be left owed at merge. (This is the code-side twin of design-doc's
-  falsifying-test rule, applied after the code exists instead of before it.)
+  neither direction may be left owed at merge. (Design-doc names each invariant's observable and
+  revert at contract depth; this gate owns the demonstration once the code exists.)
 - **A test that claims coverage names its enforcer.** A shipped check asserting "every X
   conforms" or "no X escapes" needs the mechanism that makes its checked domain equal its claimed
   domain — or a committed escape probe from outside its visible domain — or its name and docs
