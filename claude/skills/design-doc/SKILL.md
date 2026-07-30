@@ -84,13 +84,16 @@ verified facts" with no facts named is exactly where a hidden `ASSUMED` link hid
 cannot point at the premises, the claim is not `ARGUED` yet.
 
 **Enumeration claims are tagged by their bound, not their members.** A claim that a set is
-complete — "these are the writers to X", "all call sites of Y", "every surface that does Z" —
-takes its tag from what closes the set:
+complete — "these are the writers to X", "all call sites of Y", "every surface that does Z" — or
+empty — "there is no X" — takes its tag from what closes the set:
 
 - `VERIFIED` means the bounding sweep was run **this session** and its output inspected. Cite the
-  command itself (e.g. `grep -rn 'Journal::' src/`) next to the enumeration, so a reviewer can
-  re-run and re-scope the bound — the citation exists to make a mis-scoped sweep visible, not to
-  certify it.
+  command itself (e.g. `grep -rn 'Journal::' src/`) and paste its output next to the enumeration,
+  so a reviewer can re-run, re-scope, and diff — the same sweep returning different members on a
+  re-run is itself a finding, and the citation exists to make a mis-scoped sweep visible, not to
+  certify it. An **empty** result is the case to distrust: with no members to inspect, a
+  mis-scoped sweep is indistinguishable from a true negative, so an empty-set claim additionally
+  states its quantifier domain and the condition under which the sweep must be re-run.
 - `ARGUED` means a verified closing mechanism is cited as the thing that closes the set — an
   exhaustive `match` the compiler enforces, the sole accessor to a private field, a sealed schema.
   Reasoning that merely accumulates members is not a bound.
@@ -152,6 +155,29 @@ and re-derive the claim from opened source:
 None of these words are forbidden. Each is a flag that the sentence containing it is doing work
 that evidence should be doing. Before shipping, grep your own draft for them and check each hit.
 
+## Match each claim to its cheapest falsifier
+
+Before drafting, sort the load-bearing claims by the cheapest artifact that could prove them
+wrong, and work in that medium — never substitute a cheaper one:
+
+- **An execution** — claims about mechanism behaviour: what code does on given inputs, including
+  inputs from states that do not exist yet. Spike or build first; prose may *record* a mechanism
+  an execution has pinned, never assert one in advance. Name the fixture and the shipped surface
+  that constructs it; if nothing shipped can build the fixture, the claim is execution-owed, not
+  arguable.
+- **A constructed attack** — claims about what an adversary can do against a specified interface.
+  Prose design plus adversarial review is the right instrument.
+- **Neither** — forward contracts and format ratchets, rules for readers that do not exist yet.
+  Decide the observable in prose at contract depth, and stop before mechanism.
+
+Revising un-executed mechanism prose under review does not converge: each rewrite mints new
+execution-only-falsifiable claims about as fast as review retires them. The exit is to stop
+generating mechanism prose, not to stop reviewing — review of contracts and adversarial surface
+stays productive. "The failure modes resist testing" (criteria above) is this rule's boundary
+case, not a conflict: it covers claims whose deterministic falsifier does not exist, where prose
+review is the best remaining instrument and a can't-build entry records why. This section asks
+for the cheapest falsifier that *exists*.
+
 ## Spike the load-bearing claim
 
 You cannot know at design time how a test will behave. So do not design it — **write it.**
@@ -180,6 +206,16 @@ both worlds pins nothing — the mutation survives. "Red today, for the predicte
 only the red half; both halves of this failure have passed review while satisfying it. When the fix
 does not yet exist, green cannot be run: say which direction has been demonstrated and which is
 still owed — the owed green run lands with the fix, and the clause is not pinned until it does.
+
+Watch for observables that are **printed, not asserted**. A test pins only what its assertions
+compare; anything it merely prints is a log line the test keeps passing without. When the doc
+cites a specific observable from a run — an exit code, a count, a message, a field — that
+observable must be an assertion in the test, at the strength the citation leans on it (a claim
+that "the collector swept" needs `deleted > 0`, not the transcript's exact count), before the doc
+may cite it. A pasted transcript records what happened once and goes stale silently when the
+behaviour changes. This holds even when the observable is current-defect behaviour: assert the
+defect and mark that assertion as the one that inverts with the fix — that is what turns "this is
+live today" from a diary entry into a tripwire.
 
 Watch for tests that pin a *proxy* rather than the claim: a unit test that exercises a primitive
 with arguments shaped like what a call site would pass does **not** pin the call site's wiring.
@@ -287,6 +323,10 @@ Check before flagging it:
   has a can't-build entry giving the mechanism. Every invariant claiming coverage of a domain
   additionally names its enforcer or escape probe, or has been narrowed to the cases actually
   checked.
+- Every run observable the doc cites is pinned by an assertion in the cited test, at the strength
+  the prose uses it. Sweep the cited spike for printed-only output — `println!`, log lines, pasted
+  transcripts — and check each printed value the doc leans on against the test's assertions:
+  promote it to an assertion, or downgrade the citation to a one-time, unpinned observation.
 - The class analysis enumerates call sites with a per-site verdict, including the ones correct as
   written.
 
