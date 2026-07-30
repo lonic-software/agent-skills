@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# Report drift between this repo's skills/agents and an installed copy.
+#
+#   check-sync <tool>
+#
+# tool : which coding tool's config to compare against (currently only "claude")
+#
+# Read-only: it never copies, edits, or deletes anything. `bin/install` is the
+# only writer, and this deliberately does not offer to "fix" what it finds —
+# it cannot know which side is newer, and guessing is how an authored change
+# gets silently reverted. It prints the diff and exits nonzero; the human picks
+# a direction.
+#
+# Why this exists: the repo is the source consumers install from, but edits get
+# made in the installed copy too (a skill is easiest to change where it is in
+# force). Nothing detected that, so the two drifted — on one occasion the
+# installed copy was two approved changes ahead of the repo for a day, with no
+# signal. That is the failure this closes.
+#
+# Exit codes:
+#   0  every tracked item matches
+#   1  usage/environment error (bad tool, missing repo tree, no install found)
+#   2  drift found — the reportable outcome, distinct from a real error so a
+#      caller can tell "it ran and found problems" from "it could not run"
+set -euo pipefail
+
+tool="${1:-}"
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+
+die() { echo "check-sync: $*" >&2; exit 1; }
+
+[ -n "$tool" ] || die "no tool given (expected: claude)"
+
+# --- Per-tool config layout -------------------------------------------------
+# Mirrors bin/install's dispatch. Keep the two in step: a tool added there
+# needs an arm here, or its install becomes undetectable drift.
+case "$tool" in
+  claude)
+    src_skills="$repo_root/claude/skills"
+    src_agents="$repo_root/claude/agents"
+    dst_skills="$HOME/.claude/skills"
+    dst_agents="$HOME/.claude/agents"
+    ;;
+  *)
+    die "unknown tool '$tool' (only 'claude' is supported today)"
+    ;;
+esac
+
+[ -d "$src_skills" ] || die "no skills tree at $src_skills"
+[ -d "$src_agents" ] || die "no agents tree at $src_agents"
+
+if [ ! -d "$dst_skills" ] && [ ! -d "$dst_agents" ]; then
+  die "nothing installed for $tool (no $dst_skills, no $dst_agents) — run \"install $tool powerup\" first"
+fi
+
+# --- Scope ------------------------------------------------------------------
+# The repo is the authority on WHAT is tracked: every skill directory and agent
+# file it ships. Items the installed copy has and the repo does not are NOT
+# drift — a user's own skills live alongside these and are none of this repo's
+# business. So the sweep is over the repo's contents, never the union.
+#
+# The direction that matters is therefore: for each tracked item, is the
+# installed copy present and identical?
+
+# Noise that is never content. Ignored on both sides so a stray Finder file
+# cannot fail a run — and so it never gets copied into the repo either.
+ignore_args=(-x '.DS_Store' -x 'Thumbs.db')
+
+drift=0
+matched=0
+
+report() { printf '  %-8s %s\n' "$1" "$2"; }
+
+echo "Comparing $tool install against $repo_root"
+echo
+echo "skills ($dst_skills):"
+
+for path in "$src_skills"/*; do
+  [ -d "$path" ] || continue
+  name="$(basename "$path")"
+  installed="$dst_skills/$name"
+
+  if [ ! -d "$installed" ]; then
+    report "MISSING" "$name — tracked here, not installed"
+    drift=$((drift + 1))
+    continue
+  fi
+
+  if diff -rq "${ignore_args[@]}" "$path" "$installed" >/dev/null 2>&1; then
+    report "ok" "$name"
+    matched=$((matched + 1))
+  else
+    report "DIFFERS" "$name"
+    # Indent the detail so the summary stays scannable when several drift.
+    # `|| true` is load-bearing: `diff` exits nonzero by design here, and under
+    # `set -o pipefail` that status would propagate out of the pipeline and
+    # `set -e` would abort the sweep at the first difference — reporting one
+    # drifted skill and silently skipping the rest.
+    detail="$(diff -rq "${ignore_args[@]}" "$path" "$installed" 2>&1 || true)"
+    printf '%s\n' "$detail" | sed 's|^|             |'
+    drift=$((drift + 1))
+  fi
+done
+
+echo
+echo "agents ($dst_agents):"
+
+for path in "$src_agents"/*.md; do
+  [ -f "$path" ] || continue
+  name="$(basename "$path")"
+  installed="$dst_agents/$name"
+
+  if [ ! -f "$installed" ]; then
+    report "MISSING" "$name — tracked here, not installed"
+    drift=$((drift + 1))
+    continue
+  fi
+
+  if cmp -s "$path" "$installed"; then
+    report "ok" "$name"
+    matched=$((matched + 1))
+  else
+    report "DIFFERS" "$name"
+    drift=$((drift + 1))
+  fi
+done
+
+echo
+if [ "$drift" -eq 0 ]; then
+  echo "In sync: $matched tracked item(s) match."
+  exit 0
+fi
+
+echo "Drift: $drift item(s) differ or are missing, $matched match."
+echo
+echo "Nothing was changed. To see a specific difference:"
+echo "  diff -ru $src_skills/<skill> $dst_skills/<skill>"
+echo
+echo "Then pick a direction deliberately:"
+echo "  install $tool powerup      # repo  -> installed (discards installed edits)"
+echo "  cp -R ...                  # installed -> repo (when the edit was made in place)"
+exit 2
