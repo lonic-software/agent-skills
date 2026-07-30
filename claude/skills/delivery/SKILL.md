@@ -45,6 +45,18 @@ bound-not-members rule applies even when the claim never enters a doc: a set is 
 as the sweep or closing mechanism that bounds it, and individually verified members never upgrade
 the set.
 
+**The falsifier is not always in the repo.** When a load-bearing claim is about an external
+system's behavior — a server version's defaults, a library's semantics, a platform guarantee; the
+tell is a sentence naming a version, a default, a deprecation, or an implementation limit — no
+grep or local run settles it: the settling check is the system's primary documentation, and the
+claim ships with that source named where the claim lives. Where the doc genuinely cannot be
+fetched, ship the claim marked unverified rather than bare. And gate local experiments by
+substrate before they count as verification: an experiment establishes such a claim only when run
+on the implementation, version, and configuration the claim names; on anything else it corroborates
+the mechanism at best, and a *passing* run on the wrong substrate is the dangerous case — it
+launders an unverified claim into a "tested" one. Name the substrate next to the result whenever
+the two differ.
+
 Verification sometimes shows the finding was wrong — a cited function no longer exists, a line
 number has drifted, a described behavior doesn't reproduce. That outcome is a first-class
 **success**, not a failed task: "not reproduced, here's the evidence, here's the narrower real gap"
