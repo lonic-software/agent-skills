@@ -6,7 +6,8 @@ disable-model-invocation: true
 # Delivery mode
 
 **When this skill is enabled, open your response by telling the user, in 1–2 sentences:**
-Delivery is on — I'll ground handed-down findings — and my own checkable claims — before acting,
+Delivery is on — I'll ground handed-down findings — and my own checkable claims — before acting on
+or durably writing them,
 route pre-merge review through
 `/code-review` (after CI is green where a PR with checks exists; medium default; above-medium only
 with your approval), ship one finding per PR, and
@@ -24,9 +25,8 @@ definitions. This skill only owns what has no other home.
 Treat every handed-down finding as unverified until you check it against current code — a Jira
 ticket, a prior-session summary, an executor's report, a review finding, a memory file. All of
 these describe a past state of the code or a past act of reading it; none of them are the code
-itself. The memory system already enforces this discipline on its own output: it stamps memory
-reads with a warning to verify against current code before asserting anything as fact. Apply that
-same caution to every other secondhand claim, not just memories.
+itself. The memory system already stamps its own reads with exactly this warning — extend that
+caution to every other secondhand claim.
 
 **Your own freshly authored claims get the same treatment.** A claim does not need to be handed
 down to be unverified — the sentence you wrote two minutes ago about current code, a tool, or an
@@ -39,11 +39,24 @@ and the argument it replaces costs a rebuild when it collapses. Argument length 
 tell: when your justification for why something works keeps growing, some sentence in it is a
 checkable fact doing work a file could do — open the file instead of extending the argument.
 (Design-doc's "cite nothing you have not opened this session" is this same rule confined to doc
-authoring; this paragraph is its session-wide form, for claims that never enter a doc.) For
+authoring; this paragraph is its session-wide form, for claims that never enter a design doc.) For
 enumeration claims specifically — "these are all the callers/writers/surfaces" — design-doc's
 bound-not-members rule applies even when the claim never enters a doc: a set is only as verified
 as the sweep or closing mechanism that bounds it, and individually verified members never upgrade
 the set.
+
+**Writing a claim into durable prose is acting on it — the actor is the future reader.** An
+explanatory comment, a guide sentence, a commit message: your own next step does not change if the
+aside is false, so the trigger above never fires — and review does not fire either, because a claim
+about *why* something is safe survives review exactly when the surrounding conclusion happens to be
+true (reviewers argue with the reasoning instead of opening the file). So a checkable mechanism
+claim headed for durable prose gets one of two moves before it ships: open the file, or narrow the
+claim to what you can support without opening anything. Prefer narrowing — "nothing in this command
+writes before the probe" names the property doing the work and cannot rot; "this read-only command"
+was false the day it was written. The tell-words are design-doc's substitution vocabulary
+("cannot", "never", "unreachable", "read-only", …); sweep prose you are about to ship for them the
+way that section sweeps a doc draft. Plain narration needs neither move — the claim that earns one
+is the one a reader would take as a reason.
 
 **The falsifier is not always in the repo.** When a load-bearing claim is about an external
 system's behavior — a server version's defaults, a library's semantics, a platform guarantee; the

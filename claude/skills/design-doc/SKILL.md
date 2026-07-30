@@ -150,7 +150,8 @@ Certain phrases are where evidence gets quietly replaced by assertion. When you 
 and re-derive the claim from opened source:
 
 > by construction · structurally · trivially · cannot · compile error · deliberately · obviously ·
-> is already · there are no other · unreachable · guaranteed · never · fail-closed · exhaustive
+> is already · there are no other · unreachable · guaranteed · never · fail-closed · exhaustive ·
+> read-only
 
 None of these words are forbidden. Each is a flag that the sentence containing it is doing work
 that evidence should be doing. Before shipping, grep your own draft for them and check each hit.
