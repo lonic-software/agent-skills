@@ -108,15 +108,22 @@ documented — routing decisions elsewhere should cite this section, not restate
   live outside the working repo, and a review invoked there has no diff to anchor on — it falls back
   to the branch diff and silently reviews the wrong artifact, which reads as a completed review of
   the thing you asked about.
-- **The command carries context, not just a path.** A bare path spends the reviewer's budget
-  re-deriving what is already settled and re-finding what four earlier rounds confirmed. Do not
-  assume the reviewer inherits your conversation: it may run in a separate context entirely, and
-  even when it forks the session, that context may have been **compacted** down to a summary. State
-  what matters rather than betting review quality on inheritance. Worth including, when each
-  applies: which round this is and what prior rounds found; the base commit; the scope, naming what
-  to skip **and why**; which parts are new or unreviewed since the last round; conventions that
-  would otherwise read as defects (a corrections log describing deliberately superseded positions, a
-  section declared the single source of truth); and known gaps you do not want re-reported.
+- **The command carries its context inside the copyable block — not just a path, and not in the
+  prose around it.** Only what is copied travels: the reviewer receives the block and nothing
+  else, so a message can satisfy every content item below and still hand off a bare-path review
+  if the material sits in adjacent paragraphs. Do not assume the reviewer inherits your
+  conversation: it may run in a separate context entirely, and even when it forks the session,
+  that context may have been **compacted** down to a summary. Put inside the block, when each
+  applies: which round this is and what prior rounds found; the base commit; the scope, naming
+  what to skip **and why**; which parts are new or unreviewed since the last round; conventions
+  that would otherwise read as defects (a corrections log describing deliberately superseded
+  positions, a section declared the single source of truth); known gaps you do not want
+  re-reported; and the **effort tier, named explicitly even when it is the default**, so the
+  review never silently runs at a tier nobody chose. A tier written into the block is a
+  recommendation the user edits at launch, not a launch — naming an above-medium tier there
+  still requires the evidence-shaped case and stated cost from the bullets above. Before
+  sending, read the block alone, as the reviewer will receive it: anything a stranger could not
+  answer from the block is not in the handoff.
 - **Scoping narrows effort, never permission.** An instruction may tell a reviewer where to spend
   its budget; it must never tell it to stay silent about a defect it finds anyway. "Don't re-verify
   the citations" is legitimate; anything that would suppress reporting a real problem is not — that
