@@ -206,6 +206,24 @@ regression test while the class stays broken.
   itself: red in both worlds pins as little as green in both. At code time both worlds exist, so
   neither direction may be left owed at merge. (Design-doc names each invariant's observable and
   revert at contract depth; this gate owns the demonstration once the code exists.)
+- **A revert-check certifies only what its fixture can distinguish.** The rule above is necessary,
+  not sufficient, and reads as more than it delivers: "red when reverted" certifies the claim only
+  over the domain the fixture exercises. When the claim is that an observable is **computed from a
+  particular source** — an instance field, a config value, an environment read — the pinning test
+  must give that source a value which **separates it from every rival the code could have read
+  instead**: every constant in scope, every default, every same-typed field. Coincidence is the
+  tell. If the injected value equals anything else the code could have used, the right and wrong
+  implementations are extensionally equal everywhere the test looks, and it cannot tell them apart
+  no matter how convincingly the revert run went red. Where production constructors can only
+  produce constant-valued sources, **add a test-only injection point** rather than settling for the
+  values production paths happen to permit — one sentinel colliding with nothing kills every
+  hardcoding mutant at once, and beats a conspiracy of tests that jointly cover the case by
+  accident. Report the separation, so the check cannot be claimed without being done: *injected 7s;
+  separates from CONNECT (5s), CONNECT_TOR (60s), BODY_READ (10s); collisions: none.* This is the
+  coverage-claim rule below, specialized: a fixture exercising one client is a checked domain
+  strictly smaller than the claimed domain of every client, with nothing making them equal. Do not
+  expect a mutation-testing CI lane to cover this — source substitution is not an operator such
+  tools generate.
 - **A test that claims coverage names its enforcer.** A shipped check asserting "every X
   conforms" or "no X escapes" needs the mechanism that makes its checked domain equal its claimed
   domain — or a committed escape probe from outside its visible domain — or its name and docs

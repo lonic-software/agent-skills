@@ -227,7 +227,9 @@ live today" from a diary entry into a tripwire.
 
 Watch for tests that pin a *proxy* rather than the claim: a unit test that exercises a primitive
 with arguments shaped like what a call site would pass does **not** pin the call site's wiring.
-If a site's wiring is load-bearing, it needs a site-level test.
+If a site's wiring is load-bearing, it needs a site-level test. Site-level is necessary but not
+sufficient: a fixture whose injected value coincides with a rival constant is still a proxy — see
+delivery §D's distinguishing-fixture rule.
 
 Watch for tests that would be **flaky in both directions**. A test that sometimes passes on
 reverted code is not a weak detector — it is a false one, and worse than a documented gap.
