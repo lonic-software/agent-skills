@@ -70,6 +70,9 @@ cite. Not "I recall that function," not "the other memo says," not "the executor
 Line numbers drift; files get split; a citation into a file shorter than the line number you
 wrote is a real thing that has happened.
 
+For a claim about an external system, the thing to open is its primary documentation — delivery §A
+owns that rule — and the citation names the document and section in place of a path and line.
+
 ## The claims ledger
 
 Every load-bearing sentence carries one of three tags. Keep them visible while drafting; strip
@@ -136,10 +139,13 @@ looks like diligence.** It reads as "I checked, and this is genuinely open" whil
 stopped reading." The honest label supplies the feeling of rigour without the rigour, and it
 survives review, because a reviewer will not challenge something you have already flagged.
 
-Before flagging anything UNKNOWN, ask: *could I resolve this by opening one more file?* If yes, that
-is not an unknown — that is the next thing to read. Reserve the label for what genuinely cannot be
-determined from the code in front of you (a platform guarantee, a third-party behaviour, a
-production workload characteristic), and say which of those it is.
+Before flagging anything UNKNOWN, ask: *could I resolve this by opening one more file — or, for a
+claim about an external system, by fetching its primary documentation?* If yes, that is not an
+unknown — that is the next thing to read; for the external-system case delivery §A owns the
+evidence rule, and a platform guarantee or a third-party behaviour is settled against its primary
+documentation, not parked under a label. Reserve UNKNOWN for what has nothing left to open — a
+production workload characteristic, or an external-system claim whose documentation you tried and
+could not fetch — and say which it is.
 
 Expect resolving them to change the design, not merely to confirm it. When a real instance of this
 was chased down, the "unknown" turned out to hide a third code path whose failure mode was worse
