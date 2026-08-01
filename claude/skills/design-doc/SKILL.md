@@ -288,11 +288,19 @@ revisited together.
 ## Shape of the doc
 
 Numbered sections, roughly: defect · fix · soundness (with preconditions) · class analysis ·
-falsifying tests · rejected alternatives · risks/open notes · when settled.
+spike ledger · falsifying tests · rejected alternatives · risks/open notes · when settled.
 
 - **Class analysis is not optional.** Fix the class, not the finding: enumerate every call site,
   report per-site status, and say plainly when a site is *correct as written* rather than
   fixing it for symmetry.
+- **The spike ledger is a section of the doc, not a check to remember.** One row per load-bearing
+  execution-class claim: the claim, and its disposition — **run** (result, this session),
+  **implementation-owned** (named catcher; legal only where falsity would change mechanism, not a
+  decision — the deferral test), or **can't-build** (entry per above). A doc with no ledger is
+  claiming its execution class is empty; that is an enumeration claim — state it as one line and
+  expect review to attack it. The asymmetry is the point: an absent or thin section is visible to a
+  reviewer, an unperformed check is not. Numeric constants that budgets, thresholds, or limits are
+  derived from are execution-class unless their citation says otherwise.
 - **Version by layering**, newest changelog paragraph on top, older ones preserved. Record
   corrections as corrections — when a prior version's reasoning was wrong, say what was wrong and
   why it survived, rather than silently editing the prose.
@@ -339,7 +347,8 @@ Check before flagging it:
 - Every cited `file:line` was opened this session, at that line — against the current target
   branch, re-grounded if the branch moved while the doc was in flight (a citation into a superseded
   base is stale even though you opened it).
-- Every load-bearing execution-class claim is settled by a run this session — a spike or an existing
+- Every load-bearing execution-class claim is settled by a run this session (recorded in the spike
+  ledger) — a spike or an existing
   test, on the substrate the claim names (delivery §A's substrate rule governs), result recorded —
   or explicitly implementation-owned with one line naming the instrument that will catch it (the
   compiler, a named test, code review of the diff), or has a can't-build entry giving the mechanism.
