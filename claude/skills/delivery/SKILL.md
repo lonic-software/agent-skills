@@ -144,7 +144,8 @@ documented — routing decisions elsewhere should cite this section, not restate
   that would otherwise read as defects (a corrections log describing deliberately superseded
   positions, a section declared the single source of truth); known gaps you do not want
   re-reported; the **depth being reviewed — contract or implementation — so mechanism findings
-  against a contract-depth doc read as routing, not as misses**; and the **effort tier, named
+  against a contract-depth doc read as routing, not as misses; a depth names where the budget goes,
+  never a level that is settled (the scoping bullet owns this)**; and the **effort tier, named
   explicitly even when it is the default**, so the
   review never silently runs at a tier nobody chose. A tier written into the block is a
   recommendation the user edits at launch, not a launch — naming an above-medium tier there
@@ -161,7 +162,16 @@ documented — routing decisions elsewhere should cite this section, not restate
 - **Scoping narrows effort, never permission.** An instruction may tell a reviewer where to spend
   its budget; it must never tell it to stay silent about a defect it finds anyway. "Don't re-verify
   the citations" is legitimate; anything that would suppress reporting a real problem is not — that
-  turns a scoped review into a review that looks clean because it was told to.
+  turns a scoped review into a review that looks clean because it was told to. **Declaring a level
+  settled is this failure wearing scoping's clothes** — "the design is settled," "contract questions
+  are out of scope," a design doc handed over as the authority the diff answers to. None of these
+  reads as a silence instruction, but a reviewer never finds a defect *anyway* at a depth it was told
+  is decided: attention follows scope, so the finding class dies without anyone being told to stay
+  quiet. A handoff names the depth the review targets; it never names a depth as closed. Where a
+  design doc exists, either withhold it — making the review an independent derivation of the contract
+  — or supply it with its decisions explicitly challengeable; never as authority. Listing known
+  findings as already-reported and deliberate conventions as deliberate stays legitimate — deliberate
+  means "not an accident," never "beyond challenge."
 - **Say which bets your scoping makes.** Excluding a section is a judgement the user should get to
   overrule, so name what a skipped area could hide and what it would cost to include it. A scope
   the user cannot see is one they cannot correct.
