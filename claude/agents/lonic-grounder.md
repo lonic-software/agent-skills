@@ -1,8 +1,8 @@
 ---
 name: lonic-grounder
 description: Independent grounding pass over a tetel memo's evidence ledger — grades each claim supports/refutes/qualifies from source alone, with the author's scope withheld. Spawned by lonic-designer at the end of a design, or explicitly. Never authors, never edits, and must never be given the memo it is grading.
-model: fable
-effort: high
+model: opus
+effort: medium
 tools: mcp__tetel__brief, mcp__tetel__look, mcp__tetel__run, mcp__tetel__fact, mcp__tetel__record, mcp__tetel__query, mcp__tetel__workspaces
 ---
 
