@@ -14,9 +14,99 @@ Enabling this skill sets a rule for the rest of the session; it is **not** a req
 design doc right now. From now on: a change in the design-first class (next section) gets a design
 doc *before* the code, and every design doc you write follows the method below.
 
-When you do write one, flag it ready-for-review and **stop** — the user launches the review, which
-is `/code-review` run on the doc. Hand over the full paste-ready command with it, every time you
-suggest a round including repeat suggestions; `delivery` §B owns what that command must carry.
+**There are two ways to write one, and they have different reviewers.** Check which you are in
+before you start, because the wrong one wastes a review round:
+
+- **tetel is installed** (the `mcp__tetel__*` tools are available) → the design is authored and
+  reviewed *inside the loop* described under **The grounding loop** below. Grounders grade each
+  claim against source, an attacker attacks what the claims jointly support, and findings arrive as
+  records against claim ids rather than as a report somebody reconciles by hand. The loop's own
+  stopping rule ends the design phase. **Do not also run `/code-review` on the doc** — it is a
+  weaker instrument for the same artifact, and by the time the loop stops, the memo has been graded
+  by more independent passes than a review round supplies.
+- **tetel is not installed** → this is the fallback, and everything below about the claims ledger,
+  the spike ledger and falsifying tests is how you get the same discipline by hand. Flag the doc
+  ready-for-review and **stop** — the user launches `/code-review` on it. Hand over the full
+  paste-ready command, every time you suggest a round including repeat suggestions; `delivery` §B
+  owns what that command must carry.
+
+The rest of this skill applies to both. The method is the same; only who checks it differs.
+
+## The grounding loop
+
+**Only when tetel is installed.** You do not author the design yourself — you run the loop around
+it, and each stage is a fresh agent so no stage inherits another's context. A design run's cost is
+`requests × context carried`, and holding one context open across the whole loop has been measured
+at 95% of a run's cost, most of it re-reading a context that had stopped changing.
+
+1. **`lonic-designer`** authors until its first machine-clean render, then stops and hands back a
+   workspace and a memo path. It grades nothing.
+2. **Then, each round, in this order:** an attacker pass, then a grounding pass, then — if either
+   returned anything to answer — a **fresh `lonic-reviser`** with the workspace, the memo and the
+   verdict records.
+3. Repeat from 2 until the stopping rule below fires.
+
+### Dispatch rules that are not negotiable
+
+**Spawn every pass synchronously — `run_in_background: false`.** The default runs subagents
+detached, which makes the loop unable to wait for the result it exists to read. A designer left in
+that state spent **15% of its entire budget** calling `workspaces` in a loop, polling for children it
+could not have waited for; the polls' own output then became the single largest thing in its
+context. Never poll for an agent.
+
+**Never run the attacker and a grounder at the same time, and run the attacker first.** They
+overlapped on 7 of 7 passes in one measured run purely because both were dispatched detached. The
+order matters on cost: an attacker costs about a minute and provokes roughly 0.83 revisions per
+record, a grounding pass costs fifteen to twenty minutes and provokes 0.06–0.47. Running the cheap,
+high-yield instrument first means the expensive one grades wording that has already survived attack
+— and a revision landing mid-pass strands that pass's records, because a revised claim's earlier
+gradings no longer match its digest.
+
+**Give a grounder the memo path and a fresh workspace name, and nothing else.** No propositions, no
+summary of the reasoning, no note about which claims you are unsure of. It runs `brief` itself so
+the propositions are byte-identical, and it has no read path into the author's workspace. Every word
+you add is a channel for handing over the answer. Name workspaces for the pass — `k1-<design>-grounder`,
+then `k2-…`; `a1-<design>-attacker`, then `a2-…` — so independence is recomputed from identity
+rather than trusted from a label. **A pass is fresh every time:** never reuse a pass workspace, and
+never re-run a grounder over a memo it has already graded, because its second look is not
+independent of its first.
+
+**Run an attacker every round, even when the grounding came back clean** — especially then, since a
+clean grounding is exactly the state in which nothing else will question the design. The attacker
+was for a long time spawned only to re-validate a refutation's fix, which meant it ran only when a
+grounder had refuted something; across four memos nothing ever was, so the highest-yield instrument
+in the loop never ran at all. A grounder grades **each proposition as written**, so it structurally
+cannot see what the claims fail to establish *jointly*. The two are not substitutes.
+
+**A refutation's fix is re-validated by an attacker, not by a grounder.** A grounder grading the
+repaired sentence establishes only that the new sentence is true. It cannot see the defect class a
+refutation-fix risks — a fix that is right about the finding and wrong about a premise neither the
+finding nor the fix made explicit. That has happened and cost a round: a repair was graded
+`supports` twice, correctly, and the next attack pass showed it unsound at its destination.
+
+### When the loop stops
+
+**Both of these must hold: the last round provoked no revision, and an attacker has graded the
+current wording.** A dry *grounding* round means the grounders are out of ideas, which is not the
+same as the design having settled. On one run, pass 1 was a dry grounding round and the attacker
+after it provoked **eight** revisions; passes 5 and 7 were also dry, and their attackers provoked 8
+and 5. Stopping at the first dry round would have discarded 24 of that run's 35 revisions.
+
+If the dry round was a grounding pass and no attacker has seen the current text, **the next pass is
+an attacker, not a stop.** Once both conditions hold, stop — do not run one more round to be sure.
+One memo paid for that: two consecutive dry grounding rounds, 55 records between them, nothing
+changed by either.
+
+**Cap the loop at four grounding rounds.** If it is not clean by then, stop and report plainly which
+claims will not survive, what each pass said, and what the design cannot currently establish. An
+honest report of an unstable design is a result; a design reported as finished because the loop ran
+out of patience is worse than an unstable one, because it arrives with a green attached.
+
+**Machine-clean is the bar, and the human-owed partition is not a queue to empty.** `check` will
+always list qualified verdicts, `proc:` extents, self-grounding and its own standing non-coverage.
+Surviving qualifications belong in the report, in the grounder's own words.
+
+**Never report a design that has not been independently grounded.**
 
 ## When a design doc comes before code
 
@@ -367,6 +457,10 @@ Check before flagging it:
 - The class analysis enumerates call sites with a per-site verdict, including the ones correct as
   written.
 
-Then flag it ready-for-review and stop — the user launches `/code-review` on the doc, so end with
-the paste-ready command per `delivery` §B. Do not begin implementation. The doc's job is to be wrong
-cheaply, before the code makes it expensive.
+Then stop, and hand over according to the path you were on. **Under tetel**, the loop has already
+reviewed it — report the memo path, the `check` verdict and the surviving qualifications, and say
+the design phase is closed; do not queue a `/code-review` round on the doc. **Without tetel**, flag
+it ready-for-review and end with the paste-ready `/code-review` command per `delivery` §B.
+
+Either way, do not begin implementation. The doc's job is to be wrong cheaply, before the code makes
+it expensive.
