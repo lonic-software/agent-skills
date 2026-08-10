@@ -41,10 +41,16 @@ at 95% of a run's cost, most of it re-reading a context that had stopped changin
 
 1. **`lonic-designer`** authors until its first machine-clean render, then stops and hands back a
    workspace and a memo path. It grades nothing.
-2. **Then, each round, in this order:** an attacker pass, then a grounding pass, then — if either
-   returned anything to answer — a **fresh `lonic-reviser`** with the workspace, the memo and the
-   verdict records.
+2. **Then, each round, in this order:** an attacker pass; then a **fresh `lonic-reviser`** with the
+   workspace, the memo and the verdict records, if the attacker returned anything to answer; then a
+   grounding pass over what the revision left owed.
 3. Repeat from 2 until the stopping rule below fires.
+
+**The reviser goes between them, not after both.** An attacker that refutes has just established
+that some wording is wrong; a grounding pass run beside it grades claims that are about to change,
+and a revised claim's earlier gradings no longer match its digest, so those records strand on
+arrival. Answer the attack first, then ground what the answer left owed — the brief's `owed` line
+names exactly that set.
 
 ### Dispatch rules that are not negotiable
 
@@ -86,16 +92,42 @@ finding nor the fix made explicit. That has happened and cost a round: a repair 
 
 ### When the loop stops
 
-**Both of these must hold: the last round provoked no revision, and an attacker has graded the
-current wording.** A dry *grounding* round means the grounders are out of ideas, which is not the
-same as the design having settled. On one run, pass 1 was a dry grounding round and the attacker
-after it provoked **eight** revisions; passes 5 and 7 were also dry, and their attackers provoked 8
-and 5. Stopping at the first dry round would have discarded 24 of that run's 35 revisions.
+**The signal is that the buildable design has settled — not that the prose has.**
 
-If the dry round was a grounding pass and no attacker has seen the current text, **the next pass is
-an attacker, not a stop.** Once both conditions hold, stop — do not run one more round to be sure.
-One memo paid for that: two consecutive dry grounding rounds, 55 records between them, nothing
-changed by either.
+Stop when `check` is machine-clean, nothing is refuted, and **the last attack pass returned no
+finding that changes what an implementer would build**: no declared modification target added or
+removed, no change to a decision an implementer acts on. Findings that correct *how accurately the
+design describes itself* are recorded and do not extend the loop.
+
+That is the same test this skill already applies on the other path — *what is the cheapest downstream
+instrument that would catch this?* A wrong decision has no downstream instrument and must be caught
+here. A claim that is right in substance and over-claims in one clause will be caught by code review
+of the diff, or by the compiler, or by the test the claim names.
+
+**A dry *grounding* round is not the signal.** Grounders being out of ideas is not the design having
+settled, and the difference is expensive: on one run, pass 1 was a dry grounding round and the
+attacker after it provoked **eight** revisions; passes 5 and 7 were also dry, and their attackers
+provoked 8 and 5. Stopping at the first dry round would have discarded 24 of that run's 35 revisions.
+If a grounding round comes back dry and no attacker has seen the current text, **the next pass is an
+attacker, not a stop.**
+
+**And an earlier formulation of this rule — "stop when the last round provoked no revision" — is
+unreachable, which is why it is gone.** Any round that answers a finding rewrites some wording, which
+invalidates the attacker's grading, which requires another attacker, which finds something. Measured
+on one loop: refutations fell 2 → 1 → 1 → 0 across four attack passes while qualifications did not
+fall at all, because **every revision writes new prose and new prose carries new overreach**. All
+three of that run's final qualifications were the same shape — a single clause saying *only*, *never*
+or *permanently* about a claim that was right in substance. Iterating cannot drive that to zero; it
+manufactures it.
+
+So: refutation and target churn extend the loop. Prose accuracy does not. Once both attack passes and
+grounding passes are returning only the second kind, stop — do not run one more round to be sure. One
+memo paid for that: two consecutive dry grounding rounds, 55 records between them, nothing changed by
+either.
+
+**Make the distinction the attacker's job, not yours.** Ask each attack pass to say, per finding,
+whether it changes what gets built or only what the implementer is told. They separate the two
+readily; it is the stop decision that needs the separation stated rather than inferred.
 
 **Cap the loop at four grounding rounds.** If it is not clean by then, stop and report plainly which
 claims will not survive, what each pass said, and what the design cannot currently establish. An

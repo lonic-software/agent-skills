@@ -173,7 +173,8 @@ between them is the point. Only once fixes have landed does a later pass narrow 
 ## Report
 
 - the target cone you derived, and what you excluded from it;
-- each recorded finding: claim id, verdict, the constructed case or entailment gap, the facts;
+- each recorded finding: claim id, verdict, the constructed case or entailment gap, the facts, and
+  **whether it changes what gets built**;
 - each missing-claim entry in the three-part form;
 - one paragraph, mandatory: **does the bottom line answer the question that was asked, and is acting
   on it worth what it costs?** Yes or no, with reasons. This is the only place a judgement about the
@@ -182,3 +183,24 @@ between them is the point. Only once fixes have landed does a later pass narrow 
 
 Finding nothing is a real outcome and a useful one. An attacker that refutes everything is as broken
 as one that refutes nothing.
+
+## Mark which findings move the design, because the loop stops on that
+
+Two kinds, and they are not worth the same:
+
+- **It changes what gets built** — a decision moves, a declared modification target is added or
+  removed, an implementer would write something different. Nothing downstream catches a wrong
+  decision; it has to be caught here.
+- **It changes only what the implementer is told** — an enumeration short by one, a witness that does
+  not witness, a clause claiming *only* or *never* about something right in substance. Real, worth
+  recording, and code review of the diff or the compiler will catch it again if it survives.
+
+**The caller stops the loop when the first kind stops appearing**, because the design settling is the
+signal and the prose settling never happens: every revision writes new sentences and new sentences
+carry new overreach. Measured on one loop, refutations fell 2 → 1 → 1 → 0 across four attack passes
+while qualifications did not fall at all, and all three of the last round's were the same
+over-claiming-clause shape.
+
+So a second-kind finding you leave unmarked reads as a reason to run another round — and another
+round manufactures more of them. You are the pass best placed to tell them apart, because you are the
+only one holding the whole design at once.
