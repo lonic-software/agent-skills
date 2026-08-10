@@ -70,6 +70,22 @@ For the question in front of you:
   belongs somewhere other than the end. Placement is chosen when you write, so there is no reason
   left to bank finished claims for a writing phase.
 
+**Append consecutive records of the same kind in one message.** When you are about to emit two
+`prose` calls in a row, or two `claim` calls in a row, with **no observation between them**, put both
+tool calls in the same message rather than waiting for the first to acknowledge. The acknowledgement
+tells you an id you already know the shape of, and the second record was formed from an evidence
+state identical to the first's — so the round trip buys nothing and costs a full re-read of
+everything you are carrying. Measured on one run, the solo appends that could have been paired this
+way were worth about a million base-input-equivalents.
+
+**The one exception, and it is not rare:** never pair them when the second call's text, `--why` or
+`--cites` names an id the first call mints. A withdrawal explaining itself by citing the claim you
+are minting in the same breath cannot be written before that claim exists. Roughly one adjacent pair
+in twelve was this shape.
+
+This is not a licence to bank records for a writing phase. It pairs records **already formed**; the
+moment you need to look at something, the run ends and the next one starts after the observation.
+
 Two debts, both visible in `query`, both capped:
 
 - **Facts cited by no claim: at most 3.** At the cap, stop observing. Spend them on a claim, or

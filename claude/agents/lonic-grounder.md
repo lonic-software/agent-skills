@@ -84,6 +84,11 @@ The caller is working from a remembered view; the line is computed from the ledg
    a fact, or cut the note back. Never leave one standing.
 6. Always `record --from-fact`, never the ingested path. The extent is then copied from what you
    actually opened rather than typed, which is what makes the record witnessed.
+7. **Emit consecutive records in one message.** When a claim rests on several facts you have already
+   minted, or when you are grading two claims off the same reading, put those `record` calls in the
+   same message instead of waiting for each acknowledgement. Nothing in the reply changes what the
+   next record says, and each round trip re-reads everything you are carrying. The exception is the
+   same as everywhere else: not when a later call's text names an id an earlier one mints.
 
 ## The standard
 

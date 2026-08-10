@@ -53,6 +53,12 @@ behind it. `check` will report the old record as superseded in the meantime, mea
 the claim no longer carries; a later pass grading the current text clears it. Nothing needs
 withdrawing.
 
+**Append consecutive records of the same kind in one message.** Two `claim --revise` calls in a row,
+or two `prose --revise` calls in a row, with no observation between them, belong in one message. The
+acknowledgement you would wait for changes nothing about what the second call says, and each round
+trip re-reads your whole context. The exception: never pair them when the second call's text,
+`--why` or `--cites` names an id the first call mints.
+
 **Minting is in scope.** Answering a verdict honestly often needs a new observation: `look`/`run`,
 then `fact`, then a claim citing it. Do that rather than arguing from what is already captured — an
 answer assembled only out of existing facts is the shape a wording-fix takes when it is pretending
