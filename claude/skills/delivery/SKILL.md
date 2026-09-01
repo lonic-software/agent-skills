@@ -218,8 +218,9 @@ regression test while the class stays broken.
   revert at contract depth; this gate owns the demonstration once the code exists.)
 - **A revert-check certifies only what its fixture can distinguish.** The rule above is necessary,
   not sufficient, and reads as more than it delivers: "red when reverted" certifies the claim only
-  over the domain the fixture exercises. When the claim is that an observable is **computed from a
-  particular source** — an instance field, a config value, an environment read — the pinning test
+  over the domain the fixture exercises. When the claim is that an observable is **computed from, or
+  wired to, a particular source or target** — an instance field, a config value, an environment
+  read, an attach target — the pinning test
   must give that source a value which **separates it from every rival the code could have read
   instead**: every constant in scope, every default, every same-typed field. Coincidence is the
   tell. If the injected value equals anything else the code could have used, the right and wrong
@@ -234,6 +235,14 @@ regression test while the class stays broken.
   strictly smaller than the claimed domain of every client, with nothing making them equal. Do not
   expect a mutation-testing CI lane to cover this — source substitution is not an operator such
   tools generate.
+- **A red run certifies the assertion that produced it — name it.** "The file went red" attributes
+  nothing: with neighbours in the test, any of them can supply the red while the shipped assertion
+  asserts nothing at all — the incident seeding this bullet shipped `not.toBe` on an array,
+  identity-true forever, and the revert run's red came from the line above it. The runner's failure
+  output already names the failing assertion and the value it saw; report both, the way the fixture
+  bullet reports its separation. When that output names anything other than the assertion being
+  certified, nothing has been certified yet: silence the neighbours for one run and show the shipped
+  assertion go red alone.
 - **A test that claims coverage names its enforcer.** A shipped check asserting "every X
   conforms" or "no X escapes" needs the mechanism that makes its checked domain equal its claimed
   domain — or a committed escape probe from outside its visible domain — or its name and docs
