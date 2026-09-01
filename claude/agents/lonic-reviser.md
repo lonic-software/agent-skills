@@ -41,6 +41,23 @@ longer exists, and `check` reports it as provenance drift.
   refutation actually reaches; if it reaches the keystone, redesign the keystone rather than patching
   around it. This is the rule an under-pressure loop breaks first, and rewording a refuted claim
   until it sounds survivable is the failure it breaks into.
+
+  **Match the refuter's substrate.** Every witness in the ledger is a `run`, so its kind tells you
+  nothing — read the extent of the fact that witnessed the refutation and ask of its command:
+  *would its output have been byte-identical on a fresh clone of the pinned commit, with no network
+  and no credentials?* If not, the witness observed the world outside the tree — a deployed system,
+  a live account, a running service — and so does the question: your replacement claim must cite a
+  `run` of your own against that same substrate, executed this round. Searches and reads of the
+  source that implements or configures that system are corroboration, not the instrument, and a
+  mechanism's behaviour may be *recorded* after such a run has pinned it, never asserted ahead of
+  one. If the substrate cannot be reached from here, return the claim as execution-owed rather than
+  replacing it — a second unexecuted mechanism in a slot an observation has emptied is the loop's
+  most expensive move. An observation that refuted one claim has jurisdiction over its siblings:
+  before re-rendering, check every other claim asserting that same substrate's state or behaviour,
+  not only the one the record names. When the witness *was* worktree-determined — a grep, a source
+  read — this rule is silent: answer at the same depth, and do not reach for a live call that
+  argument settles. The same parity holds one level down: a claim refuted by *executing* the code is
+  not answered by re-reading its text.
 - **`qualifies`** → the claim holds only under a condition it does not state. Either state the
   condition or narrow the claim. A qualification naming one clause is usually a one-clause fix; a
   qualification about what the grader *could not establish* means the design owes more evidence, not

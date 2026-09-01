@@ -68,6 +68,19 @@ high-yield instrument first means the expensive one grades wording that has alre
 — and a revision landing mid-pass strands that pass's records, because a revised claim's earlier
 gradings no longer match its digest.
 
+**A claim refuted from outside the worktree is answered from outside the worktree.** A record's kind
+does not discriminate — every witness is a `run` — so apply the substrate test to the refutation's
+witnessing command: would its output have been identical on a fresh clone of the pinned commit, with
+no network and no credentials? When it would not — the command interrogated the deployed system, not
+the tree — say so in the reviser's brief, and a returned revision whose replacement claims cite no
+observation of that substrate is not attacked next: it is rejected and re-briefed. Prose and
+source-reads have just been demonstrated to lack jurisdiction over that question, and dispatching
+review at its successor re-runs the demonstrated failure. Measured once: three read-mechanism claims
+asserted in prose were each refuted against the live system by a later pass — five rounds, ~4.5M
+tokens — and four scripts then settled every remaining question in twenty minutes. In that run's
+ledger of 155 records, exactly the five refutations witnessed by live-system calls were the mechanism
+failures; the ten witnessed from source were contract-level, and this rule stays silent on those.
+
 **Give a grounder the memo path and a fresh workspace name, and nothing else.** No propositions, no
 summary of the reasoning, no note about which claims you are unsure of. It runs `brief` itself so
 the propositions are byte-identical, and it has no read path into the author's workspace. Every word
@@ -76,6 +89,18 @@ then `k2-…`; `a1-<design>-attacker`, then `a2-…` — so independence is reco
 rather than trusted from a label. **A pass is fresh every time:** never reuse a pass workspace, and
 never re-run a grounder over a memo it has already graded, because its second look is not
 independent of its first.
+
+**A designer's brief leads with the deliverable's surface; the open questions come second.** The
+question list you attach becomes the scope whether you mean it to or not — the designer answers the
+brief it is given, and grounding pulls the same way, because the half of the problem with readable
+source outcompetes the half without. One design briefed as "an admin UI" plus five unsettled
+substrate questions came back answering all five and containing no feature set, no screens, no auth
+model and no data model — and rendered exactly as clean as a complete memo, because nothing in the
+artifact distinguishes never-asked from answered. Name the sections a reader would expect the
+finished design to contain; anything outside that surface is an explicit deferral in the brief, so a
+gap in the memo is a stated deferral rather than a silence. And a decision no source can settle — a
+stack, a product feature set — is settled with the user before dispatch: the designer has no channel
+to ask, so an unaskable question becomes an omission.
 
 **Run an attacker every round, even when the grounding came back clean** — especially then, since a
 clean grounding is exactly the state in which nothing else will question the design. The attacker
@@ -111,6 +136,13 @@ provoked 8 and 5. Stopping at the first dry round would have discarded 24 of tha
 If a grounding round comes back dry and no attacker has seen the current text, **the next pass is an
 attacker, not a stop.**
 
+**A caveat is not a close.** "No attack pass has seen the answers" written into a close-out report is
+the stop condition failing, in writing — the process-level form of the load-bearing UNKNOWN: the
+honest label reads as diligence and survives precisely because it was flagged. If revisions landed
+after the last attack pass, the next pass is an attacker, at any `check` verdict and any round count;
+if it refutes, the design is reported unfinished, not clean-with-a-caveat. Either way the close-out
+report states that the final attack pass read the text being closed.
+
 **And an earlier formulation of this rule — "stop when the last round provoked no revision" — is
 unreachable, which is why it is gone.** Any round that answers a finding rewrites some wording, which
 invalidates the attacker's grading, which requires another attacker, which finds something. Measured
@@ -132,7 +164,10 @@ readily; it is the stop decision that needs the separation stated rather than in
 **Cap the loop at four grounding rounds.** If it is not clean by then, stop and report plainly which
 claims will not survive, what each pass said, and what the design cannot currently establish. An
 honest report of an unstable design is a result; a design reported as finished because the loop ran
-out of patience is worse than an unstable one, because it arrives with a green attached.
+out of patience is worse than an unstable one, because it arrives with a green attached. The cap
+bounds grounding rounds — the expensive instrument — never the closing attack pass. Machine-clean at
+the cap with revisions no attacker has seen is not clean; it is unattacked text with a green
+attached.
 
 **Machine-clean is the bar, and the human-owed partition is not a queue to empty.** `check` will
 always list qualified verdicts, `proc:` extents, self-grounding and its own standing non-coverage.
