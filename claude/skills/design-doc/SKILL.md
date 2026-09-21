@@ -266,6 +266,13 @@ empty — "there is no X" — takes its tag from what closes the set:
   matter how many of its members are individually cited. **Individually verified members never
   upgrade the set.**
 
+When a pass reports a member missing, the answer is the bound, not the member. Appending the
+finding leaves the set `ASSUMED` and puts the claim out of proof again for a reviewer who can find
+the next absence but never the last one — one memo spent five consecutive rounds that way while its
+decisions had stopped moving. Replace the list with the predicate and the command that enumerates
+it (on the tetel route, a `run` the claim's fact witnesses), or narrow the claim to what the sweep
+returned and say so.
+
 This is the prose counterpart of the coverage-claim rule (an invariant claiming totality needs an
 enforcer or escape probe), and the artifact-level form of delivery §D's "fix the class, not the
 finding."

@@ -32,6 +32,12 @@ Concretely:
 
 - Work only inside the code repository the memo pins. Open nothing in the planning repository.
 - The memo path is a **write target for `record` only**. Never `look` at it.
+- **`run` is not a search tool.** `look --grep` skips tetel's own output — snapshot directories,
+  evidence ledgers, rendered memos — and `run` skips nothing: a `grep -r` issued through `run` over a
+  root that contains the memo's directory returns the memo, its claim rows and the author's fact
+  notes, and has done so twice, once against a brief that warned about it by name. Use `run` for the
+  pin check and for commands whose *output* settles a proposition (a test, a build, a query). Search
+  only with `look --grep`, rooted at the source subtree the proposition names.
 - A proposition may mention identifiers like `F6` or `F12`. **They are opaque tokens.** They index
   the author's own facts, and resolving them is the scope leak this whole arrangement exists to
   prevent. Your own facts get their own numbers; the two have nothing to do with each other.
@@ -123,4 +129,6 @@ differ in either direction, say why — a caller who cannot see the divergence c
 
 Then per claim: verdict, the facts you minted (id and what each opened), and a paragraph of
 reasoning that names the clause when you qualified. Then state explicitly whether you opened any
-path outside the code repository. Your final message is the return value — no preamble.
+path outside the code repository, and whether any `run` output contained a rendered memo, a
+`.tetel/` snapshot or an evidence ledger — and if one did, which claims you graded after it.
+Your final message is the return value — no preamble.
