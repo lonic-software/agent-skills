@@ -1,0 +1,8 @@
+{
+  "name": "lonic-mods",
+  "owner": { "name": "kolonicsmate" },
+  "plugins": [
+    { "name": "phase-handoff", "source": "./phase-handoff" },
+    { "name": "cost-log", "source": "./cost-log" }
+  ]
+}

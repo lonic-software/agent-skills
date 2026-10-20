@@ -11,10 +11,8 @@ discipline into the skills, with your approval and an advisor-gate, rather than 
 silently.
 
 This skill owns the rules for changing the skill set itself — nothing else. A doctrine with an
-object-level home (executor tiering, review routing, design-doc criteria, ...) lives there instead.
-Skill self-edits are main-thread work: orchestrate already carves out "edits to this orchestration
-config itself" as the orchestrator's own job, not an executor's — that carve-out is what makes
-edits under this skill legal at all; it is not restated here.
+object-level home (review routing, design-doc criteria, advisor mechanics, ...) lives there instead.
+Skill self-edits are main-thread work — yours, never delegated.
 
 ## Trigger
 
@@ -35,7 +33,7 @@ A one-off is not doctrine material — it goes to memory only.
 
 Surface the pattern, its cost, a specific actionable candidate rule, and which skill should own it
 — citing the prior memory or incident. User decides whether it ships: **user first** (gates intent,
-cheap) → **advisor-gate second** (gates form, expensive; default `lonic-advisor-high`) → **commit
+cheap) → **advisor-gate second** (gates form; `lonic-advisor-medium` by default, escalating per consult's tier table) → **commit
 third**.
 
 **Advisor-gate checklist:** generalization, already-exists-elsewhere, correct owner, contradiction

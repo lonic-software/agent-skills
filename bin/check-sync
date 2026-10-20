@@ -40,8 +40,16 @@ case "$tool" in
   claude)
     src_skills="$repo_root/claude/skills"
     src_agents="$repo_root/claude/agents"
+    src_bin="$repo_root/claude/bin"
+    src_hooks="$repo_root/claude/hooks"
+    src_mods="$repo_root/claude/mods"
     dst_skills="$HOME/.claude/skills"
     dst_agents="$HOME/.claude/agents"
+    dst_bin="$HOME/.claude/bin"
+    dst_hooks="$HOME/.claude/hooks"
+    # Not an install target: mods are added as a plugin marketplace from the
+    # checkout. This is where they are developed, and is compared only if present.
+    dst_mods="$HOME/.claude/mods"
     ;;
   *)
     die "unknown tool '$tool' (only 'claude' is supported today)"
@@ -126,6 +134,53 @@ for path in "$src_agents"/*.md; do
     drift=$((drift + 1))
   fi
 done
+
+# Scripts are opt-in (a hook) or ride along with one skill (wait-pr-ci with
+# delivery), so one that is not installed is not drift. One that is installed
+# and differs is.
+for kind in bin hooks; do
+  if [ "$kind" = bin ]; then src="$src_bin" dst="$dst_bin"; else src="$src_hooks" dst="$dst_hooks"; fi
+  echo
+  echo "$kind ($dst):"
+  for path in "$src"/*; do
+    [ -f "$path" ] || continue
+    name="$(basename "$path")"
+    if [ ! -f "$dst/$name" ]; then
+      report "-" "$name — not installed (optional)"
+    elif cmp -s "$path" "$dst/$name"; then
+      report "ok" "$name"
+      matched=$((matched + 1))
+    else
+      report "DIFFERS" "$name"
+      drift=$((drift + 1))
+    fi
+  done
+done
+
+if [ -d "$dst_mods" ] && [ -d "$src_mods" ]; then
+  echo
+  echo "mods ($dst_mods):"
+  # Generated plugin types are gitignored here and rewritten by Claude Code on
+  # update, so they are never content.
+  mod_ignore=("${ignore_args[@]}" -x 'types' -x '.gitignore')
+  # `|| true`: see the skills loop.
+  detail="$(diff -rq "${mod_ignore[@]}" "$src_mods" "$dst_mods" 2>&1 || true)"
+  # phase-handoff's own hand-written types/ is content; compare it explicitly.
+  for m in "$src_mods"/*/types; do
+    [ -d "$m" ] || continue
+    rel="${m#"$src_mods"/}"
+    more="$(diff -rq "${ignore_args[@]}" "$m" "$dst_mods/$rel" 2>&1 || true)"
+    detail="$detail${detail:+${more:+$'\n'}}$more"
+  done
+  if [ -z "$detail" ]; then
+    report "ok" "mods"
+    matched=$((matched + 1))
+  else
+    report "DIFFERS" "mods"
+    printf '%s\n' "$detail" | sed 's|^|             |'
+    drift=$((drift + 1))
+  fi
+fi
 
 echo
 if [ "$drift" -eq 0 ]; then

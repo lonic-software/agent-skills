@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# wait-pr-ci <pr> [deadline-seconds]   — run with run_in_background.
+# Exits 0 only on a reading it obtained: runs for the PR's CURRENT head sha, at least one,
+# all completed, and the same row count on two consecutive polls. Any gh error, an empty
+# list, or a stale sha is "no reading" and keeps polling. Exit 1 = terminal with a failure,
+# exit 2 = deadline passed WITHOUT a terminal reading (never implies a result).
+# Sees GitHub Actions runs only, not external commit statuses. A run that never completes
+# (action_required, waiting) ends in exit 2 — UNKNOWN is the honest answer there.
+# The stability clause is keyed to the sha, so a push mid-wait restarts it.
+set -u
+pr=$1; deadline=$(( $(date +%s) + ${2:-1800} )); prev=""
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  if head=$(gh pr view "$pr" --json headRefOid,headRefName -q '.headRefOid+" "+.headRefName' 2>/dev/null) \
+     && set -- $head && [ -n "${1:-}" ] && [ -n "${2:-}" ] \
+     && rows=$(gh run list --branch "$2" --commit "$1" --limit 50 \
+               --json status,conclusion -q '.[]|"\(.status) \(.conclusion)"' 2>/dev/null); then
+    n=$(printf '%s' "$rows" | grep -c . || true)
+    if [ "$n" -ge 1 ] && ! printf '%s\n' "$rows" | grep -qv '^completed ' && [ "$1:$n" = "$prev" ]; then
+      echo "head $1: $n run(s) completed"; printf '%s\n' "$rows" | sort | uniq -c
+      printf '%s\n' "$rows" | grep -qvE '^completed (success|skipped|neutral)$' && exit 1 || exit 0
+    fi
+    prev="$1:$n"
+  fi
+  sleep 30
+done
+echo "DEADLINE: no terminal reading for PR $pr — CI result UNKNOWN" >&2; exit 2
