@@ -87,7 +87,8 @@ stop after the current item instead of chaining blind.
 
 Call `mcp__phase-handoff__handoff` as the **last action** of the session, then end the turn. The
 prompt must stand alone, because it is all the next session knows. Start it with the same command that
-started this run (`/queue-run`, or a wrapper such as `/powerup-auto`) so the same skills load again,
+started this run (`/queue-run`, or a wrapper such as `/powerup-auto`; `/lonic:queue-run` and
+`/lonic:powerup-auto` when installed as the `lonic` plugin) so the same skills load again,
 and include:
 
 - **Stop threshold:** the absolute weekly percentage, e.g. `stop at 62% weekly`.

@@ -48,9 +48,7 @@ switch ($Tool) {
         $srcAgents = Join-Path (Join-Path $repoRoot 'claude') 'agents'
         $dstSkills = Join-Path (Join-Path $HOME '.claude') 'skills'
         $dstAgents = Join-Path (Join-Path $HOME '.claude') 'agents'
-        $srcBin    = Join-Path (Join-Path $repoRoot 'claude') 'bin'
         $srcHooks  = Join-Path (Join-Path $repoRoot 'claude') 'hooks'
-        $dstBin    = Join-Path (Join-Path $HOME '.claude') 'bin'
         $dstHooks  = Join-Path (Join-Path $HOME '.claude') 'hooks'
     }
 }
@@ -62,17 +60,15 @@ $advisors     = @('lonic-advisor-low', 'lonic-advisor-medium', 'lonic-advisor-hi
 # Inert without tetel; design-doc routes to them only when it is installed.
 $designPasses = @('lonic-design-attacker', 'lonic-grounder')
 $bundleSkills = @('powerup', 'consult', 'design-doc', 'delivery', 'evolve')
-$skills = @(); $agents = @(); $bins = @(); $hooks = @()
+$skills = @(); $agents = @(); $hooks = @()
 switch ($Skill) {
     'powerup' {
         $skills = $bundleSkills
         $agents = $advisors + $designPasses
-        $bins   = @('wait-pr-ci')
     }
     'powerup-auto' {
         $skills = $bundleSkills + @('queue-run', 'powerup-auto')
         $agents = $advisors + $designPasses
-        $bins   = @('wait-pr-ci')
     }
     'consult' {
         $skills = @('consult')
@@ -82,15 +78,11 @@ switch ($Skill) {
         $skills = @('design-doc')
         $agents = $designPasses
     }
-    'delivery' {
-        $skills = @('delivery')
-        $bins   = @('wait-pr-ci')
-    }
     'test-filter-hook' {
         $hooks = @('filter-test-output.sh', 'test-output-summary.sh')
     }
     default {
-        # evolve | queue-run — skill only
+        # delivery | evolve | queue-run — skill only
         $skills = @($Skill)
     }
 }
@@ -119,19 +111,16 @@ foreach ($a in $agents) {
     Write-Host "  agent  $a -> $to"
 }
 
-# bin and hook scripts are bash; on Windows they run under Git Bash.
-foreach ($pair in @(@{ Names = $bins;  Src = $srcBin;   Dst = $dstBin;   Label = 'bin   ' },
-                    @{ Names = $hooks; Src = $srcHooks; Dst = $dstHooks; Label = 'hook  ' })) {
-    foreach ($n in $pair.Names) {
-        $from = Join-Path $pair.Src $n
-        if (-not (Test-Path -LiteralPath $from -PathType Leaf)) {
-            throw "install: '$n' not found at $from"
-        }
-        New-Item -ItemType Directory -Force -Path $pair.Dst | Out-Null
-        $to = Join-Path $pair.Dst $n
-        Copy-Item -LiteralPath $from -Destination $to -Force
-        Write-Host "  $($pair.Label) $n -> $to"
+# Hook scripts are bash; on Windows they run under Git Bash.
+foreach ($n in $hooks) {
+    $from = Join-Path $srcHooks $n
+    if (-not (Test-Path -LiteralPath $from -PathType Leaf)) {
+        throw "install: hook '$n' not found at $from"
     }
+    New-Item -ItemType Directory -Force -Path $dstHooks | Out-Null
+    $to = Join-Path $dstHooks $n
+    Copy-Item -LiteralPath $from -Destination $to -Force
+    Write-Host "  hook   $n -> $to"
 }
 
 Write-Host ''

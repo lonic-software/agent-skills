@@ -8,7 +8,7 @@ disable-model-invocation: true
 This is powerup mode running the queue-run chain. It is a wrapper, so it adds no rules of its own
 beyond the composition below.
 
-Read `~/.claude/skills/powerup/SKILL.md` and `~/.claude/skills/queue-run/SKILL.md` now, in full, and
+Read `${CLAUDE_SKILL_DIR}/../powerup/SKILL.md` and `${CLAUDE_SKILL_DIR}/../queue-run/SKILL.md` now, in full, and
 follow both. That includes everything powerup tells you to read in turn. Both skills carry
 `disable-model-invocation: true`, so reading them here is what puts them in force. The arguments of
 this command are queue-run's arguments.
@@ -20,7 +20,7 @@ Open with powerup's announcement, then queue-run's parameter confirmation, in th
 - **Order of work.** Queue-run resolves the run parameters and picks the item. Powerup governs how the
   item is done: design-first classification, delivery disciplines, review loops, advisor use, and the
   evolve loop.
-- **Handoff prompts start with `/powerup-auto`**, never `/powerup` or `/queue-run` alone. This overrides
+- **Handoff prompts start with `/powerup-auto`** (`/lonic:powerup-auto` under the plugin install), never `/powerup` or `/queue-run` alone. This overrides
   powerup's "the prompt starts with `/powerup`". The prompt carries queue-run's run parameters (§4)
   *and* powerup's content: the files the next phase reads first, in order.
 - **Two kinds of boundary:**

@@ -48,7 +48,7 @@ also correctness-critical.
 
 ## How to consult
 
-- Spawn via the Agent tool with `subagent_type: "lonic-advisor-medium"` unless the tier table under *Cost discipline* points elsewhere — `low` for a narrow question with a checkable answer, `high`/`xhigh` only when a lower tier said the question exceeds its depth. It runs in the background by default — keep working on independent things while it thinks, or pass `run_in_background: false` when the answer gates your next step.
+- Spawn via the Agent tool with `subagent_type: "lonic-advisor-medium"` (`lonic:lonic-advisor-medium` when these skills are installed as the `lonic` plugin; use the form your session lists, for every tier) unless the tier table under *Cost discipline* points elsewhere — `low` for a narrow question with a checkable answer, `high`/`xhigh` only when a lower tier said the question exceeds its depth. It runs in the background by default — keep working on independent things while it thinks, or pass `run_in_background: false` when the answer gates your next step.
 - **Send a context package, not a vibe.** State: the decision or problem, the constraints, what you've already tried or considered, the specific files/lines involved, and the exact question. The advisor is read-only and will verify your framing against the source — give it the paths it needs.
 - **Ask for a recommendation**, with reasoning and risks — not a menu of options.
 - **Continue, don't respawn.** Use SendMessage for follow-ups on the same problem (the advisor keeps its context); spawn fresh for unrelated questions.

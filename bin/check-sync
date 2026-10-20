@@ -40,12 +40,10 @@ case "$tool" in
   claude)
     src_skills="$repo_root/claude/skills"
     src_agents="$repo_root/claude/agents"
-    src_bin="$repo_root/claude/bin"
     src_hooks="$repo_root/claude/hooks"
     src_mods="$repo_root/claude/mods"
     dst_skills="$HOME/.claude/skills"
     dst_agents="$HOME/.claude/agents"
-    dst_bin="$HOME/.claude/bin"
     dst_hooks="$HOME/.claude/hooks"
     # Not an install target: mods install as plugins from the repo's `lonic`
     # marketplace. This is where they are developed, and is compared only if
@@ -137,26 +135,22 @@ for path in "$src_agents"/*.md; do
   fi
 done
 
-# Scripts are opt-in (a hook) or ride along with one skill (wait-pr-ci with
-# delivery), so one that is not installed is not drift. One that is installed
-# and differs is.
-for kind in bin hooks; do
-  if [ "$kind" = bin ]; then src="$src_bin" dst="$dst_bin"; else src="$src_hooks" dst="$dst_hooks"; fi
-  echo
-  echo "$kind ($dst):"
-  for path in "$src"/*; do
-    [ -f "$path" ] || continue
-    name="$(basename "$path")"
-    if [ ! -f "$dst/$name" ]; then
-      report "-" "$name — not installed (optional)"
-    elif cmp -s "$path" "$dst/$name"; then
-      report "ok" "$name"
-      matched=$((matched + 1))
-    else
-      report "DIFFERS" "$name"
-      drift=$((drift + 1))
-    fi
-  done
+# Hook scripts are opt-in, so one that is not installed is not drift. One that
+# is installed and differs is.
+echo
+echo "hooks ($dst_hooks):"
+for path in "$src_hooks"/*; do
+  [ -f "$path" ] || continue
+  name="$(basename "$path")"
+  if [ ! -f "$dst_hooks/$name" ]; then
+    report "-" "$name — not installed (optional)"
+  elif cmp -s "$path" "$dst_hooks/$name"; then
+    report "ok" "$name"
+    matched=$((matched + 1))
+  else
+    report "DIFFERS" "$name"
+    drift=$((drift + 1))
+  fi
 done
 
 if [ -d "$dst_mods" ] && [ -d "$src_mods" ]; then

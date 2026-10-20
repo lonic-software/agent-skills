@@ -1,10 +1,17 @@
 {
   "name": "lonic",
-  "owner": { "name": "kolonicsmate" },
+  "owner": {
+    "name": "kolonicsmate"
+  },
   "metadata": {
-    "description": "Claude Code plugins from lonic-software/agent-skills: session handoffs and cost accounting for long, disciplined runs."
+    "description": "Claude Code plugins from lonic-software/agent-skills: the powerup workflow skills, plus session handoffs and cost accounting for long, disciplined runs."
   },
   "plugins": [
+    {
+      "name": "lonic",
+      "source": "./claude",
+      "description": "The powerup workflow skills and their agents: /lonic:powerup, /lonic:powerup-auto, /lonic:consult, /lonic:design-doc, /lonic:delivery, /lonic:evolve, /lonic:queue-run."
+    },
     {
       "name": "phase-handoff",
       "source": "./claude/mods/phase-handoff",
