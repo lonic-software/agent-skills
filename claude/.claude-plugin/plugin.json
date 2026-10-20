@@ -1,0 +1,11 @@
+{
+  "name": "powerup",
+  "version": "2.1.0",
+  "description": "Full-rigor engineering workflow: /powerup:powerup (design-first, disciplined delivery, a consulted advisor, a learning loop) and /powerup:powerup-auto (the same, unattended across a queue within a weekly-usage budget).",
+  "author": {
+    "name": "kolonicsmate"
+  },
+  "homepage": "https://github.com/lonic-software/agent-skills",
+  "repository": "https://github.com/lonic-software/agent-skills",
+  "license": "Apache-2.0"
+}

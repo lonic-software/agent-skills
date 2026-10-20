@@ -12,13 +12,16 @@ myself** — code, tests and designs — and use review and grounding loops to c
 agent across rounds rather than spawning a fresh one each time. Design-class work goes through
 tetel whenever it is installed — that is not a choice to offer (design-doc's routing).
 
-Read `~/.claude/skills/consult/SKILL.md`, `~/.claude/skills/design-doc/SKILL.md`,
-`~/.claude/skills/delivery/SKILL.md`, and `~/.claude/skills/evolve/SKILL.md` now, in full. They carry
+Read `${CLAUDE_SKILL_DIR}/../consult/SKILL.md`, `${CLAUDE_SKILL_DIR}/../design-doc/SKILL.md`,
+`${CLAUDE_SKILL_DIR}/../delivery/SKILL.md`, and `${CLAUDE_SKILL_DIR}/../evolve/SKILL.md` now, in full. They carry
 `disable-model-invocation: true`, so this is the only way to activate them together — reading them
 here is what puts them in force; nothing below substitutes for reading them.
 
 Every conditional inside them — "if `/consult` is active," "if an advisor mode is active" — resolves
 to **true**. What follows is the composition detail none of them states on its own.
+
+**Names.** Installed as the `powerup` plugin, every command and agent these skills name carries a `powerup:` prefix (`/powerup:powerup`, `powerup:lonic-advisor-medium`). Use the form your session lists. In a
+handoff prompt, use the form that started this session.
 
 ## You are the author, not an orchestrator
 
@@ -126,8 +129,8 @@ re-reads. So:
   of the context (R close to C). Estimate R from the files the next phase must read, not from what
   you remember, and start at ~30k: a `/powerup` opening re-reads the five skills and CLAUDE.md before
   any project file.
-- **Test output is filtered before it reaches context.** A PreToolUse hook
-  (`~/.claude/hooks/filter-test-output.sh`) shows only failures and summaries for long runs of
+- **Test output is filtered before it reaches context** when the opt-in PreToolUse hook
+  (`~/.claude/hooks/filter-test-output.sh`) is installed: it shows only failures and summaries for long runs of
   un-piped test commands. Put `FULL_TEST_OUTPUT=1` in the command when the full output is needed.
 
 **Effort: start low, and know which way it cuts.** Newer models deliver at low and medium what older

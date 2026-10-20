@@ -141,7 +141,7 @@ documented — routing decisions elsewhere should cite this section, not restate
   grind on a stuck or flaky pipeline: if CI can't go green for reasons unrelated to the diff, say so
   and proceed to review rather than blocking. Design-doc reviews are exempt — they run inside the
   design loop (see the design-doc bullet below) and gate the doc's content, which CI does not check.
-  Wait for it with `~/.claude/bin/wait-pr-ci <PR>` run in the background — never a hand-written
+  Wait for it with `${CLAUDE_SKILL_DIR}/wait-pr-ci <PR>` (shipped beside this skill) run in the background — never a hand-written
   loop; read its exit status, never a piped summary of it. A wrapper preserves the status of what
   it wraps: no `| tail`/`| head`/`| grep` on a command whose exit status is the verdict — read the
   status first, trim afterwards.

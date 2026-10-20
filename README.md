@@ -82,7 +82,19 @@ Model names (Fable / Opus / Sonnet) are Anthropic-specific. The two design agent
 
 ## Install
 
-### With [pult](https://github.com/lonic-software/pult) (recommended)
+### As a Claude Code plugin (simplest)
+
+```sh
+claude plugin marketplace add lonic-software/agent-skills
+claude plugin install powerup@lonic         # the skills and their agents
+claude plugin install phase-handoff@lonic   # lets /powerup:powerup-auto chain sessions
+```
+
+Plugin skills are namespaced, so the commands become `/powerup:powerup`, `/powerup:powerup-auto`, `/powerup:consult` and so on, and the agents `powerup:lonic-advisor-medium` and so on; the skills know both forms. Update with `claude plugin update powerup@lonic`. The test-output hook is not part of the plugin; install it with pult or by hand.
+
+### With [pult](https://github.com/lonic-software/pult) (unprefixed commands)
+
+This copies the skills into `~/.claude`, so they run as plain `/powerup`, `/powerup-auto` and so on.
 
 This repo is a pult module — run its installer straight from the source, no clone and no manifest, with `pult x`:
 
@@ -92,7 +104,7 @@ pult x github.com/lonic-software/agent-skills install
 
 Drop the trailing args for the guided flow: `pult x github.com/lonic-software/agent-skills` lists the tools (currently only `claude`) and then the skills, with **powerup** on top. A bare source takes the latest tag; pin explicitly with `@v2` if you want.
 
-Selecting **powerup** installs the full bundle (the five skills, their agents, and the `wait-pr-ci` script `delivery` uses); **powerup-auto** adds `queue-run` and its wrapper on top (add the `phase-handoff` [mod](#mods) to let it chain sessions); selecting a single skill installs just that one and what it needs. **test-filter-hook** copies the hook below and prints the `settings.json` entry to add — the installer never edits your settings.
+Selecting **powerup** installs the full bundle (the five skills and their agents); **powerup-auto** adds `queue-run` and its wrapper on top (add the `phase-handoff` [mod](#mods) to let it chain sessions); selecting a single skill installs just that one and what it needs. **test-filter-hook** copies the hook below and prints the `settings.json` entry to add — the installer never edits your settings.
 
 If you reach for it often, `pult includes add github.com/lonic-software/agent-skills --prefix skills` pins it into your own `pult.yaml` so it's `pult skills:install`. Or `git clone` and run `pult install claude powerup` from inside the checkout.
 
@@ -118,14 +130,13 @@ Copy into your Claude Code config:
 ```sh
 cp -R claude/skills/*  ~/.claude/skills/
 cp    claude/agents/*  ~/.claude/agents/
-mkdir -p ~/.claude/bin && cp claude/bin/wait-pr-ci ~/.claude/bin/
 ```
 
 (Overwrites any same-named skills/agents you already have — the skill names are unprefixed.) Then start a session and run `/powerup`, or enable any single skill by name. On the first consult it will ask your preferred advisor model and effort and save them.
 
 ## Mods
 
-This repo is also a Claude Code plugin marketplace, `lonic`, with two mods (plugins written as TypeScript modules, loaded straight from source with no build step). Mods run with your permissions, and an organization can block them with managed settings.
+The `lonic` marketplace also carries two mods (plugins written as TypeScript modules, loaded straight from source with no build step). Mods run with your permissions, and an organization can block them with managed settings.
 
 - **phase-handoff** — a `context` tool that reports context size, cost and rate limits with a handoff break-even, and a `handoff` tool that, at a phase boundary, clears the session and opens the next one with a given prompt after a cancellable countdown. `powerup` and `queue-run` use it; without it they stop and print the next prompt instead.
 - **cost-log** — records each turn's token usage per agent and reports cost-equivalents, heavy turns and cache rebuilds (`/cost-log`, `cost_log` tool).

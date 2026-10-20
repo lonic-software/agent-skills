@@ -44,11 +44,9 @@ case "$tool" in
   claude)
     src_skills="$repo_root/claude/skills"
     src_agents="$repo_root/claude/agents"
-    src_bin="$repo_root/claude/bin"
     src_hooks="$repo_root/claude/hooks"
     dst_skills="$HOME/.claude/skills"
     dst_agents="$HOME/.claude/agents"
-    dst_bin="$HOME/.claude/bin"
     dst_hooks="$HOME/.claude/hooks"
     ;;
   *)
@@ -57,8 +55,8 @@ case "$tool" in
 esac
 
 # --- Which skills + agents does this selection pull in? ---------------------
-# Skills are copied as directories; agents as individual *.md files; bin and
-# hook scripts as individual files. Hooks are copied but never wired in:
+# Skills are copied as directories; agents as individual *.md files; hook
+# scripts as individual files. Hooks are copied but never wired in:
 # settings.json is the user's, so the entry to add is printed instead.
 advisors=(lonic-advisor-low lonic-advisor-medium lonic-advisor-high lonic-advisor-xhigh)
 # Inert without tetel; design-doc routes to them only when it is installed.
@@ -67,18 +65,15 @@ bundle_skills=(powerup consult design-doc delivery evolve)
 bundle_agents=("${advisors[@]}" "${design_passes[@]}")
 skills=()
 agents=()
-bins=()
 hooks=()
 case "$skill" in
   powerup)
     skills=("${bundle_skills[@]}")
     agents=("${bundle_agents[@]}")
-    bins=(wait-pr-ci)
     ;;
   powerup-auto)
     skills=("${bundle_skills[@]}" queue-run powerup-auto)
     agents=("${bundle_agents[@]}")
-    bins=(wait-pr-ci)
     ;;
   consult)
     skills=(consult)
@@ -88,11 +83,7 @@ case "$skill" in
     skills=(design-doc)
     agents=("${design_passes[@]}")
     ;;
-  delivery)
-    skills=(delivery)
-    bins=(wait-pr-ci)
-    ;;
-  evolve|queue-run)
+  delivery|evolve|queue-run)
     skills=("$skill")
     ;;
   test-filter-hook)
@@ -107,7 +98,6 @@ esac
 # Loops expand arrays as ${a[@]+"${a[@]}"}: macOS ships bash 3.2, where an empty
 # array under `set -u` is an unbound-variable error.
 mkdir -p "$dst_skills" "$dst_agents"
-[ ${#bins[@]} -eq 0 ]  || mkdir -p "$dst_bin"
 [ ${#hooks[@]} -eq 0 ] || mkdir -p "$dst_hooks"
 
 for s in ${skills[@]+"${skills[@]}"}; do
@@ -121,13 +111,6 @@ for a in ${agents[@]+"${agents[@]}"}; do
   [ -f "$src_agents/$a.md" ] || die "agent '$a' not found at $src_agents/$a.md"
   cp "$src_agents/$a.md" "$dst_agents/$a.md"
   echo "  agent  $a -> $dst_agents/$a.md"
-done
-
-for b in ${bins[@]+"${bins[@]}"}; do
-  [ -f "$src_bin/$b" ] || die "script '$b' not found at $src_bin/$b"
-  cp "$src_bin/$b" "$dst_bin/$b"
-  chmod +x "$dst_bin/$b"
-  echo "  bin    $b -> $dst_bin/$b"
 done
 
 for h in ${hooks[@]+"${hooks[@]}"}; do
