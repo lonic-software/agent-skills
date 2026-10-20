@@ -9,21 +9,20 @@ disable-model-invocation: true
 Delivery is on — I'll ground handed-down findings — and my own checkable claims — before acting on
 or durably writing them,
 route pre-merge review through
-`/code-review` (after CI is green where a PR with checks exists; medium default; above-medium only
-with your approval), ship one finding per PR, and
+`/code-review` (after CI is green where a PR with checks exists; **run on my own authority,
+capped at medium**), ship one finding per PR, and
 fix the class with run-and-reported revert-checks.
 
 Scope: this skill holds the doctrines that apply to shipping work regardless of which other mode
-is active — orchestrated or not, with or without an advisor, with or without a design doc in
+is active — with or without an advisor, with or without a design doc in
 flight. It is not a junk drawer: a doctrine with a mode-specific home lives there instead of here
-— design-first class criteria belong to design-doc, advisor authorship belongs to consult,
-executor tiering and the foreground/timeout rule belong to orchestrate and the exec agent
-definitions. This skill only owns what has no other home.
+— design-first class criteria belong to design-doc, and advisor mechanics belong to consult.
+This skill only owns what has no other home.
 
 ## A. Evidence rules
 
 Treat every handed-down finding as unverified until you check it against current code — a Jira
-ticket, a prior-session summary, an executor's report, a review finding, a memory file. All of
+ticket, a prior-session summary, a subagent's report, a review finding, a memory file. All of
 these describe a past state of the code or a past act of reading it; none of them are the code
 itself. The memory system already stamps its own reads with exactly this warning — extend that
 caution to every other secondhand claim.
@@ -58,17 +57,58 @@ was false the day it was written. The tell-words are design-doc's substitution v
 way that section sweeps a doc draft. Plain narration needs neither move — the claim that earns one
 is the one a reader would take as a reason.
 
-**The falsifier is not always in the repo.** When a load-bearing claim is about an external
-system's behavior — a server version's defaults, a library's semantics, a platform guarantee; the
-tell is a sentence naming a version, a default, a deprecation, or an implementation limit — no
-grep or local run settles it: the settling check is the system's primary documentation, and the
-claim ships with that source named where the claim lives. Where the doc genuinely cannot be
-fetched, ship the claim marked unverified rather than bare. And gate local experiments by
-substrate before they count as verification: an experiment establishes such a claim only when run
-on the implementation, version, and configuration the claim names; on anything else it corroborates
-the mechanism at best, and a *passing* run on the wrong substrate is the dangerous case — it
-launders an unverified claim into a "tested" one. Name the substrate next to the result whenever
-the two differ.
+**Before a claim gets either move, ask whether it should be prose at all.** This sorts the prose the
+paragraph above names — comments, guide sentences, commit messages; a design doc's claims are
+graded, and design-doc owns them. Sort by what only the sentence can carry:
+
+- *Derivable from the lines it sits beside* — what the code does, restated — carries nothing: the
+  reader has a better falsifier one line down. Cut it. Cut only what *agrees* with the code; a
+  restatement that disagrees is a finding to resolve first, since the code may be the bug (§D, never
+  sync docs to defective code).
+- *An obligation on a future editor* is not a claim and gets neither move — there is nothing to
+  open. §D's obligation bullet owns it: it becomes a mechanism, never a comment.
+- *A fact about an artifact elsewhere that moves* — a grant in another repo, a stack list, a
+  deployed policy, a tool's exit behaviour — is never cut: stated, it can be refuted; unstated, it
+  cannot. Prefer a check that reads that artifact and goes red when it moves (§D's enforcer bullet
+  names the forms). Where no check can be built, the sentence ships with the location and the
+  command that re-derives it, so the next reader re-runs rather than trusts — and is narrowed per
+  the paragraph above.
+- *Why this shape and not the other* — the constraint that forced it, the alternative rejected, the
+  observation that settled it — is kept. Code shows only what won.
+
+**Locate the falsifier before you argue.** A load-bearing claim about behaviour — a default you did
+not pass, what a call returns or throws, what runs before what, what a deployed thing permits — is
+settled in whichever of three places holds the thing that could refute it, and choosing the wrong
+place looks like diligence:
+
+- **In the worktree, including installed and vendored dependencies.** `node_modules/`, `vendor/`, a
+  bundled `dist/` are source on disk, pinned by the lockfile. For a claim about what a library does,
+  that source outranks its documentation, which omits the defaults and error paths the code states
+  plainly. The tell: your sentence is about the *callee* — what it defaults, returns, throws, or
+  does first — and you have opened only the caller. Open the callee; cite its path and the version
+  the lockfile pins.
+- **Outside the worktree.** Apply the worktree test: would the claim's truth be identical on a fresh
+  clone with no network and no credentials? If not — a deployed role's statements, a running
+  service's configuration, an account's state — nothing that reads the tree can settle it: not
+  tests, not synth, not review, and not merge. *Merged* is a claim about the tree. A change whose
+  effect lands in an account is not in force until an artifact read back from that account says so;
+  expect "not deployed" by default, record the deploy as an owed action with its owner, and give the
+  completion record one entry per substrate the change lands on, so an undeployed grant is an empty
+  cell rather than a silence. When you do read the estate, put the identity in the command — a
+  profile, an endpoint, a URL — never through ambient configuration, and name it again beside the
+  result: the ambient identity is precisely the case where you do not know it is the wrong one.
+  (Design-doc's out-of-worktree rule is this test applied to refutations; this is its session-wide
+  form.)
+- **In neither** — a remote platform's guarantee, a service version's documented limit, code you
+  cannot obtain. Then, and only then, the settling check is the system's primary documentation,
+  cited where the claim lives; where it cannot be fetched, the claim ships marked unverified rather
+  than bare.
+
+Gate local experiments by substrate before they count as verification: an experiment establishes
+such a claim only when run on the implementation, version, and configuration the claim names; on
+anything else it corroborates the mechanism at best, and a *passing* run on the wrong substrate is
+the dangerous case — it launders an unverified claim into a "tested" one. Name the substrate beside
+every result, not only when you believe it differs.
 
 Verification sometimes shows the finding was wrong — a cited function no longer exists, a line
 number has drifted, a described behavior doesn't reproduce. That outcome is a first-class
@@ -99,30 +139,54 @@ documented — routing decisions elsewhere should cite this section, not restate
   owns. This **orders** the gates, it does not merge them — green CI is necessary, never sufficient,
   and never substitutes for the review. Skip the wait when there is no forge or no CI, and don't
   grind on a stuck or flaky pipeline: if CI can't go green for reasons unrelated to the diff, say so
-  and proceed to review rather than blocking. Design-doc reviews are exempt — they are user-launched
-  (see the design-doc bullet below) and gate the doc's content, which CI does not check.
-- **Default to medium effort.** Drop to **low** only for changes that are genuinely simple and
-  small — a rename, a localized fix, boilerplate.
-- **Above-medium (high/ultra) is expensive and user-gated.** Never auto-trigger it. The routine,
-  autonomous pre-merge gate is low or medium; above-medium is *offered*, never launched on your own
-  authority.
-- **The offer must be evidence-shaped**, mirroring the same discipline orchestrate applies to
-  executor escalation: offer above-medium only when you can name a concrete reason medium won't
-  suffice — the change sits in the contract/failure-path class, the diff is too large for one
-  reviewer to hold at once, or a medium round already produced findings whose fixes touch a shared
-  primitive (the escalating-rounds pattern; see §C). "This matters" is not a reason — gravity is
-  not evidence. State the cost plainly and let the user decide.
-- **Check the economics before offering.** Pressure for an expensive code review is often the
-  symptom of a skipped design review, not a reason to spend more on code review. Before offering
-  above-medium, ask whether this was design-doc-class work that skipped its doc — if so, the fix is
-  a design doc, not a bigger review.
-- **Design-doc reviews are `/code-review`, but user-launched — not part of the autonomous pre-merge
-  gate.** A design doc flagged ready-for-review is reviewed by running `/code-review` on the doc;
-  the design-doc skill's flag-and-stop rule owns *when* — the user launches it, you never
-  auto-trigger it as part of the pre-merge gate. The user picks the tier at launch — the tier
-  gating above governs only reviews launched on your own authority, and a user-launched review is
-  user-approved at whatever tier the user names. If asked to recommend a tier, apply the same
-  evidence-shaped reasoning as above.
+  and proceed to review rather than blocking. Design-doc reviews are exempt — they run inside the
+  design loop (see the design-doc bullet below) and gate the doc's content, which CI does not check.
+  Wait for it with `~/.claude/bin/wait-pr-ci <PR>` run in the background — never a hand-written
+  loop; read its exit status, never a piped summary of it. A wrapper preserves the status of what
+  it wraps: no `| tail`/`| head`/`| grep` on a command whose exit status is the verdict — read the
+  status first, trim afterwards.
+- **One reviewer per change, resumed across rounds.** Invoke `/code-review` **once**; drive later
+  rounds by `SendMessage` to that instance. Verified: a completed review agent resumes with its diff,
+  its mutation runs and its findings intact. A repeat `Skill` call always starts a new one. **A
+  reviewer's cache lasts five minutes** (the subagent default; a forked `/code-review` takes no
+  per-agent TTL). A resume within that window re-reads at 0.1x; a later one rebuilds the reviewer's
+  whole context at 1.25x. Read the gap from the reviewer's transcript timestamp rather than
+  estimating it. Resume a small reviewer regardless. For a large one,
+  compare the rebuild (about 1.25x its context) against a fresh `/code-review` carrying the full block
+  above. Measured at ~100k, the two cost about the same, so resume unless the reviewer has grown well
+  past that.
+- **Later rounds scope *effort*, never permission.** Say what changed and ask it to judge the fixes
+  and what they broke; never re-post the diff it already holds. Do not hand it your fix description
+  as settled — that is the scoped review this section warns against two bullets down, wearing your
+  own words. A resumed reviewer may also anchor on a verdict it already gave, so **name the changed
+  regions explicitly** rather than trusting it to re-derive them.
+- **Rounds end on the finding class, not on a count.** Keep going while any finding affects the
+  *semantics* of the code; stop when a round returns none. Wording, naming and a comment that
+  overstates are recorded and fixed, and buy no further round.
+- **Run the review on your own authority. Medium is the cap, not the default.** Launching the
+  pre-merge review is routine and wanted — do not gate it on the user, do not offer it, just run it.
+  What is capped is the *tier*: **medium is the ceiling** for any review you launch yourself. Drop to
+  **low** only for changes that are genuinely simple and small — a rename, a localized fix,
+  boilerplate.
+- **Never launch above medium on your own authority, and do not offer to.** high/ultra costs several
+  times medium and, measured across a long session, returns the same defect classes. If the user
+  names a higher tier, run what they name; if asked to recommend one, recommend medium and say what
+  you would scope it to; otherwise the ceiling holds without discussion.
+- **The cap erodes silently, so watch for the rationalization rather than the rule.** This drifts
+  the same way every prose rule in this file drifts — not by being disagreed with but by each
+  individual case feeling like the exception. The tells are specific and they all sound like
+  diligence: the material is subtle, it is authorization or a failure path, the last round found
+  something serious, the diff is large, a fix round touched a shared primitive. **None of those is a
+  reason to exceed the cap** — they are reasons to scope the review tightly, name the risk in the
+  args, and run it at medium. A review at medium that is pointed at the right surface beats a high
+  review pointed at everything.
+- **If medium genuinely is not enough, the tier is the wrong lever.** Pressure for a bigger review is
+  usually the symptom of a skipped design review, an unscoped diff, or work that should have been
+  sliced smaller. Ask which of those it is. Raising the tier buys a more thorough pass over the same
+  material; splitting the change or writing the design doc changes the material.
+- **Design docs are never `/code-review`-ed by the pre-merge gate and never by the user.**
+  `design-doc` owns which path reviews a doc and when it closes; where that path is `/code-review`
+  (no tetel), you launch it yourself under the cap above.
 - **Every review you suggest or hand off ships with its command — every time, including repeats.**
   This holds whether you raised the review or the user asked for it, and **whether or not you gave
   the same command in an earlier turn**. Never write "the command from before", "as above", or a
@@ -176,7 +240,7 @@ documented — routing decisions elsewhere should cite this section, not restate
   overrule, so name what a skipped area could hide and what it would cost to include it. A scope
   the user cannot see is one they cannot correct.
 - **Report tier choices like spawn costs.** State which tier you ran and why, the same way
-  orchestrate reports every executor spawn's configuration — the user is tracking review spend the
+  the user is tracking review spend the
   same way they track model spend.
 
 ## C. Shipping cadence
@@ -208,10 +272,32 @@ regression test while the class stays broken.
 - **Reuse existing helpers** before writing new comparison or guard logic — check for the helper
   that already solves it one file over.
 - **Prefer moving the guarantee into the primitive** over special-casing every call site, so future
-  callers can't get it wrong.
+  callers can't get it wrong — the guarantee, and only the guarantee. What depends on context the
+  primitive cannot see (how a failure is presented, what the caller or user is told to do next)
+  belongs to the caller; a primitive that guesses it is right for one caller and wrong for the
+  rest. Anything a primitive tells its caller to *do* is a claim that must hold on every path that
+  can reach it: offer it only where it does, pin it with a test that performs it, and otherwise
+  state the fact alone. "This primitive serves caller X" is a caller-enumeration claim and owes the
+  sweep above when it is made; a sweep done earlier for a different question does not discharge
+  it.
+- **An obligation written in prose is a guard that is not there.** "Update this list when you add a
+  statement", "a new key belongs on the base set too": writing it down feels like discharging it and
+  discharges nothing — the editor it addresses is exactly the one who did not read it. Convert
+  before merge: an exact-set assertion, a compile-time shape (`Record<keyof T, …>`), or a test that
+  fails on the edit the comment warns about; the test then owes the revert-check below. The sharpest
+  tell is an allowlist or coverage mirror entry annotated with why it does not yet qualify — that is
+  the guard disarmed in writing, and merging it puts every run past the check it was built to fail.
+  A hand-maintained list mirroring a truth held elsewhere is the coverage-claim bullet below with
+  its domain written by hand: the mechanism is a check against the artifact it mirrors, never a
+  reminder to keep it in sync. If the obligation cannot be mechanised, that is a finding about where
+  the invariant lives — the bullet above — not a licence to leave the comment.
 - **Revert-check, run and reported — both directions.** No durability or contract clause ships
   without a test demonstrated **green with the fix in place and red when the fix — and only the fix
-  — is reverted**. Both runs must actually be **run** and their output reported; never asserted. A
+  — is reverted**. Revert means the mutation of the property the test exists to exclude, not removal
+  of the feature: a test red when the whole feature is absent and green when it is present has shown
+  that the feature exists — the wrong value origin, the wrong region, the re-seeded field are all
+  still green. Name the wrong behaviour, mutate to it, show the red. Both runs must actually be
+  **run** and their output reported; never asserted. A
   red-only report — a pinning test committed "red for the predicted reason" — establishes nothing by
   itself: red in both worlds pins as little as green in both. At code time both worlds exist, so
   neither direction may be left owed at merge. (Design-doc names each invariant's observable and
@@ -235,6 +321,19 @@ regression test while the class stays broken.
   strictly smaller than the claimed domain of every client, with nothing making them equal. Do not
   expect a mutation-testing CI lane to cover this — source substitution is not an operator such
   tools generate.
+- **A green reachable without the property certifies nothing.** Beside coincident values (above),
+  three more ways a test's green does not depend on what it is named for: a **fake that answers what
+  the real dependency could not** for the request the code actually sent — a region-blind stub, a
+  stand-in that skips the guard under test — so the test measures the fake's generosity; an
+  **assertion the empty case satisfies** — "touched neither X nor Y" over a set that iterated
+  nothing, "still empty" where the wrong path also writes empty; and an **expected value derived
+  from the implementation itself** — a message checked against the constant it was formatted from,
+  a shape checked against a sibling built by the same helper — so any wording or shape passes,
+  including the wrong one that shipped. Give the fake exactly the refusals the real thing has; pair
+  every negative with the positive that shows the domain was non-empty and the guard engaged; assert
+  against a source independent of the code under test — a literal, the documented contract, or a
+  property the output must satisfy. The one question for all four: what would have to change for
+  this test to go red, and is it the property?
 - **A red run certifies the assertion that produced it — name it.** "The file went red" attributes
   nothing: with neighbours in the test, any of them can supply the red while the shipped assertion
   asserts nothing at all — the incident seeding this bullet shipped `not.toBe` on an array,

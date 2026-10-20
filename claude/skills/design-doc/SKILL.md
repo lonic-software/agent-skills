@@ -7,8 +7,8 @@ disable-model-invocation: true
 
 **When this skill is enabled, open your response by telling the user, in 1–2 sentences:**
 Design-doc mode is on — for design-first work (durability, concurrency, shared primitives, new
-invariants) I'll write a grounded design doc first, every claim cited to source, and stop for your
-review before implementing.
+invariants) I'll write a grounded design doc first, every claim cited to source, and close it through
+attack and grounding rounds before implementing.
 
 Enabling this skill sets a rule for the rest of the session; it is **not** a request to write a
 design doc right now. From now on: a change in the design-first class (next section) gets a design
@@ -25,32 +25,121 @@ before you start, because the wrong one wastes a review round:
   weaker instrument for the same artifact, and by the time the loop stops, the memo has been graded
   by more independent passes than a review round supplies.
 - **tetel is not installed** → this is the fallback, and everything below about the claims ledger,
-  the spike ledger and falsifying tests is how you get the same discipline by hand. Flag the doc
-  ready-for-review and **stop** — the user launches `/code-review` on it. Hand over the full
-  paste-ready command, every time you suggest a round including repeat suggestions; `delivery` §B
-  owns what that command must carry.
+  the spike ledger and falsifying tests is how you get the same discipline by hand. You launch
+  `/code-review` on the doc yourself, under `delivery` §B's medium cap, alongside the advisor's
+  attack where consult mode is on, and revise until the rule under **When the design phase ends**
+  fires.
+
+**The route is decided by the two bullets above, never by asking.** Do not offer the user a choice
+and do not wait for an opt-in. "Installed" includes deferred tools: if `mcp__tetel__*` names appear
+in the deferred-tool list, load them and take the tetel route.
+
+**Design route preference (`~/.claude/lonic/design.md`).** A user may record that they want tetel,
+in the same human-editable form as consult's advisor preference:
+
+```
+route: tetel
+```
+
+- **Absent file** → availability alone decides, as above. Do not ask the user to create one.
+- **"I prefer tetel for design"** (or similar) → create or update the file.
+- **File says `tetel` and tetel is not installed, or is failing** (the tools absent, the server not
+  answering, `brief`/`run` erroring past a retry) → **stop and tell the user** what is missing or
+  failing, before any design work. Do not silently fall back to the hand-written route; fall back
+  only when the user says to, for that design.
+- **Without the file**, a tetel failure mid-design is still reported to the user before you
+  continue; whether to fall back is your call.
+
+**Neither path includes a user review.** The rounds are the review; the user does not read the
+design before implementation, and nothing here waits for them to.
 
 The rest of this skill applies to both. The method is the same; only who checks it differs.
 
 ## The grounding loop
 
-**Only when tetel is installed.** You do not author the design yourself — you run the loop around
-it, and each stage is a fresh agent so no stage inherits another's context. A design run's cost is
-`requests × context carried`, and holding one context open across the whole loop has been measured
-at 95% of a run's cost, most of it re-reading a context that had stopped changing.
+**Only when tetel is installed.** **You author the memo and you revise it.** The loop is the two
+instruments you cannot be — an attacker and a grounder — run around your own work.
 
-1. **`lonic-designer`** authors until its first machine-clean render, then stops and hands back a
-   workspace and a memo path. It grades nothing.
-2. **Then, each round, in this order:** an attacker pass; then a **fresh `lonic-reviser`** with the
-   workspace, the memo and the verdict records, if the attacker returned anything to answer; then a
-   grounding pass over what the revision left owed.
+1. **You author** in a tetel workspace until the first machine-clean render.
+2. **Then, each round, in this order:** an attack pass; then **you revise** to answer whatever it
+   returned; then a grounding pass over what the revision left owed (the brief's `owed` line names
+   exactly that set).
 3. Repeat from 2 until the stopping rule below fires.
 
-**The reviser goes between them, not after both.** An attacker that refutes has just established
+**Cost lives in carrying, and a pass stays warm for an hour.** A pass re-reads its whole context on
+every turn. The attacker and grounder definitions carry `experimental: cacheTtl: 1h`, so a resume
+within an hour of the pass's last request re-reads at 0.1x. The default for subagents is five minutes,
+which a revision round always outlasts; that cost one measured design two ~300k rebuilds. Past the hour, a fresh pass
+(memo path and workspace name only, as below) is favoured on paper: its predecessor's verdicts are
+already records, and `check` counts it as a second independent workspace. Measure it the first time,
+since no fresh pass has been costed yet.
+
+**The revision goes between them, not after both.** An attacker that refutes has just established
 that some wording is wrong; a grounding pass run beside it grades claims that are about to change,
 and a revised claim's earlier gradings no longer match its digest, so those records strand on
 arrival. Answer the attack first, then ground what the answer left owed — the brief's `owed` line
 names exactly that set.
+
+### Authoring the memo — the rhythm
+
+Run `brief` with `authoring: true` once at the start; **its rhythm section is the rhythm.** `run` the
+commit check first and make the pin your first claim. After that there are no phases.
+
+Work in **questions** — one design decision at a time, small enough to settle with a handful of
+observations. **Document order is not authoring order**: `prose --before <ID>` places a block where it
+belongs, so you never trade a readable memo for an honestly-built one. Deciding a question's *answer*
+before observing is the failure this method exists to prevent.
+
+- **Inside a question, `look`/`run` is the read path.** `Read`/`Grep`/`Glob` find *which* file matters;
+  the moment you know, switch. Reading a file with `Grep` until you understand it and re-opening it
+  with `look` so `fact` has something to point at records the act and loses the finding.
+- **Read in ranges, and it matters most at the start.** Anything loaded in the first ~30 tool calls is
+  re-read on every later request and charged roughly **15x** its size; the same bytes late cost ~3x.
+  Measured across two runs, the opening 30 requests carried **~73%** of the entire tool-result cost.
+- **When a fact refuses a direction, that is the method working.** The `--why` on the revision names
+  that fact's id, so the refutation becomes load-bearing. Three signatures mean thrashing instead:
+  the same decision flips twice with no new fact between the flips; you reach for `fact --revise` on a
+  load-bearing fact (facts should almost never be revised, claims often); or a `--why` citing
+  preference rather than a fact id.
+- **Two reversals of one decision with no new evidence between them means the evidence cannot decide
+  it.** Stop. Report both directions, the fact blocking each, and the observation that would
+  discriminate. That is a result. Do not take a third option — one chosen under no new evidence was
+  chosen by the process that already failed twice.
+
+**The editorial pass mints nothing.** When the last question is settled, `review` every paragraph
+beside the claims it cites, then `prose --revise` for flow only. No new facts, no new claims — if the
+document needs an assertion it lacks, that sends you back into the loop, not into prose. It also
+cannot reorder, so choose placement as you write. This is not tidiness: the highest-severity defect in
+this project's first tetel memo was a keystone claim that existed **only in prose**, under a citation
+to a claim that said something else, and it entered during exactly such a writing phase. Read the
+block ids from `query prose` immediately before any batch of `prose --revise`; never reconstruct them
+from memory or by counting. Ids are permanent but positions are not — an inserted block keeps its own
+id wherever it lands (`P35` can sit between `P19` and `P20`), so any count is off by one past the
+first insertion, and the row number `query prose` prints is a position, not an id. A revise against
+the wrong id silently overwrites whatever block holds it; twice in one memo that replaced headings.
+
+Then `render --out`, then `check`. Be machine-clean before spending a grounding pass.
+
+### Answering a verdict
+
+- **`refutes`** → the claim is wrong. **Fix the design, not the wording.** Redesign as far as the
+  refutation reaches, keystone included. Rewording a refuted claim until it sounds survivable is the
+  failure an under-pressure loop breaks into first.
+
+  **Match the refuter's substrate.** Every witness is a `run`, so its kind tells you nothing — read the
+  extent of the witnessing fact and ask: *would its output have been byte-identical on a fresh clone of
+  the pinned commit, with no network and no credentials?* If not, it observed the world outside the
+  tree, and your replacement must cite a `run` of your own against that same substrate this round.
+  Source reads are corroboration, not the instrument. If the substrate cannot be reached, return the
+  claim as execution-owed rather than replacing it. **A refutation has jurisdiction over siblings**:
+  check every other claim asserting that substrate's behaviour, not only the one the record names.
+  Where the witness *was* worktree-determined, answer at the same depth and do not reach for a live
+  call the argument settles.
+- **`qualifies`** → it holds only under a condition it does not state. State the condition or narrow
+  the claim. A qualification naming one clause is a one-clause fix; one about what the grader *could
+  not establish* means the design owes more evidence, not better prose.
+- **`supports`** → nothing is owed. **Do not revise a supported claim for style** — you would put it
+  out of proof and buy another pass to return to where you already were.
 
 ### Dispatch rules that are not negotiable
 
@@ -62,9 +151,10 @@ context. Never poll for an agent.
 
 **Never run the attacker and a grounder at the same time, and run the attacker first.** They
 overlapped on 7 of 7 passes in one measured run purely because both were dispatched detached. The
-order matters on cost: an attacker costs about a minute and provokes roughly 0.83 revisions per
-record, a grounding pass costs fifteen to twenty minutes and provokes 0.06–0.47. Running the cheap,
-high-yield instrument first means the expensive one grades wording that has already survived attack
+order matters on yield: an attack pass and a grounding pass cost about the same per round (measured
+attacker round 0 on two designs: 57 turns in 14 minutes, and 64 turns in 23 minutes), but the attacker
+provokes roughly 0.83 revisions per record and a grounding pass 0.06–0.47. Running the high-yield
+instrument first means the grounder grades wording that has already survived attack
 — and a revision landing mid-pass strands that pass's records, because a revised claim's earlier
 gradings no longer match its digest.
 
@@ -72,8 +162,8 @@ gradings no longer match its digest.
 does not discriminate — every witness is a `run` — so apply the substrate test to the refutation's
 witnessing command: would its output have been identical on a fresh clone of the pinned commit, with
 no network and no credentials? When it would not — the command interrogated the deployed system, not
-the tree — say so in the reviser's brief, and a returned revision whose replacement claims cite no
-observation of that substrate is not attacked next: it is rejected and re-briefed. Prose and
+the tree — say so when you revise, and a revision whose replacement claims cite no
+observation of that substrate is not attacked next: it is rejected and redone. Prose and
 source-reads have just been demonstrated to lack jurisdiction over that question, and dispatching
 review at its successor re-runs the demonstrated failure. Measured once: three read-mechanism claims
 asserted in prose were each refuted against the live system by a later pass — five rounds, ~4.5M
@@ -86,9 +176,24 @@ summary of the reasoning, no note about which claims you are unsure of. It runs 
 the propositions are byte-identical, and it has no read path into the author's workspace. Every word
 you add is a channel for handing over the answer. Name workspaces for the pass — `k1-<design>-grounder`,
 then `k2-…`; `a1-<design>-attacker`, then `a2-…` — so independence is recomputed from identity
-rather than trusted from a label. **A pass is fresh every time:** never reuse a pass workspace, and
-never re-run a grounder over a memo it has already graded, because its second look is not
-independent of its first.
+rather than trusted from a label.
+
+**Send a grounder only claims it can actually reach.** Ground what a claim asserts about *the tree* —
+what the code does, what a constraint admits, what exists and what does not. A grounding pass is
+barred from reading the design directory, so **a claim that quotes your own planning documents is
+ungradable by any bound pass**: the only party who can reach it is you, the least independent one.
+Grade those yourself, state the non-independence in the record's note, and let `check` report them as
+attested. Better still, rewrite such a claim to assert the tree property it is standing in for — then
+a grounder can grade it after all.
+
+**Resume a pass across rounds of the same design; spawn a new one for a new design.** A resumed
+grounder keeps its workspace, so `check` still computes it as non-author, and it keeps everything it
+learned about the tree, which makes round two faster, and cheap while it is inside its cache
+lifetime (above). The cost is real and bounded: `check`
+will report **one** distinct non-author workspace rather than several, and a second look by the same
+context is weaker evidence than a first look by a new one. Spend a fresh pass where that weakness
+would matter — a claim nothing else covers, or one a resumed pass has already graded `supports` and
+would now have to contradict itself to refute.
 
 **A designer's brief leads with the deliverable's surface; the open questions come second.** The
 question list you attach becomes the scope whether you mean it to or not — the designer answers the
@@ -223,11 +328,12 @@ the rest is still a good doc. A doc that follows all the scaffolding and violate
 exact failure this skill exists to prevent — worse than no doc, because it reads as rigorous.
 
 "Opened" means you read the actual lines, this session, at the path and line you are about to
-cite. Not "I recall that function," not "the other memo says," not "the executor reported."
+cite. Not "I recall that function," not "the other memo says," not "a subagent reported."
 Line numbers drift; files get split; a citation into a file shorter than the line number you
 wrote is a real thing that has happened.
 
-For a claim about an external system, the thing to open is its primary documentation — delivery §A
+For a claim about an external system, the thing to open is its installed source where that is on
+disk, else its primary documentation — delivery §A
 owns that rule — and the citation names the document and section in place of a path and line.
 
 ## The claims ledger
@@ -295,7 +401,7 @@ move it out and tag it.
 ### A load-bearing unknown is an open task, not a disclosure
 
 Writing "UNKNOWN, must be resolved before implementing" on a claim the design rests on does **not**
-make the doc ready. It makes the doc unfinished, in writing. The doc is not ready for review until
+make the doc ready. It makes the doc unfinished, in writing. The doc is not ready to close until
 every load-bearing claim is `VERIFIED` or `ARGUED` from verified facts.
 
 This is the tagging system's own failure mode, so watch for it specifically: **a stated unknown
@@ -304,7 +410,8 @@ stopped reading." The honest label supplies the feeling of rigour without the ri
 survives review, because a reviewer will not challenge something you have already flagged.
 
 Before flagging anything UNKNOWN, ask: *could I resolve this by opening one more file — or, for a
-claim about an external system, by fetching its primary documentation?* If yes, that is not an
+claim about an external system, by opening its installed source or fetching its primary
+documentation?* If yes, that is not an
 unknown — that is the next thing to read; for the external-system case delivery §A owns the
 evidence rule, and a platform guarantee or a third-party behaviour is settled against its primary
 documentation, not parked under a label. Reserve UNKNOWN for what has nothing left to open — a
@@ -339,7 +446,11 @@ wrong, and work in that medium — never substitute a cheaper one:
 - **An execution** — claims about mechanism behaviour: what code does on given inputs, including
   inputs from states that do not exist yet. Spike or build first; prose may *record* a mechanism
   an execution has pinned, never assert one in advance. If nothing shipped can build the fixture,
-  the claim is execution-owed, not arguable.
+  the claim is execution-owed, not arguable. Once the code exists, record a pinned mechanism as a
+  pointer — the symbol and the test that pins it — not a paraphrase of its behaviour: a paraphrase
+  is graded once and the code it describes keeps changing, and nothing re-grades it. Reserve the
+  doc's evidence for what reading the code cannot recover — the constraint that forced the shape,
+  the alternative rejected, the observation that settled it.
 - **A constructed attack** — claims about what an adversary can do against a specified interface.
   Prose design plus adversarial review is the right instrument.
 - **Neither** — forward contracts and format ratchets, rules for readers that do not exist yet.
@@ -497,14 +608,13 @@ is the system working, not the stopping rule failing.
 
 ## When it is ready
 
-Check before flagging it:
+Check before closing it:
 
-- **If an advisor mode is active, the advisor authored the design substance and has seen the
-  finished doc.** In that mode the division of labour is not optional and not a question of how
-  confident you feel: the advisor authors the recommendation, alternatives and invariants; you
-  ground every claim in `file:line`, transcribe, and feed discrepancies back. Doing the verification
-  yourself is the scribe's job done well — it does not make you the author. Check the consult skill
-  for the exact contract rather than reconstructing it from memory.
+- **If an advisor mode is active, the advisor has attacked the finished doc**, and every finding it
+  marked as changing what gets built is resolved. The main session authors the design — the
+  recommendation, alternatives and invariants — and the advisor's role is the adversarial read, not
+  authorship. Check the consult skill for the exact contract rather than reconstructing it from
+  memory.
 - Every load-bearing claim is `VERIFIED` or `ARGUED` with its premises named — **no load-bearing
   `UNKNOWN` or `ASSUMED` survives.** Any that remain are non-load-bearing and say so explicitly,
   singly or behind a passage-level fence.
@@ -531,10 +641,11 @@ Check before flagging it:
 - The class analysis enumerates call sites with a per-site verdict, including the ones correct as
   written.
 
-Then stop, and hand over according to the path you were on. **Under tetel**, the loop has already
-reviewed it — report the memo path, the `check` verdict and the surviving qualifications, and say
-the design phase is closed; do not queue a `/code-review` round on the doc. **Without tetel**, flag
-it ready-for-review and end with the paste-ready `/code-review` command per `delivery` §B.
+Then report the close according to the path you were on. **Under tetel**, report the memo path, the
+`check` verdict and the surviving qualifications, and say the design phase is closed; do not queue a
+`/code-review` round on the doc. **Without tetel**, report the `/code-review` rounds you ran and what
+each changed.
 
-Either way, do not begin implementation. The doc's job is to be wrong cheaply, before the code makes
-it expensive.
+A closed design is ready to implement. The end of a design is a phase boundary — `powerup`'s
+phase-boundary rule owns whether to hand off there. Never begin implementation before the close: the doc's job is to be wrong cheaply,
+before the code makes it expensive.

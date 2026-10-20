@@ -6,9 +6,9 @@ The headline is **`/powerup`**: one command that switches the whole disciplined 
 
 ## `/powerup` — full-rigor mode (start here)
 
-Enabling `/powerup` activates all five skills below at once, plus the composition rules none of them state alone. In this mode the assistant:
+Enabling `/powerup` activates `consult`, `design-doc`, `delivery` and `evolve` at once, plus the composition rules none of them state alone. In this mode the assistant:
 
-- **orchestrates** — stays in the planning-and-review seat and hands execution to subagents, so big changes stay reviewable;
+- **authors the work itself** — code, tests and designs are written in the main session, whose context is already warm, rather than handed to executor subagents that each pay to rebuild a worse copy of it (measured: delegation moved the growing context, it did not bound it). Subagents are kept for review, grounding and advice, and are resumed across rounds instead of respawned;
 - **consults an advisor** — pulls in a more capable model for the calls where judgment is the bottleneck;
 - **designs before coding** — when the work involves real design decisions, produces a grounded design first and stops for your review before implementing (with [tetel](https://github.com/lonic-software/tetel) installed, that design is authored against captured evidence and independently graded — see below);
 - **ships with discipline** — the home for the shipping doctrines that keep work high-quality, efficient, and stable as it lands;
@@ -32,32 +32,34 @@ Then `/powerup` hands you a design that survived that loop, or an explicit state
 
 **Why this improves more than your design docs.** Design quality is upstream of everything: the implementation is built from the design, so a design that was never checked against the code propagates into code that inherits its wrong assumptions. tetel improves the design **directly** and the resulting implementation, tests, and review rounds **indirectly** — which is where most of the benefit actually lands, because that is where most of the work is.
 
-Three of the agents in this repo (`lonic-designer`, `lonic-grounder`, `lonic-design-attacker`) exist only to drive that loop and do nothing without tetel installed. Everything else here works unchanged with or without it — `/powerup` falls back to grounded design docs written the `design-doc` way.
+Two of the agents in this repo (`lonic-design-attacker`, `lonic-grounder`) exist only to drive that loop and do nothing without tetel installed. Everything else here works unchanged with or without it — `/powerup` falls back to grounded design docs written the `design-doc` way.
 
 ## The skills
 
 | Skill | What it does | Portability |
 |---|---|---|
-| **powerup** | Turns the whole disciplined workflow on for a session — every skill below, plus the rules for how they work together | Claude Code (the Skill/agent machinery) |
-| **orchestrate** | Keeps planning and review in your main session and hands the actual editing to subagents, so large changes stay reviewable | Claude Code (subagents, worktrees, model tiers) |
+| **powerup** | Turns the whole disciplined workflow on for a session — every skill below, plus the rules for how they work together, cache-aware agent reuse, and phase handoffs | Claude Code (the Skill/agent machinery) |
 | **consult** | Brings in a second, more capable model for the moments where judgment — not typing — is the bottleneck | Claude Code mechanics; the *when-to-consult* doctrine is portable |
 | **design-doc** | Insists on a grounded design doc before code when the work involves real design decisions, so the load-bearing assumptions surface and get tested before they cost you | **Portable** — near-pure engineering method |
 | **delivery** | The home for the shipping doctrines that keep work high-quality, efficient, and stable as it lands | Mostly portable; the review-routing section is built on `/code-review` |
 | **evolve** | Lets a recurring pattern harden into a durable rule, so the skills sharpen with use instead of drifting | Portable idea; the advisor-gate + memory system are Claude Code |
+| **queue-run** | Works through a project's queue unattended, one item per fresh session, until weekly usage reaches a threshold you set for the run (`/queue-run stop at 60%`) | Claude Code; hands off via the `phase-handoff` mod |
+| **powerup-auto** | `/powerup` + `/queue-run` in one: the queue, worked at full rigor | As above |
+
+`orchestrate` and its `lonic-exec-*` executors were retired in favour of the main session authoring the work itself; see *You are the author* in `powerup`.
 
 Everything lives under `claude/` because even the doctrine-heavy skills reference Claude Code constructs (the `/code-review` command, the advisor agent, the memory system). The **engineering principles** inside `design-doc` / `delivery` / `evolve` carry over to any agent framework; the **mechanics** don't. If this repo ever grows a non-Claude implementation, those doctrines are the parts worth porting.
 
 ## The agents
 
-Nine subagents the skills spawn, under `claude/agents/`:
+Six subagents the skills spawn, under `claude/agents/`:
 
-- `lonic-exec-{medium,high,xhigh}` — executors for `orchestrate`, by reasoning effort (medium = mechanical, high = default, xhigh = gnarly). Sonnet.
-- `lonic-advisor-{medium,high,xhigh}` — the read-only advisor for `consult`, by effort.
-- `lonic-designer`, `lonic-grounder`, `lonic-design-attacker` — the [tetel](https://github.com/lonic-software/tetel) design loop: the designer authors against captured evidence, the grounder re-derives each claim from source with the author's scope withheld, and the attacker attacks what the claims jointly support. **These three require tetel** and are inert without it; the other six are unaffected.
+- `lonic-advisor-{low,medium,high,xhigh}` — the read-only advisor for `consult`, by effort (low = narrow questions you can grade at once; medium is the default).
+- `lonic-design-attacker`, `lonic-grounder` — the [tetel](https://github.com/lonic-software/tetel) design loop: you author the memo against captured evidence, the attacker attacks what its claims jointly support, and the grounder re-derives each owed claim from source with the author's scope withheld. **These two require tetel** and are inert without it; the advisors are unaffected.
 
 The `lonic-` prefix is a brand namespace so these don't collide with your own agents.
 
-Model names (Fable / Opus / Sonnet) are Anthropic-specific. The three design agents run on **Opus** deliberately: they are long, tool-heavy loops, and running them on Fable was measured consuming an extreme amount of tokens for the same work — not a default anyone should inherit. The advisor is the opposite case, being consulted rarely and for judgment only, so its **model and default effort are a per-user preference** stored at `~/.claude/lonic/advisor.md`; `consult` asks once on first use (recommending Fable, with its plan/cost caveats, and Opus as the strong alternative) and remembers.
+Model names (Fable / Opus / Sonnet) are Anthropic-specific. The two design agents run on **Opus** deliberately: they are long, tool-heavy loops, and running them on Fable was measured consuming an extreme amount of tokens for the same work — not a default anyone should inherit. The advisor is the opposite case, being consulted rarely and for judgment only, so its **model and default effort are a per-user preference** stored at `~/.claude/lonic/advisor.md`; `consult` asks once on first use (recommending Fable, with its plan/cost caveats, and Opus as the strong alternative) and remembers.
 
 ## Install
 
@@ -71,7 +73,7 @@ pult x github.com/lonic-software/agent-skills install
 
 Drop the trailing args for the guided flow: `pult x github.com/lonic-software/agent-skills` lists the tools (currently only `claude`) and then the skills, with **powerup** on top. A bare source takes the latest tag; pin explicitly with `@v1` if you want.
 
-Selecting **powerup** installs the full bundle (all five skills + their agents); selecting a single skill installs just that one and the agents it needs.
+Selecting **powerup** installs the full bundle (the five skills, their agents, and the `wait-pr-ci` script `delivery` uses); **powerup-auto** adds `queue-run` and its wrapper; selecting a single skill installs just that one and what it needs. **test-filter-hook** copies the hook below and prints the `settings.json` entry to add — the installer never edits your settings.
 
 If you reach for it often, `pult includes add github.com/lonic-software/agent-skills --prefix skills` pins it into your own `pult.yaml` so it's `pult skills:install`. Or `git clone` and run `pult install claude powerup` from inside the checkout.
 
@@ -97,9 +99,35 @@ Copy into your Claude Code config:
 ```sh
 cp -R claude/skills/*  ~/.claude/skills/
 cp    claude/agents/*  ~/.claude/agents/
+mkdir -p ~/.claude/bin && cp claude/bin/wait-pr-ci ~/.claude/bin/
 ```
 
 (Overwrites any same-named skills/agents you already have — the skill names are unprefixed.) Then start a session and run `/powerup`, or enable any single skill by name. On the first consult it will ask your preferred advisor model and effort and save them.
+
+## Mods
+
+`claude/mods/` is a plugin marketplace (`lonic-mods`) with two Claude Code plugins. They are TypeScript loaded straight from source (no build step) against Claude Code's plugin API, which is early-access: it may not be enabled on your account or version.
+
+- **phase-handoff** — a `context` tool that reports context size, cost and rate limits with a handoff break-even, and a `handoff` tool that, at a phase boundary, clears the session and opens the next one with a given prompt after a cancellable countdown. `powerup` and `queue-run` use it; without it they stop and print the next prompt instead.
+- **cost-log** — records each turn's token usage per agent and reports cost-equivalents, heavy turns and cache rebuilds (`/cost-log`, `cost_log` tool).
+
+From a checkout:
+
+```sh
+claude plugin marketplace add ./claude/mods
+claude plugin install phase-handoff@lonic-mods
+claude plugin install cost-log@lonic-mods
+```
+
+Each has tests (`claude plugin test claude/mods/<plugin>`). The `.claude-plugin/types/` directories are generated by Claude Code and gitignored.
+
+## Test-output filter hook
+
+`claude/hooks/filter-test-output.sh` is a `PreToolUse` hook on Bash that keeps test-runner output out of the model's context: an un-piped `jest`/`vitest`/`npm test`/`pytest`/`go test` command is rewritten to print only failures and summary lines, keeping the runner's exit status. Put `FULL_TEST_OUTPUT=1` in a command to bypass it. Needs `jq`. Install with `install claude test-filter-hook`, then add the printed entry to `~/.claude/settings.json`.
+
+## Keeping a checkout and an install in step
+
+`bin/check-sync claude` (or `pult check-sync claude`) is read-only: it reports which skills, agents, scripts and mods differ between this repo and `~/.claude`, and leaves the direction to you.
 
 ## License
 

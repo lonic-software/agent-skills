@@ -1,0 +1,8 @@
+{
+  "name": "cost-log",
+  "version": "0.1.0",
+  "description": "Records each turn's token usage per agent and reports cost-equivalents, heavy turns and cache rebuilds (/cost-log, cost_log tool)",
+  "author": {
+    "name": "kolonicsmate"
+  }
+}

@@ -11,13 +11,16 @@
         pwsh bin/install.ps1 claude powerup
 
     "powerup" installs the whole bundle (all five skills + their agents);
-    a single skill installs just that one and the agents it needs.
+    "powerup-auto" is that bundle plus queue-run and its wrapper; a single
+    skill installs just that one and the agents it needs. "test-filter-hook"
+    copies the hook scripts and prints the settings.json entry to add.
 
 .PARAMETER Tool
     Which coding tool to install into (currently only "claude").
 
 .PARAMETER Skill
-    powerup | orchestrate | consult | design-doc | delivery | evolve
+    powerup | consult | design-doc | delivery | evolve | queue-run
+    | powerup-auto | test-filter-hook
 #>
 [CmdletBinding()]
 param(
@@ -26,7 +29,8 @@ param(
     [string]$Tool,
 
     [Parameter(Mandatory = $true, Position = 1)]
-    [ValidateSet('powerup', 'orchestrate', 'consult', 'design-doc', 'delivery', 'evolve')]
+    [ValidateSet('powerup', 'consult', 'design-doc', 'delivery', 'evolve', 'queue-run',
+                 'powerup-auto', 'test-filter-hook')]
     [string]$Skill
 )
 
@@ -44,28 +48,50 @@ switch ($Tool) {
         $srcAgents = Join-Path (Join-Path $repoRoot 'claude') 'agents'
         $dstSkills = Join-Path (Join-Path $HOME '.claude') 'skills'
         $dstAgents = Join-Path (Join-Path $HOME '.claude') 'agents'
+        $srcBin    = Join-Path (Join-Path $repoRoot 'claude') 'bin'
+        $srcHooks  = Join-Path (Join-Path $repoRoot 'claude') 'hooks'
+        $dstBin    = Join-Path (Join-Path $HOME '.claude') 'bin'
+        $dstHooks  = Join-Path (Join-Path $HOME '.claude') 'hooks'
     }
 }
 
 # --- Which skills + agents does this selection pull in? ---------------------
+# Hooks are copied but never wired in: settings.json is the user's, so the
+# entry to add is printed instead.
+$advisors     = @('lonic-advisor-low', 'lonic-advisor-medium', 'lonic-advisor-high', 'lonic-advisor-xhigh')
+# Inert without tetel; design-doc routes to them only when it is installed.
+$designPasses = @('lonic-design-attacker', 'lonic-grounder')
+$bundleSkills = @('powerup', 'consult', 'design-doc', 'delivery', 'evolve')
+$skills = @(); $agents = @(); $bins = @(); $hooks = @()
 switch ($Skill) {
     'powerup' {
-        $skills = @('powerup', 'orchestrate', 'consult', 'design-doc', 'delivery', 'evolve')
-        $agents = @('lonic-exec-medium', 'lonic-exec-high', 'lonic-exec-xhigh',
-                    'lonic-advisor-medium', 'lonic-advisor-high', 'lonic-advisor-xhigh')
+        $skills = $bundleSkills
+        $agents = $advisors + $designPasses
+        $bins   = @('wait-pr-ci')
     }
-    'orchestrate' {
-        $skills = @('orchestrate')
-        $agents = @('lonic-exec-medium', 'lonic-exec-high', 'lonic-exec-xhigh')
+    'powerup-auto' {
+        $skills = $bundleSkills + @('queue-run', 'powerup-auto')
+        $agents = $advisors + $designPasses
+        $bins   = @('wait-pr-ci')
     }
     'consult' {
         $skills = @('consult')
-        $agents = @('lonic-advisor-medium', 'lonic-advisor-high', 'lonic-advisor-xhigh')
+        $agents = $advisors
+    }
+    'design-doc' {
+        $skills = @('design-doc')
+        $agents = $designPasses
+    }
+    'delivery' {
+        $skills = @('delivery')
+        $bins   = @('wait-pr-ci')
+    }
+    'test-filter-hook' {
+        $hooks = @('filter-test-output.sh', 'test-output-summary.sh')
     }
     default {
-        # design-doc | delivery | evolve — skill only, no agents
+        # evolve | queue-run — skill only
         $skills = @($Skill)
-        $agents = @()
     }
 }
 
@@ -93,10 +119,36 @@ foreach ($a in $agents) {
     Write-Host "  agent  $a -> $to"
 }
 
+# bin and hook scripts are bash; on Windows they run under Git Bash.
+foreach ($pair in @(@{ Names = $bins;  Src = $srcBin;   Dst = $dstBin;   Label = 'bin   ' },
+                    @{ Names = $hooks; Src = $srcHooks; Dst = $dstHooks; Label = 'hook  ' })) {
+    foreach ($n in $pair.Names) {
+        $from = Join-Path $pair.Src $n
+        if (-not (Test-Path -LiteralPath $from -PathType Leaf)) {
+            throw "install: '$n' not found at $from"
+        }
+        New-Item -ItemType Directory -Force -Path $pair.Dst | Out-Null
+        $to = Join-Path $pair.Dst $n
+        Copy-Item -LiteralPath $from -Destination $to -Force
+        Write-Host "  $($pair.Label) $n -> $to"
+    }
+}
+
 Write-Host ''
 Write-Host "Installed '$Skill' for $Tool."
 if ($Skill -eq 'powerup') {
     Write-Host 'Start a session and run /powerup to switch on full-rigor mode.'
+} elseif ($Skill -eq 'test-filter-hook') {
+    $hookCmd = 'bash ' + ((Join-Path $dstHooks 'filter-test-output.sh') -replace '\\', '/')
+    Write-Host 'Not active yet: add this to ~/.claude/settings.json (needs jq and Git Bash):'
+    Write-Host ''
+    Write-Host '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
+    Write-Host "    { `"type`": `"command`", `"command`": `"$hookCmd`" }"
+    Write-Host '  ] } ] }'
+} elseif ($Skill -eq 'queue-run' -or $Skill -eq 'powerup-auto') {
+    Write-Host "Start a session and run /$Skill stop at <N>%."
+    Write-Host 'It hands off between items with the phase-handoff mod (see README, "Mods");'
+    Write-Host "without it, each session stops and prints the next session's prompt."
 } else {
     Write-Host "Start a session and enable it by name: /$Skill"
 }

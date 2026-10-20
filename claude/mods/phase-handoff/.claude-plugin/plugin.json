@@ -1,0 +1,9 @@
+{
+  "name": "phase-handoff",
+  "version": "0.1.0",
+  "description": "At a phase boundary the model hands off: the session clears and the next-phase prompt starts a fresh one after a cancellable countdown",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "kolonicsmate"
+  }
+}
