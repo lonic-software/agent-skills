@@ -2,7 +2,10 @@
 
 Composable workflow skills for high-rigor engineering — planning, delegation, design review, and disciplined shipping — that tighten with use. Built for **Claude Code** today; the portable doctrines are written to travel to other coding tools (Codex, …) as they're ported, which is why installs are namespaced per tool (`claude`).
 
-The headline is **`/powerup`**: one command that switches the whole disciplined workflow on for a session.
+Two headlines:
+
+- **`/powerup`** — one command that switches the whole disciplined workflow on for a session.
+- **`/powerup-auto`** — the same workflow, unattended: it works through your project's queue one item per fresh session, at full rigor, until it spends the share of your weekly usage you gave it.
 
 ## `/powerup` — full-rigor mode (start here)
 
@@ -10,11 +13,27 @@ Enabling `/powerup` activates `consult`, `design-doc`, `delivery` and `evolve` a
 
 - **authors the work itself** — code, tests and designs are written in the main session, whose context is already warm, rather than handed to executor subagents that each pay to rebuild a worse copy of it (measured: delegation moved the growing context, it did not bound it). Subagents are kept for review, grounding and advice, and are resumed across rounds instead of respawned;
 - **consults an advisor** — pulls in a more capable model for the calls where judgment is the bottleneck;
-- **designs before coding** — when the work involves real design decisions, produces a grounded design first and stops for your review before implementing (with [tetel](https://github.com/lonic-software/tetel) installed, that design is authored against captured evidence and independently graded — see below);
+- **designs before coding** — when the work involves real design decisions, produces a grounded design first and converges it through attack and grounding loops before implementing (with [tetel](https://github.com/lonic-software/tetel) installed, that design is authored against captured evidence and independently graded — see below);
 - **ships with discipline** — the home for the shipping doctrines that keep work high-quality, efficient, and stable as it lands;
 - **learns** — when a pattern recurs, proposes folding it into these skills (with your sign-off) instead of drifting.
 
 Every skill also works on its own; `/powerup` just turns them all on together.
+
+## `/powerup-auto` — powerup, on autopilot
+
+```text
+/powerup-auto stop at 60%
+```
+
+`/powerup` makes one session rigorous. `/powerup-auto` keeps that rigor going across a whole backlog without you in the loop:
+
+- **Finds the queue** — your prompt, memory or CLAUDE.md, a `ROADMAP`/`TODO`/`BACKLOG` file in the repo, or the tracker the project points at. If there is more than one candidate, it asks once, up front.
+- **One item per fresh session.** Each item is done under full `/powerup`: designed first when it is design-class, reviewed until no blocker findings remain, and shipped with the delivery discipline. At the item boundary it hands off to a clean session, so context never piles up across items.
+- **Spends only what you budget.** You set the stop line as a share of weekly usage, either absolute (`stop at 60%`) or relative (`spend 10%`). It checks usage at every boundary, prices multi-agent steps against the remaining headroom, and won't start a review round it can't finish. An item it can't finish is left resumable with its open findings written down. A half-converged round is never treated as done.
+- **Merges only with permission.** You choose the merge authority once: merge after review converges and CI is green, open PRs only, or ask each time.
+- **Stays steerable.** It re-reads the queue at the start of every item, so reordering the queue mid-run takes effect. Items marked parked or "ask first" are skipped and listed in the final report.
+
+All the questions come at the start, then it runs unattended. It needs the [`phase-handoff` mod](#mods) to chain sessions; without it, every item ends with a ready-to-paste prompt for the next one. `/queue-run` is the same chain without powerup, for working a queue under the project's own workflow.
 
 ## Recommended: pair it with [tetel](https://github.com/lonic-software/tetel)
 
@@ -73,7 +92,7 @@ pult x github.com/lonic-software/agent-skills install
 
 Drop the trailing args for the guided flow: `pult x github.com/lonic-software/agent-skills` lists the tools (currently only `claude`) and then the skills, with **powerup** on top. A bare source takes the latest tag; pin explicitly with `@v1` if you want.
 
-Selecting **powerup** installs the full bundle (the five skills, their agents, and the `wait-pr-ci` script `delivery` uses); **powerup-auto** adds `queue-run` and its wrapper; selecting a single skill installs just that one and what it needs. **test-filter-hook** copies the hook below and prints the `settings.json` entry to add — the installer never edits your settings.
+Selecting **powerup** installs the full bundle (the five skills, their agents, and the `wait-pr-ci` script `delivery` uses); **powerup-auto** adds `queue-run` and its wrapper on top (add the `phase-handoff` [mod](#mods) to let it chain sessions); selecting a single skill installs just that one and what it needs. **test-filter-hook** copies the hook below and prints the `settings.json` entry to add — the installer never edits your settings.
 
 If you reach for it often, `pult includes add github.com/lonic-software/agent-skills --prefix skills` pins it into your own `pult.yaml` so it's `pult skills:install`. Or `git clone` and run `pult install claude powerup` from inside the checkout.
 
