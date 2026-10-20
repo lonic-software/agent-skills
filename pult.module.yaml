@@ -5,7 +5,7 @@
 # skills into your coding tool's config.
 #
 #   includes:
-#     - source: github.com/lonic-software/agent-skills@v1
+#     - source: github.com/lonic-software/agent-skills@v2
 #       prefix: skills        # -> `pult skills:install`
 #
 # Real logic lives in bin/install (a directory module, so the whole tree is
