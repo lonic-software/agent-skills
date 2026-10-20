@@ -86,11 +86,11 @@ Model names (Fable / Opus / Sonnet) are Anthropic-specific. The two design agent
 
 ```sh
 claude plugin marketplace add lonic-software/agent-skills
-claude plugin install lonic@lonic           # the skills and their agents
-claude plugin install phase-handoff@lonic   # lets /lonic:powerup-auto chain sessions
+claude plugin install powerup@lonic         # the skills and their agents
+claude plugin install phase-handoff@lonic   # lets /powerup:powerup-auto chain sessions
 ```
 
-Plugin skills are namespaced, so the commands become `/lonic:powerup`, `/lonic:powerup-auto`, `/lonic:consult` and so on, and the agents `lonic:lonic-advisor-medium` and so on; the skills know both forms. Update with `claude plugin update lonic@lonic`. The test-output hook is not part of the plugin; install it with pult or by hand.
+Plugin skills are namespaced, so the commands become `/powerup:powerup`, `/powerup:powerup-auto`, `/powerup:consult` and so on, and the agents `powerup:lonic-advisor-medium` and so on; the skills know both forms. Update with `claude plugin update powerup@lonic`. The test-output hook is not part of the plugin; install it with pult or by hand.
 
 ### With [pult](https://github.com/lonic-software/pult) (unprefixed commands)
 

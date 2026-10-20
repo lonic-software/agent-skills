@@ -8,9 +8,9 @@
   },
   "plugins": [
     {
-      "name": "lonic",
+      "name": "powerup",
       "source": "./claude",
-      "description": "The powerup workflow skills and their agents: /lonic:powerup, /lonic:powerup-auto, /lonic:consult, /lonic:design-doc, /lonic:delivery, /lonic:evolve, /lonic:queue-run."
+      "description": "The powerup workflow skills and their agents: /powerup:powerup, /powerup:powerup-auto, /powerup:consult, /powerup:design-doc, /powerup:delivery, /powerup:evolve, /powerup:queue-run."
     },
     {
       "name": "phase-handoff",

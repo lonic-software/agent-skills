@@ -20,7 +20,7 @@ here is what puts them in force; nothing below substitutes for reading them.
 Every conditional inside them — "if `/consult` is active," "if an advisor mode is active" — resolves
 to **true**. What follows is the composition detail none of them states on its own.
 
-**Names.** Installed as the `lonic` plugin, every command and agent these skills name carries a `lonic:` prefix (`/lonic:powerup`, `lonic:lonic-advisor-medium`). Use the form your session lists. In a
+**Names.** Installed as the `powerup` plugin, every command and agent these skills name carries a `powerup:` prefix (`/powerup:powerup`, `powerup:lonic-advisor-medium`). Use the form your session lists. In a
 handoff prompt, use the form that started this session.
 
 ## You are the author, not an orchestrator

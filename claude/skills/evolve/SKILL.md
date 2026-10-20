@@ -33,7 +33,7 @@ A one-off is not doctrine material — it goes to memory only.
 
 Surface the pattern, its cost, a specific actionable candidate rule, and which skill should own it
 — citing the prior memory or incident. User decides whether it ships: **user first** (gates intent,
-cheap) → **advisor-gate second** (gates form; `lonic-advisor-medium` by default, `lonic:`-prefixed under the plugin install, escalating per consult's tier table) → **commit
+cheap) → **advisor-gate second** (gates form; `lonic-advisor-medium` by default, `powerup:`-prefixed under the plugin install, escalating per consult's tier table) → **commit
 third**.
 
 **Advisor-gate checklist:** generalization, already-exists-elsewhere, correct owner, contradiction
