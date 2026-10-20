@@ -90,7 +90,7 @@ This repo is a pult module — run its installer straight from the source, no cl
 pult x github.com/lonic-software/agent-skills install
 ```
 
-Drop the trailing args for the guided flow: `pult x github.com/lonic-software/agent-skills` lists the tools (currently only `claude`) and then the skills, with **powerup** on top. A bare source takes the latest tag; pin explicitly with `@v1` if you want.
+Drop the trailing args for the guided flow: `pult x github.com/lonic-software/agent-skills` lists the tools (currently only `claude`) and then the skills, with **powerup** on top. A bare source takes the latest tag; pin explicitly with `@v2` if you want.
 
 Selecting **powerup** installs the full bundle (the five skills, their agents, and the `wait-pr-ci` script `delivery` uses); **powerup-auto** adds `queue-run` and its wrapper on top (add the `phase-handoff` [mod](#mods) to let it chain sessions); selecting a single skill installs just that one and what it needs. **test-filter-hook** copies the hook below and prints the `settings.json` entry to add — the installer never edits your settings.
 
