@@ -47,8 +47,10 @@ case "$tool" in
     dst_agents="$HOME/.claude/agents"
     dst_bin="$HOME/.claude/bin"
     dst_hooks="$HOME/.claude/hooks"
-    # Not an install target: mods are added as a plugin marketplace from the
-    # checkout. This is where they are developed, and is compared only if present.
+    # Not an install target: mods install as plugins from the repo's `lonic`
+    # marketplace. This is where they are developed, and is compared only if
+    # present — per plugin, since a dev marketplace file of its own here is not
+    # one of the repo's.
     dst_mods="$HOME/.claude/mods"
     ;;
   *)
@@ -163,23 +165,29 @@ if [ -d "$dst_mods" ] && [ -d "$src_mods" ]; then
   # Generated plugin types are gitignored here and rewritten by Claude Code on
   # update, so they are never content.
   mod_ignore=("${ignore_args[@]}" -x 'types' -x '.gitignore')
-  # `|| true`: see the skills loop.
-  detail="$(diff -rq "${mod_ignore[@]}" "$src_mods" "$dst_mods" 2>&1 || true)"
-  # phase-handoff's own hand-written types/ is content; compare it explicitly.
-  for m in "$src_mods"/*/types; do
-    [ -d "$m" ] || continue
-    rel="${m#"$src_mods"/}"
-    more="$(diff -rq "${ignore_args[@]}" "$m" "$dst_mods/$rel" 2>&1 || true)"
-    detail="$detail${detail:+${more:+$'\n'}}$more"
+  for path in "$src_mods"/*/; do
+    name="$(basename "$path")"
+    if [ ! -d "$dst_mods/$name" ]; then
+      report "MISSING" "$name — tracked here, not in $dst_mods"
+      drift=$((drift + 1))
+      continue
+    fi
+    # `|| true`: see the skills loop.
+    detail="$(diff -rq "${mod_ignore[@]}" "$src_mods/$name" "$dst_mods/$name" 2>&1 || true)"
+    # phase-handoff's own hand-written types/ is content; compare it explicitly.
+    if [ -d "$src_mods/$name/types" ]; then
+      more="$(diff -rq "${ignore_args[@]}" "$src_mods/$name/types" "$dst_mods/$name/types" 2>&1 || true)"
+      detail="$detail${detail:+${more:+$'\n'}}$more"
+    fi
+    if [ -z "$detail" ]; then
+      report "ok" "$name"
+      matched=$((matched + 1))
+    else
+      report "DIFFERS" "$name"
+      printf '%s\n' "$detail" | sed 's|^|             |'
+      drift=$((drift + 1))
+    fi
   done
-  if [ -z "$detail" ]; then
-    report "ok" "mods"
-    matched=$((matched + 1))
-  else
-    report "DIFFERS" "mods"
-    printf '%s\n' "$detail" | sed 's|^|             |'
-    drift=$((drift + 1))
-  fi
 fi
 
 echo

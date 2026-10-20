@@ -1,0 +1,19 @@
+{
+  "name": "lonic",
+  "owner": { "name": "kolonicsmate" },
+  "metadata": {
+    "description": "Claude Code plugins from lonic-software/agent-skills: session handoffs and cost accounting for long, disciplined runs."
+  },
+  "plugins": [
+    {
+      "name": "phase-handoff",
+      "source": "./claude/mods/phase-handoff",
+      "description": "At a phase boundary the model hands off: the session clears and the next-phase prompt starts a fresh one after a cancellable countdown. Also a context tool with the handoff break-even."
+    },
+    {
+      "name": "cost-log",
+      "source": "./claude/mods/cost-log",
+      "description": "Records each turn's token usage per agent and reports cost-equivalents, heavy turns and cache rebuilds (/cost-log, cost_log tool)."
+    }
+  ]
+}
