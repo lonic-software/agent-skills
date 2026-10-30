@@ -131,6 +131,15 @@ superseded base is stale even though you opened it.
 `/code-review` is the standard pre-merge gate. This skill is the only place its usage policy is
 documented — routing decisions elsewhere should cite this section, not restate it.
 
+- **CI is not the first test run.** Before you open a PR or push a fix to one, run the complete
+  test suites of every package the diff touches and every package that depends on one, locally —
+  not a filter of the tests you expect to matter. A filtered run checks the tests you predicted
+  would break; the ones that actually break are the ones you didn't predict — it is §A's
+  enumeration claim with no sweep behind it. Bound each run (with a watchdog where the platform has
+  no `timeout`). Leave to CI only what this machine cannot run — other OSes, services it lacks, or a
+  suite too long to run here, named with its measured duration so the reader can overrule the call
+  — and say which you left. The seeding incident ran filtered e2e subsets locally; CI then went red
+  on three OSes over six assertions a few-second run of the one test file would have caught.
 - **Where a PR is viable, let CI go green before the review gate.** When the change ships as a PR — a
   remote forge is in play, not a local-only repo — and the project has checks that run on the PR,
   open the PR and let the automated checks pass *before* you run the `/code-review` merge gate. A red
