@@ -1,5 +1,5 @@
 ---
-description: Queue run — work through a project's queue unattended, one item per session, handing off to a fresh session at each item boundary and stopping once weekly usage reaches a threshold the user sets for this run. Works on any repo. Args may carry the stop threshold, the queue location and merge authority, e.g. `/queue-run stop at 60%`. User-invoked only.
+description: Queue run — work through a project's queue unattended, one item per session, handing off to a fresh session at each item boundary and stopping once weekly usage reaches a threshold the user sets for this run. Works on any repo. Args may carry the stop threshold, the queue location, merge authority and when the user is available to answer questions (availability windows), e.g. `/queue-run stop at 60%`. User-invoked only.
 disable-model-invocation: true
 ---
 
@@ -14,11 +14,12 @@ own CLAUDE.md, memory and any other active skills. Follow those inside each item
 
 ## 1. Resolve the run parameters (first session only)
 
-A session started by a handoff gets all three parameters in its prompt. In that case, do not ask
-again; go straight to §2.
+A session started by a handoff gets every parameter of this section in its prompt. In that case, do
+not ask again; go straight to §2.
 
-Otherwise, resolve them from the user's prompt, and ask only for what is missing. Put every missing
-question into **one** AskUserQuestion call.
+Otherwise, resolve them from the user's prompt, and ask only for what is missing (availability
+windows, §1d, are the exception: never asked for). Put every missing question into **one**
+AskUserQuestion call.
 
 **a. Stop threshold — always required, never assumed.** This is the weekly usage level, as a
 percentage of the weekly limit, at which the chain stops. The user's level changes from day to day,
@@ -48,14 +49,36 @@ current head is green". Alternatives: "open PRs, never merge" (then the chain mo
 don't depend on the unmerged PR, and lists the open PRs at the end), or "ask each time" (this ends the
 chain at each merge point, so warn that it is effectively not unattended).
 
-Confirm the resolved parameters back to the user in one or two lines, then start.
+**d. Availability windows — optional, never asked for.** The user may say when they can answer
+questions during this run: "until 23:00 Budapest", "9–17 on weekdays, Europe/Budapest". Record each
+as a rule plus an IANA time zone (a one-off end time becomes an absolute date and time), and carry it
+forward (§4). No window stated means the user is away for the whole run. Whenever a rule below
+depends on the time, read it with `TZ=<zone> date`; you have no clock.
+
+- **Inside a window**, a question for the user does not end the chain. Notify (*Getting the user's
+  attention*), ask with AskUserQuestion, and continue on the answer. This covers a decision
+  mid-item, an "ask first" or parked row reached in the queue, and the *Always ask* list; the answer
+  authorizes only what it names. Write the answer into the queue entry before going on, so no later
+  session asks it again. Each question is asked once per run: a "no" or "not now" stands for the
+  rest of the run and joins the handoff's standing exclusions. AskUserQuestion has no timeout, so
+  near a window's end prefer parking (below) over a question that may still be pending when it
+  closes.
+- **Outside every window, nothing waits on the user.** An item that needs a decision is **parked**:
+  brought to resumable state (§2), its queue entry marked `blocked on user — Q: <the question in
+  full>`, and the user notified once. Parking is an item boundary: go to §2 step 5. The next session
+  takes the next item that is not blocked on the user.
+
+Confirm the resolved parameters back to the user in one or two lines, windows included, then start.
 
 ## 2. Each session: one item
 
-1. **Check usage first** (§3). If it is at or over the threshold, stop (§5).
+1. **Check usage first** (§3). If it is at or over the threshold, stop (§5). Then, if the time is
+   inside an availability window (§1d) and the queue holds entries marked `blocked on user`, ask
+   them all in one AskUserQuestion round and write the answers back before taking an item.
 2. **Read the queue** freshly. The user may have reordered it since the last session, and their order
-   wins. Take the **first unfinished item**. Skip items the queue or memory marks as parked or
-   "ask first". Note them for the final report rather than asking mid-chain.
+   wins. Take the **first unfinished item not blocked on the user**. Items the queue or memory marks
+   as parked or "ask first" are asked about inside an availability window (§1d) and skipped outside
+   one; note skipped ones for the final report.
 3. **Do the item** under the project's own workflow, to its natural end: merged (if authorized), or a
    PR left open with review done (if not).
 4. **Update the queue**: tick the item, or mark it in progress or blocked with a one-line reason. File
@@ -66,10 +89,11 @@ Confirm the resolved parameters back to the user in one or two lines, then start
 *phase boundary* counts as an item boundary. Finish the phase, leave everything durable (committed,
 pushed, written down), and hand off "continue item X at phase Y".
 
+**Resumable state** means: committed, pushed (as a draft PR if needed), nothing uncommitted left
+behind, and the queue entry saying exactly where the item stands.
+
 **Crossing the threshold mid-item.** Do not start new expensive steps such as another review round,
-an agent fan-out, or a new slice. Bring the work to a resumable state: committed, pushed (as a draft
-PR if needed), with the queue entry saying exactly where it stands. Then stop (§5). Never leave
-uncommitted work behind.
+an agent fan-out, or a new slice. Bring the work to resumable state, then stop (§5).
 
 **Before any fan-out** (multi-agent review, workflows), estimate its cost as a percentage of weekly
 usage. If that estimate would cross the threshold, use the cheaper form or defer the step.
@@ -94,8 +118,11 @@ and include:
 - **Stop threshold:** the absolute weekly percentage, e.g. `stop at 62% weekly`.
 - **Queue:** the exact locator from §1b.
 - **Merge authority:** the exact rule from §1c.
-- **Standing exclusions:** anything the user said to always ask about, or to never touch, in this run.
-- **Where things stand:** what just finished (PR numbers, merge commits), and anything in flight. If
+- **Availability windows:** the rules and time zone from §1d, or `none`.
+- **Standing exclusions:** anything the user said to always ask about, or to never touch, in this run,
+  including questions they declined inside a window (§1d).
+- **Where things stand:** what just finished (PR numbers, merge commits), any items parked as
+  blocked on the user, and anything in flight. If
   the next item is a continuation, include its phase and any hard-won context it needs. Otherwise, let
   the next session read the queue itself; don't pre-pick an item the user might reorder.
 
@@ -106,8 +133,8 @@ If the handoff tool is unavailable, stop (§5) and print the ready-to-paste prom
 
 ## 5. Stopping
 
-Stop when any of these holds: the threshold is reached, the queue has no unblocked items left, an item
-needs a decision only the user can make, or something is broken in a way the chain shouldn't guess
+Stop when any of these holds: the threshold is reached, the queue has no unblocked items left (an
+item parked as blocked on the user counts as blocked, §1d), or something is broken in a way the chain shouldn't guess
 past (CI infrastructure down, auth expired, repeated review non-convergence).
 
 The final report covers:
@@ -124,4 +151,17 @@ The final report covers:
 Merging is the only outward action this skill authorizes, and only per §1c. Still stop and ask before:
 releases or publishing, deploys, anything touching live infrastructure, destructive git (force-push,
 history rewrites, deleting branches you didn't create), and anything the project's instructions mark
-as needing the user. Asking ends the chain, so first leave state resumable (§2).
+as needing the user. Inside an availability window, ask and continue (§1d). Outside one, do not
+ask: park the item (§1d).
+
+## Getting the user's attention
+
+The user does not watch the chain. Whenever the run needs them, send a `PushNotification` (load it
+with ToolSearch `select:PushNotification` if it is deferred) **before** ending the turn or calling
+AskUserQuestion. That covers every stop in §5, every ask above, and a question asked mid-item. One
+line, under 200 characters, leading with what they must act on, e.g. "ISSUE-63: decision needed —
+index rebuild cost on large repos" or "queue-run stopped at 80% weekly: 3 merged, 1 PR open".
+
+A parked item (§1d) is notified once, when it is parked, so the question is waiting when the user
+looks. Do not notify at handoffs, item merges or routine progress; the chain continuing needs nothing from
+them. A "not sent" result means they are at the terminal already, so carry on.

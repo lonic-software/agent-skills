@@ -140,6 +140,11 @@ documented — routing decisions elsewhere should cite this section, not restate
   suite too long to run here, named with its measured duration so the reader can overrule the call
   — and say which you left. The seeding incident ran filtered e2e subsets locally; CI then went red
   on three OSes over six assertions a few-second run of the one test file would have caught.
+- **Bookkeeping is part of the diff.** Before opening a PR, walk the project's own list of
+  hand-kept files (its contributing guide or equivalent, the changelog first) and write in the PR
+  body which entries the change touched, or that none applied. If the project keeps no such list,
+  say so in the PR body. Checked docs fail CI when stale; unchecked ones fail nobody, so a run of
+  merged PRs can leave a changelog silently behind.
 - **Where a PR is viable, let CI go green before the review gate.** When the change ships as a PR — a
   remote forge is in play, not a local-only repo — and the project has checks that run on the PR,
   open the PR and let the automated checks pass *before* you run the `/code-review` merge gate. A red

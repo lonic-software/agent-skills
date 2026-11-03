@@ -118,6 +118,12 @@ re-reads. So:
   registered, tell the user it is a boundary and give that prompt instead. `autoCompactWindow` (250k)
   is only the safety net for a session that runs long anyway. A finding that exists only in context
   is one boundary from gone.
+- **Handoffs stay inside the item you were given.** Under bare `/powerup`, the chain exists so one
+  item too big for a session (a ticket, a design) can run one slice per session. It ends when that
+  item is done. At that point, do not hand off. Report, and stop. Picking the next item from a queue
+  is `/powerup-auto` and `/queue-run` only, even if a prompt you inherited names a queue, a merge
+  authority, or "the next row". A handoff prompt written under bare `/powerup` names the item and
+  the slice it is on, never "continue with the queue". (User, 2026-10-30.)
 - **A handoff is not free: weigh it.** Continuing re-reads the whole context C on every turn at 0.1x.
   A fresh session writes once what the next phase needs, R, at 2x (the main thread's 1-hour cache),
   then re-reads only that. Over N further turns the handoff pays when N × 0.1 × (C − R) > 2R, that is
