@@ -9,7 +9,7 @@
 # the slot only when the old one is gone. Nothing is ever taken over on elapsed time.
 #
 #   fleet init --workers N --threshold PCT --queue LOCATOR --merge-authority TEXT
-#              [--windows TEXT] [--lookahead K] [--worktree-root DIR] [--command NAME]
+#              [--windows TEXT] [--worktree-root DIR] [--command NAME]
 #              (NAME: the slash command each slot's worker runs and every handoff starts with;
 #              default queue-fleet, powerup-fleet for the powerup workflow)
 #   fleet launch [slot...]             start a background worker session (claude --bg) in each named
@@ -145,12 +145,12 @@ EOF
 }
 
 cmd_init() {
-  local workers="" thr="" queue="" auth="" windows="" look="" root="" command=queue-fleet
+  local workers="" thr="" queue="" auth="" windows="" root="" command=queue-fleet
   while [ $# -gt 0 ]; do
     case "$1" in
       --workers) workers=$2; shift 2 ;; --threshold) thr=$2; shift 2 ;;
       --queue) queue=$2; shift 2 ;; --merge-authority) auth=$2; shift 2 ;;
-      --windows) windows=$2; shift 2 ;; --lookahead) look=$2; shift 2 ;;
+      --windows) windows=$2; shift 2 ;;
       --worktree-root) root=$2; shift 2 ;; --command) command=${2#/}; shift 2 ;;
       *) die "init: unknown argument $1" ;;
     esac
@@ -181,7 +181,6 @@ cmd_init() {
     || refuse "every serial resource needs kind \"pool\" or \"counter\""
   S=$(state_dir)
   [ ! -d "$S" ] || refuse "a fleet already exists at $S (fleet status; fleet end to remove it)"
-  [ -n "$look" ] || look=$((workers * 2))
   [ -n "$root" ] || root=$(jq -r .worktree_root "$cfg")
   case "$root" in /*) ;; *) root="$top/$root" ;; esac
   local main_ref; main_ref=$(jq -r .main_ref "$cfg")
@@ -190,9 +189,9 @@ cmd_init() {
   mkdir -p "$S"/slots "$S"/claims "$S"/locks "$S"/pools "$S"/counters "$S"/turn "$S"/budget
   cp "$cfg" "$S/config.json"
   jq -n --argjson w "$workers" --argjson t "$thr" --arg q "$queue" --arg a "$auth" --arg win "$windows" \
-        --argjson l "$look" --arg r "$root" --arg c "$command" \
+        --arg r "$root" --arg c "$command" \
     '{workers: $w, threshold: $t, queue: $q, merge_authority: $a, windows: $win, exclusions: [],
-      lookahead: $l, worktree_root: $r, command: $c}' > "$S/run.json"
+      worktree_root: $r, command: $c}' > "$S/run.json"
   echo 0 > "$S/turn/next"; : > "$S/turn/queue"
   local i path
   for i in $(seq 1 "$workers"); do
@@ -349,7 +348,7 @@ cmd_claim() {
         case "$(basename "$c")" in ask:*) continue ;; esac
         [ "$(jq -r .slot "$c")" = "$SLOT" ] && { unlock_state; refuse "$SLOT already works $(jq -r .item "$c"); release it first"; }
         if [ -n "$area" ] && [ "$(jq -r '.area // empty' "$c")" = "$area" ]; then
-          unlock_state; refuse "area '$area' is being worked by $(jq -r .slot "$c") ($(jq -r .item "$c")); pick another item in the look-ahead window"
+          unlock_state; refuse "area '$area' is being worked by $(jq -r .slot "$c") ($(jq -r .item "$c")); take the next row by rank, or wait for a release if none is claimable"
         fi
       done
       budget_ok "$usage" 0 || { unlock_state; refuse "over budget: $BUDGET_MSG"; } ;;
@@ -538,7 +537,7 @@ cmd_unhalt() { need_state; rm -f "$S/halt"; echo "unhalted"; }
 cmd_status() {
   need_state
   echo "fleet at $S"
-  jq -r '"run: /\(.command) · threshold \(.threshold)% · \(.workers) workers · look-ahead \(.lookahead) · merge: \(.merge_authority) · queue: \(.queue)" + (if .windows != "" then " · windows: \(.windows)" else "" end) + (if (.exclusions|length) > 0 then " · excluded: \(.exclusions|join(", "))" else "" end)' "$S/run.json"
+  jq -r '"run: /\(.command) · threshold \(.threshold)% · \(.workers) workers · merge: \(.merge_authority) · queue: \(.queue)" + (if .windows != "" then " · windows: \(.windows)" else "" end) + (if (.exclusions|length) > 0 then " · excluded: \(.exclusions|join(", "))" else "" end)' "$S/run.json"
   [ -f "$S/halt" ] && echo "HALTED: $(cat "$S/halt")"
   local f s
   for f in "$S"/slots/*.json; do
@@ -604,6 +603,8 @@ self_test() {
 EOF
   expect "init refuses a command that is not a name" 2 "slash command" "$tmp/main" \
     "$self" init --workers 2 --threshold 60 --queue q --merge-authority x --command "a b"
+  expect "init refuses the removed --lookahead option" 2 "unknown argument --lookahead" "$tmp/main" \
+    "$self" init --workers 2 --threshold 60 --queue q --merge-authority x --lookahead 4
   expect "init creates the slots, naming the worker command" 0 "then: /powerup-fleet" "$tmp/main" \
     "$self" init --workers 2 --threshold 60 --queue q --merge-authority "merge on green" --command /powerup-fleet
   local W1="$tmp/main/wt/slot-1" W2="$tmp/main/wt/slot-2"
@@ -616,7 +617,7 @@ EOF
   expect "whoami registers slot-2" 0 "slot-2" "$W2" "$self" whoami
   PIDV=$P1; expect "claim an item" 0 "claimed A-1" "$W1" "$self" claim A-1 --area core --usage 10
   PIDV=$P2; expect "another slot cannot take a claimed item" 3 "claimed by slot-1" "$W2" "$self" claim A-1 --area cli --usage 10
-  expect "the same area is refused" 3 "area 'core'" "$W2" "$self" claim A-2 --area core --usage 10
+  expect "the same area is refused, pointing to the next row or a wait" 3 "or wait for a release" "$W2" "$self" claim A-2 --area core --usage 10
   expect "the claim line counts live workers" 3 "over budget" "$W2" "$self" claim A-2 --area cli --usage 54.5
   expect "an ask: claim parks a question" 0 "claimed ask:A-9" "$W2" "$self" claim ask:A-9 --usage 10
   expect "a different area and under the line is fine" 0 "claimed A-2" "$W2" "$self" claim A-2 --area cli --usage 10
