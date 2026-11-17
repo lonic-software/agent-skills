@@ -794,7 +794,7 @@ EOF
   allows "identity: an attached redirection is not a refspec" "$I" "git push -u origin HEAD >/dev/null 2>/tmp/x"
   allows "identity: a redirection with no space is not a refspec" "$I" "git push origin HEAD>/dev/null"
   allows "identity: another tool's quoted -C is not git's"  "$I" "make -C \"x\" && git -C \"$I\" push origin HEAD"
-  allows "identity: a -c pair before a quoted -C"           "$tmp" "git -c core.quotePath=false -C \"$I\" push origin HEAD"
+  allows "identity: a -c pair before a quoted -C"           "$I" "git -c core.quotePath=false -C \"$I\" push origin HEAD"
   git -C "$I" branch amb && git -C "$I" tag amb
   allows "identity: an ambiguous refname's warning is not an author" "$I" "git push origin amb"
   SG_EMAIL=good@example.invalid setgates "$I" ''
