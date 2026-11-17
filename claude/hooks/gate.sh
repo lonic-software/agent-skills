@@ -803,6 +803,8 @@ EOF
     && git -c user.name=u commit -qm c && git update-ref refs/remotes/origin/main HEAD ) || return 1
   denies "config: an unparsable config denies a forge merge" "does not parse" "$UB" "gh pr merge 12 --match-head-commit $SHA"
   allows "config: an unparsable config still allows a commit" "$UB" "git commit -m x"
+  ( cd "$UB" && git remote set-url origin https://forge.example.invalid/o/r.git ) || return 1
+  denies "config: an unparsable config is no config (an unrecognised forge gates a local merge)" "does not parse" "$UB" "git merge feature"
   ( cd "$UB" && git remote remove origin ) || return 1
   denies "config: an unparsable config denies a local merge" "does not parse" "$UB" "git merge feature"
   # a configured non-GitHub forge
