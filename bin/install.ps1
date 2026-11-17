@@ -11,7 +11,8 @@
         pwsh bin/install.ps1 claude powerup
 
     "powerup" installs the whole bundle (all five skills + their agents);
-    "powerup-auto" is that bundle plus queue-run and its wrapper; a single
+    "powerup-auto" is that bundle plus queue-run and its wrapper;
+    "powerup-fleet" adds queue-fleet and its wrapper as well; a single
     skill installs just that one and the agents it needs. "test-filter-hook"
     copies the hook scripts and prints the settings.json entry to add.
 
@@ -20,7 +21,7 @@
 
 .PARAMETER Skill
     powerup | consult | design-doc | delivery | evolve | queue-run
-    | powerup-auto | test-filter-hook
+    | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
 #>
 [CmdletBinding()]
 param(
@@ -30,7 +31,7 @@ param(
 
     [Parameter(Mandatory = $true, Position = 1)]
     [ValidateSet('powerup', 'consult', 'design-doc', 'delivery', 'evolve', 'queue-run',
-                 'powerup-auto', 'test-filter-hook')]
+                 'powerup-auto', 'powerup-fleet', 'test-filter-hook', 'gate-hook')]
     [string]$Skill
 )
 
@@ -65,12 +66,20 @@ switch ($Skill) {
     'powerup' {
         $skills = $bundleSkills
         $agents = $advisors + $designPasses
-        $hooks = @('skills-after-compact.sh')
+        $hooks = @('skills-after-compact.sh', 'gate.sh')
     }
     'powerup-auto' {
         $skills = $bundleSkills + @('queue-run', 'powerup-auto')
         $agents = $advisors + $designPasses
-        $hooks = @('skills-after-compact.sh')
+        $hooks = @('skills-after-compact.sh', 'gate.sh')
+    }
+    'powerup-fleet' {
+        $skills = $bundleSkills + @('queue-run', 'queue-fleet', 'powerup-fleet')
+        $agents = $advisors + $designPasses
+        $hooks = @('skills-after-compact.sh', 'gate.sh')
+    }
+    'gate-hook' {
+        $hooks = @('gate.sh')
     }
     'consult' {
         $skills = @('consult')
@@ -136,6 +145,15 @@ if ($hooks -contains 'skills-after-compact.sh') {
     Write-Host '  ] } ] }'
     Write-Host ''
 }
+if ($hooks -contains 'gate.sh') {
+    $gateCmd = 'bash ' + ((Join-Path $dstHooks 'gate.sh') -replace '\\', '/')
+    Write-Host 'Enforces the merge, stash, force-push and author gates once wired in - add to ~/.claude/settings.json (needs jq and Git Bash):'
+    Write-Host ''
+    Write-Host '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
+    Write-Host "    { `"type`": `"command`", `"command`": `"$gateCmd`" }"
+    Write-Host '  ] } ] }'
+    Write-Host ''
+}
 if ($Skill -eq 'powerup') {
     Write-Host 'Start a session and run /powerup to switch on full-rigor mode.'
 } elseif ($Skill -eq 'test-filter-hook') {
@@ -145,6 +163,9 @@ if ($Skill -eq 'powerup') {
     Write-Host '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
     Write-Host "    { `"type`": `"command`", `"command`": `"$hookCmd`" }"
     Write-Host '  ] } ] }'
+} elseif ($Skill -eq 'powerup-fleet') {
+    Write-Host 'From the main checkout, run /powerup-fleet start <N> stop at <N>%; it prints one command per slot.'
+} elseif ($Skill -eq 'gate-hook') {
 } elseif ($Skill -eq 'queue-run' -or $Skill -eq 'powerup-auto') {
     Write-Host "Start a session and run /$Skill stop at <N>%."
     Write-Host 'It hands off between items with the phase-handoff mod (see README, "Mods");'

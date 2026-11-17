@@ -5,9 +5,12 @@
 #
 # tool  : which coding tool to install into (currently only "claude")
 # skill : powerup | consult | design-doc | delivery | evolve
-#         | queue-run | powerup-auto | test-filter-hook
+#         | queue-run | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
 #         "powerup" installs the whole bundle: all five skills + their agents.
 #         "powerup-auto" is that bundle plus queue-run and its wrapper.
+#         "powerup-fleet" is that bundle plus queue-run, queue-fleet and its wrapper.
+#         The powerup bundles also copy the gate and compaction hooks; "gate-hook" copies
+#         the gate hook alone.
 #
 # pult calls this as `${module.dir}/bin/install {tool} {skill}`, so the repo
 # root is the parent of this script's directory — resolved from $0, not cwd.
@@ -22,7 +25,7 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 die() { echo "install: $*" >&2; exit 1; }
 
 [ -n "$tool" ]  || die "no tool given (expected: claude)"
-[ -n "$skill" ] || die "no skill given (expected: powerup | consult | design-doc | delivery | evolve | queue-run | powerup-auto | test-filter-hook)"
+[ -n "$skill" ] || die "no skill given (expected: powerup | consult | design-doc | delivery | evolve | queue-run | powerup-auto | powerup-fleet | test-filter-hook | gate-hook)"
 
 # One door, OS-native behind it. pult always runs this via `sh`, so on Linux and
 # macOS the copy logic below is the whole story. On Windows (this runs under Git
@@ -70,12 +73,20 @@ case "$skill" in
   powerup)
     skills=("${bundle_skills[@]}")
     agents=("${bundle_agents[@]}")
-    hooks=(skills-after-compact.sh)
+    hooks=(skills-after-compact.sh gate.sh)
     ;;
   powerup-auto)
     skills=("${bundle_skills[@]}" queue-run powerup-auto)
     agents=("${bundle_agents[@]}")
-    hooks=(skills-after-compact.sh)
+    hooks=(skills-after-compact.sh gate.sh)
+    ;;
+  powerup-fleet)
+    skills=("${bundle_skills[@]}" queue-run queue-fleet powerup-fleet)
+    agents=("${bundle_agents[@]}")
+    hooks=(skills-after-compact.sh gate.sh)
+    ;;
+  gate-hook)
+    hooks=(gate.sh)
     ;;
   consult)
     skills=(consult)
@@ -133,6 +144,14 @@ for h in ${hooks[@]+"${hooks[@]}"}; do
     echo '  ] } ] }'
     echo
   fi
+  if [ "$h" = "gate.sh" ]; then
+    echo "Enforces the merge, stash, force-push and author gates once wired in — add to ~/.claude/settings.json (needs jq):"
+    echo
+    echo '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
+    echo "    { \"type\": \"command\", \"command\": \"bash $dst_hooks/gate.sh\" }"
+    echo '  ] } ] }'
+    echo
+  fi
 done
 if [ "$skill" = "powerup" ]; then
   echo "Start a session and run /powerup to switch on full-rigor mode."
@@ -142,6 +161,10 @@ elif [ "$skill" = "test-filter-hook" ]; then
   echo '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
   echo "    { \"type\": \"command\", \"command\": \"bash $dst_hooks/filter-test-output.sh\" }"
   echo '  ] } ] }'
+elif [ "$skill" = "powerup-fleet" ]; then
+  echo "From the main checkout, run /powerup-fleet start <N> stop at <N>%; it prints one command per slot."
+elif [ "$skill" = "gate-hook" ]; then
+  :
 elif [ "$skill" = "queue-run" ] || [ "$skill" = "powerup-auto" ]; then
   echo "Start a session and run /$skill stop at <N>%."
   echo "It hands off between items with the phase-handoff mod (see README, \"Mods\");"

@@ -1,0 +1,641 @@
+#!/usr/bin/env bash
+# fleet — the coordination state for N concurrent queue workers in one repository.
+#
+# Every atomic fleet operation goes through this script; no worker edits the state by hand. State
+# lives in $(git rev-parse --git-common-dir)/fleet/, shared by every worktree of the repo. A *slot* is
+# one worktree; the slot owns its claims, locks, reservations and merge ticket. The owning process
+# is $CLAUDE_PID, witnessed by its start time (TZ=UTC LC_ALL=C ps -o lstart=): a handoff is a
+# /clear in the same process, so the witness survives it; a new process in the same slot adopts
+# the slot only when the old one is gone. Nothing is ever taken over on elapsed time.
+#
+#   fleet init --workers N --threshold PCT --queue LOCATOR --merge-authority TEXT
+#              [--windows TEXT] [--lookahead K] [--worktree-root DIR]
+#   fleet whoami                       register this process as the slot's owner; print the slot
+#   fleet claim <item> [--area A] --usage PCT    claim a queue item (or ask:<item>)
+#   fleet release <item>
+#   fleet reserve <resource>           pool: a free value for this slot; counter: next value (turn only)
+#   fleet with-lock <name> [--timeout S] -- <command...>   run a heavy command under a fleet lock
+#   fleet land [--squash -m MSG]       no forge: fast-forward (or squash) main to HEAD, in the turn
+#   fleet turn enter|wait|leave [--requeue]|holds|take-dead
+#   fleet budget check --usage PCT | reserve PCT --usage PCT | release | pace --five-hour PCT
+#   fleet halt <reason> | fleet unhalt | fleet exclude <item>   (exclude: a question the user declined)
+#   fleet status
+#   fleet end                          remove the state (refused while any claim has a live owner)
+#   fleet --self-test
+#
+# Exit codes: 0 ok · 2 usage · 3 refused (the message says why) · 10 waiting (not your turn yet)
+#             · 11 the turn's head is held by a dead owner (read remote state, then take-dead)
+# Needs git and jq. Bash 3.2 compatible; macOS has no timeout/flock, so the watchdog is perl's alarm
+# and every lock is an atomic mkdir.
+set -u
+
+die()    { echo "fleet: $*" >&2; exit 2; }
+refuse() { echo "fleet: refused: $*" >&2; exit 3; }
+note()   { echo "fleet: $*" >&2; }
+
+CONFIG_REL=".claude/fleet.json"
+
+proc_start() { TZ=UTC LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null | sed 's/  */ /g; s/ *$//'; }
+alive() { # pid start → 0 when that exact process still runs
+  [ -n "${1:-}" ] && [ -n "${2:-}" ] && kill -0 "$1" 2>/dev/null && [ "$(proc_start "$1")" = "$2" ]
+}
+now() { date +%s; }
+
+state_dir() {
+  local cd
+  cd=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || die "not inside a git repository"
+  printf '%s/fleet\n' "$cd"
+}
+S=""
+need_state() { S=$(state_dir); [ -d "$S" ] || refuse "no fleet here ($S); start one with fleet init"; }
+
+# --- the state mutex: held for milliseconds by this script, broken only when its owner is gone ---
+lock_state() {
+  local i=0 o
+  while ! mkdir "$S/.mutex" 2>/dev/null; do
+    o=$(cat "$S/.mutex/owner" 2>/dev/null || true)
+    if [ -n "$o" ] && ! alive "$(echo "$o" | cut -d' ' -f1)" "$(echo "$o" | cut -d' ' -f2-)"; then rm -rf "$S/.mutex"; continue; fi
+    i=$((i + 1)); [ "$i" -lt 600 ] || die "state mutex busy for 2 minutes (owner: ${o:-unknown})"
+    sleep 0.2
+  done
+  printf '%s %s\n' "$$" "$(proc_start $$)" > "$S/.mutex/owner"
+  trap 'rm -rf "$S/.mutex"' EXIT
+}
+unlock_state() { rm -rf "$S/.mutex"; trap - EXIT; }
+
+jset() { # file jq-filter [args...] — rewrite a JSON file in place, atomically
+  local f=$1 filt=$2; shift 2
+  jq "$@" "$filt" "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+}
+
+# --- who am I ---
+SLOT=""; SLOT_PATH=""
+find_slot() {
+  SLOT_PATH=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a work tree"
+  local f
+  for f in "$S"/slots/*.json; do
+    [ -f "$f" ] || continue
+    if [ "$(jq -r .path "$f")" = "$SLOT_PATH" ]; then SLOT=$(jq -r .slot "$f"); return 0; fi
+  done
+  refuse "$SLOT_PATH is not a fleet slot (slots are the worktrees fleet init created)"
+}
+me_pid()   { [ -n "${CLAUDE_PID:-}" ] || die "CLAUDE_PID is not set; run this from the Claude Code session that works the slot"; printf '%s\n' "$CLAUDE_PID"; }
+slot_owner_live() { # slot → 0 when its registered owner process is alive
+  local f="$S/slots/$1.json"
+  [ -f "$f" ] && alive "$(jq -r '.pid // empty' "$f")" "$(jq -r '.start // empty' "$f")"
+}
+require_owner() { # this process must be the registered owner of this slot
+  find_slot
+  local f="$S/slots/$SLOT.json" pid
+  pid=$(me_pid)
+  [ "$(jq -r '.pid // empty' "$f")" = "$pid" ] && [ "$(jq -r '.start // empty' "$f")" = "$(proc_start "$pid")" ] \
+    || refuse "this process does not own slot $SLOT; run fleet whoami first"
+}
+live_workers() {
+  local n=0 f s
+  for f in "$S"/slots/*.json; do [ -f "$f" ] || continue; s=$(jq -r .slot "$f"); slot_owner_live "$s" && n=$((n + 1)); done
+  echo "$n"
+}
+check_halt() { [ ! -f "$S/halt" ] || refuse "the fleet is halted: $(cat "$S/halt")"; }
+
+# --- init ---
+gates_template() {
+  cat <<'EOF'
+{
+  "forge": "github | gitlab | other | none  (default: github when origin is on github.com, none with no remote)",
+  "default_branch": "main  (default: origin/HEAD, else main or master)",
+  "ci": "true | false  (default: true for github; elsewhere true iff checks_cmd is set)",
+  "merge_cmd": "ERE matching the forge's merge command  (github default: ^gh pr merge; none: local git merge)",
+  "sha_flag": "the merge command's flag pinning the head  (github default: --match-head-commit)",
+  "head_cmd": "shell printing change $PR's head sha  (github default: gh pr view)",
+  "checks_cmd": "shell printing JSON [{name, bucket}] for change $PR  (github default: gh pr checks)",
+  "required_checks": ["check names that must pass  (default: every listed check)"],
+  "verify_cmd": "the complete local suite command; with no CI its verified stamp is the merge evidence"
+}
+EOF
+}
+cfg_template() {
+  cat <<'EOF'
+{
+  "worktree_root": ".claude/worktrees",
+  "main_ref": "origin/main",
+  "build_dir": "per-slot: each slot builds in its own tree; name any env var that must differ per slot",
+  "heavy_commands": [
+    { "pattern": "REGEX matching a command that must run under the suite lock", "bound_seconds": 2400 }
+  ],
+  "serial_resources": {
+    "EXAMPLE-COUNTER": { "kind": "counter", "max_cmd": "shell command printing the current max on git ref $REF" },
+    "EXAMPLE-POOL":    { "kind": "pool", "values": ["a", "b", "c"] }
+  },
+  "mechanical_files": [
+    { "glob": "generated/files/**", "regenerate": "command that regenerates them" }
+  ],
+  "branch_update": "merge",
+  "areas": ["the area vocabulary queue rows are tagged with"]
+}
+EOF
+}
+
+cmd_init() {
+  local workers="" thr="" queue="" auth="" windows="" look="" root=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --workers) workers=$2; shift 2 ;; --threshold) thr=$2; shift 2 ;;
+      --queue) queue=$2; shift 2 ;; --merge-authority) auth=$2; shift 2 ;;
+      --windows) windows=$2; shift 2 ;; --lookahead) look=$2; shift 2 ;;
+      --worktree-root) root=$2; shift 2 ;;
+      *) die "init: unknown argument $1" ;;
+    esac
+  done
+  [ -n "$workers" ] && [ -n "$thr" ] && [ -n "$queue" ] && [ -n "$auth" ] \
+    || die "init needs --workers --threshold --queue --merge-authority"
+  case "$workers$thr" in *[!0-9.]*) die "init: --workers and --threshold are numbers" ;; esac
+  local top cfg
+  top=$(git rev-parse --show-toplevel) || die "not inside a work tree"
+  cfg="$top/$CONFIG_REL"
+  if [ ! -f "$cfg" ]; then
+    echo "fleet: refused: no project config at $cfg. Check this template in there, filled in:" >&2
+    cfg_template
+    if [ ! -f "$top/.claude/gates.json" ]; then
+      echo "fleet: and, unless the defaults fit (GitHub with CI), .claude/gates.json — the merge gate's config:" >&2
+      gates_template
+    fi
+    exit 3
+  fi
+  jq -e 'type == "object"' "$cfg" >/dev/null 2>&1 || refuse "$cfg is not a JSON object"
+  local k
+  for k in worktree_root main_ref heavy_commands serial_resources mechanical_files branch_update areas; do
+    jq -e --arg k "$k" 'has($k)' "$cfg" >/dev/null || refuse "$cfg lacks \"$k\" (template: fleet init without a config prints one)"
+  done
+  [ "$(jq -r .branch_update "$cfg")" = "merge" ] || refuse "branch_update must be \"merge\": the merge gate merges main in and never rebases a reviewed branch"
+  jq -e '[.serial_resources[] | .kind] | all(. == "pool" or . == "counter")' "$cfg" >/dev/null \
+    || refuse "every serial resource needs kind \"pool\" or \"counter\""
+  S=$(state_dir)
+  [ ! -d "$S" ] || refuse "a fleet already exists at $S (fleet status; fleet end to remove it)"
+  [ -n "$look" ] || look=$((workers * 2))
+  [ -n "$root" ] || root=$(jq -r .worktree_root "$cfg")
+  case "$root" in /*) ;; *) root="$top/$root" ;; esac
+  local main_ref; main_ref=$(jq -r .main_ref "$cfg")
+  git fetch -q "${main_ref%%/*}" >/dev/null 2>&1 || note "fetch of ${main_ref%%/*} failed; using the local $main_ref"
+  git rev-parse --verify -q "$main_ref" >/dev/null || refuse "$main_ref does not resolve"
+  mkdir -p "$S"/slots "$S"/claims "$S"/locks "$S"/pools "$S"/counters "$S"/turn "$S"/budget
+  cp "$cfg" "$S/config.json"
+  jq -n --argjson w "$workers" --argjson t "$thr" --arg q "$queue" --arg a "$auth" --arg win "$windows" \
+        --argjson l "$look" --arg r "$root" \
+    '{workers: $w, threshold: $t, queue: $q, merge_authority: $a, windows: $win, exclusions: [],
+      lookahead: $l, worktree_root: $r}' > "$S/run.json"
+  echo 0 > "$S/turn/next"; : > "$S/turn/queue"
+  local i path
+  for i in $(seq 1 "$workers"); do
+    path="$root/slot-$i"
+    [ ! -e "$path" ] || { rm -rf "$S"; refuse "$path already exists"; }
+    git worktree add -q --detach "$path" "$main_ref" >/dev/null 2>&1 || { rm -rf "$S"; refuse "git worktree add $path failed"; }
+    jq -n --arg s "slot-$i" --arg p "$path" '{slot: $s, path: $p, pid: null, start: null}' > "$S/slots/slot-$i.json"
+  done
+  echo "fleet: $workers slot(s) at $root, state at $S"
+  echo "Open one terminal per slot and run, in each:"
+  for i in $(seq 1 "$workers"); do echo "  cd $root/slot-$i && claude      # then: /powerup-fleet"; done
+}
+
+# --- whoami ---
+cmd_whoami() {
+  need_state; find_slot
+  local pid start f="$S/slots/$SLOT.json" opid ostart
+  pid=$(me_pid); start=$(proc_start "$pid")
+  [ -n "$start" ] || die "process $pid is not running"
+  lock_state
+  opid=$(jq -r '.pid // empty' "$f"); ostart=$(jq -r '.start // empty' "$f")
+  if [ "$opid" = "$pid" ] && [ "$ostart" = "$start" ]; then unlock_state; echo "$SLOT"; return 0; fi
+  if alive "$opid" "$ostart"; then unlock_state; refuse "slot $SLOT is owned by live process $opid; one process per slot"; fi
+  jset "$f" '.pid = $p | .start = $s | .adopted_at = $t' --arg p "$pid" --arg s "$start" --argjson t "$(now)"
+  unlock_state
+  [ -z "$opid" ] && note "$SLOT registered to process $pid" || note "$SLOT adopted by process $pid (previous owner $opid is gone; its claims are now yours)"
+  echo "$SLOT"
+}
+
+# --- budget ---
+reserved_total() { # excluding slot $1
+  local t=0 f v
+  for f in "$S"/budget/*.json; do
+    [ -f "$f" ] || continue
+    [ "$(basename "$f" .json)" = "${1:-}" ] && continue
+    slot_owner_live "$(basename "$f" .json)" || continue
+    v=$(jq -r .pct "$f"); t=$(echo "$t + $v" | bc)
+  done
+  echo "$t"
+}
+budget_ok() { # usage-pct extra-pct → 0 when usage + others' reservations + extra stays under the line
+  local usage=$1 extra=$2 thr live res line
+  thr=$(jq -r .threshold "$S/run.json"); live=$(live_workers); res=$(reserved_total "$SLOT")
+  line=$(echo "$thr - $live * 3" | bc)
+  BUDGET_MSG="usage $usage% + reserved $res% + $extra% against the claim line $line% (threshold $thr% − $live live × 3%)"
+  [ "$(echo "$usage + $res + $extra < $line" | bc)" = "1" ]
+}
+cmd_budget() {
+  need_state; require_owner
+  local sub=${1:-}; shift || true
+  local usage="" pct="" five=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --usage) usage=$2; shift 2 ;; --five-hour) five=$2; shift 2 ;; *) pct=$1; shift ;; esac
+  done
+  case "$sub" in
+    check)   [ -n "$usage" ] || die "budget check --usage PCT"
+             if budget_ok "$usage" 0; then echo "ok: $BUDGET_MSG"; else refuse "over budget: $BUDGET_MSG"; fi ;;
+    reserve) [ -n "$usage" ] && [ -n "$pct" ] || die "budget reserve PCT --usage PCT"
+             lock_state
+             if budget_ok "$usage" "$pct"; then
+               jq -n --argjson p "$pct" --argjson t "$(now)" '{pct: $p, at: $t}' > "$S/budget/$SLOT.json"
+               unlock_state; echo "reserved $pct%: $BUDGET_MSG"
+             else unlock_state; refuse "reservation does not fit: $BUDGET_MSG"; fi ;;
+    release) rm -f "$S/budget/$SLOT.json"; echo "released" ;;
+    pace)    [ -n "$five" ] || die "budget pace --five-hour PCT"
+             if [ "$(echo "$five >= 85" | bc)" = "1" ]; then
+               local k=${SLOT##*-}
+               echo "wait: 5-hour window at $five%: release your locks, then wait for its reset plus $((k * 2)) minute(s) (staggered per slot)"
+               exit 10
+             fi
+             echo "ok: 5-hour window at $five%" ;;
+    *) die "budget check|reserve|release|pace" ;;
+  esac
+}
+
+# --- claims ---
+cmd_claim() {
+  need_state; require_owner; check_halt
+  local item=${1:-} area="" usage=""; shift || true
+  [ -n "$item" ] || die "claim <item> [--area A] --usage PCT"
+  while [ $# -gt 0 ]; do
+    case "$1" in --area) area=$2; shift 2 ;; --usage) usage=$2; shift 2 ;; *) die "claim: unknown argument $1" ;; esac
+  done
+  [ -n "$usage" ] || die "claim needs --usage PCT (the current weekly usage)"
+  case "$item" in */*|.*|"") die "bad item id '$item'" ;; esac
+  if [ -n "$area" ]; then
+    jq -e --arg a "$area" '.areas | index($a)' "$S/config.json" >/dev/null || refuse "area '$area' is not in the config's vocabulary"
+  fi
+  jq -e --arg i "$item" '.exclusions | index($i)' "$S/run.json" >/dev/null && refuse "$item is excluded from this run"
+  local f="$S/claims/$item.json"
+  lock_state
+  if [ -f "$f" ]; then
+    local owner; owner=$(jq -r .slot "$f")
+    unlock_state
+    [ "$owner" = "$SLOT" ] && { echo "already yours: $item"; return 0; }
+    refuse "$item is claimed by $owner (claims are never reassigned; only that slot's next process adopts them)"
+  fi
+  case "$item" in
+    ask:*) ;;
+    *)
+      local c
+      for c in "$S"/claims/*.json; do
+        [ -f "$c" ] || continue
+        case "$(basename "$c")" in ask:*) continue ;; esac
+        [ "$(jq -r .slot "$c")" = "$SLOT" ] && { unlock_state; refuse "$SLOT already works $(jq -r .item "$c"); release it first"; }
+        if [ -n "$area" ] && [ "$(jq -r '.area // empty' "$c")" = "$area" ]; then
+          unlock_state; refuse "area '$area' is being worked by $(jq -r .slot "$c") ($(jq -r .item "$c")); pick another item in the look-ahead window"
+        fi
+      done
+      budget_ok "$usage" 0 || { unlock_state; refuse "over budget: $BUDGET_MSG"; } ;;
+  esac
+  jq -n --arg i "$item" --arg s "$SLOT" --arg a "$area" --argjson t "$(now)" '{item: $i, slot: $s, area: $a, at: $t}' > "$f"
+  unlock_state
+  echo "claimed $item for $SLOT"
+}
+cmd_release() {
+  need_state; require_owner
+  local item=${1:-}; [ -n "$item" ] || die "release <item>"
+  local f="$S/claims/$item.json"
+  [ -f "$f" ] || { echo "not claimed: $item"; return 0; }
+  [ "$(jq -r .slot "$f")" = "$SLOT" ] || refuse "$item belongs to $(jq -r .slot "$f")"
+  rm -f "$f"; echo "released $item"
+}
+
+# --- merge turn: a FIFO ticket queue ---
+turn_head() { head -1 "$S/turn/queue" 2>/dev/null; }
+holds_turn() { local h; h=$(turn_head); [ -n "$h" ] && [ "${h#* }" = "$SLOT" ]; }
+cmd_turn() {
+  need_state
+  local sub=${1:-}; shift || true
+  case "$sub" in
+    holds) find_slot; holds_turn; exit $? ;;
+  esac
+  require_owner
+  case "$sub" in
+    enter)
+      check_halt
+      lock_state
+      if ! grep -q " $SLOT\$" "$S/turn/queue"; then
+        local t; t=$(( $(cat "$S/turn/next") + 1 )); echo "$t" > "$S/turn/next"
+        echo "$t $SLOT" >> "$S/turn/queue"
+        [ "$(wc -l < "$S/turn/queue" | tr -d ' ')" = "1" ] && now > "$S/turn/head_since"
+      fi
+      unlock_state
+      turn_report ;;
+    wait)
+      while :; do
+        turn_report >/dev/null 2>&1; local st=$?
+        [ "$st" -eq 10 ] || { turn_report; return $?; }
+        sleep 15
+      done ;;
+    leave)
+      local requeue=""; [ "${1:-}" = "--requeue" ] && requeue=1
+      lock_state
+      local was_head=""; holds_turn && was_head=1
+      grep -v " $SLOT\$" "$S/turn/queue" > "$S/turn/queue.tmp"; mv "$S/turn/queue.tmp" "$S/turn/queue"
+      if [ -n "$requeue" ]; then
+        local t; t=$(( $(cat "$S/turn/next") + 1 )); echo "$t" > "$S/turn/next"; echo "$t $SLOT" >> "$S/turn/queue"
+      fi
+      [ -n "$was_head" ] && now > "$S/turn/head_since"
+      unlock_state
+      [ -n "$requeue" ] && echo "left the turn; back of the queue" || echo "left the turn" ;;
+    take-dead)
+      lock_state
+      local h hs; h=$(turn_head); hs=${h#* }
+      [ -n "$h" ] || { unlock_state; refuse "the queue is empty"; }
+      [ "$hs" != "$SLOT" ] || { unlock_state; refuse "you hold the turn already"; }
+      slot_owner_live "$hs" && { unlock_state; refuse "$hs's owner is alive; a live owner's turn is never taken (nudge it, notify the user)"; }
+      sed 1d "$S/turn/queue" > "$S/turn/queue.tmp"; mv "$S/turn/queue.tmp" "$S/turn/queue"; now > "$S/turn/head_since"
+      unlock_state
+      note "removed dead $hs's ticket from the head; that slot's PR may be half-merged: you read the remote state back before this"
+      turn_report ;;
+    *) die "turn enter|wait|leave [--requeue]|holds|take-dead" ;;
+  esac
+}
+turn_report() {
+  local h hs pos
+  h=$(turn_head); hs=${h#* }
+  pos=$(grep -n " $SLOT\$" "$S/turn/queue" | cut -d: -f1)
+  [ -n "$pos" ] || { echo "not in the merge queue"; return 3; }
+  if [ "$pos" = "1" ]; then echo "your turn ($SLOT holds the merge turn)"; return 0; fi
+  if ! slot_owner_live "$hs"; then echo "position $pos; the head ($hs) has no live owner: read its PR's remote state, then fleet turn take-dead"; return 11; fi
+  local age=$(( $(now) - $(cat "$S/turn/head_since" 2>/dev/null || now) ))
+  echo "position $pos; $hs has held the turn ${age}s"
+  return 10
+}
+
+# --- serial resources ---
+cmd_reserve() {
+  need_state; require_owner
+  local res=${1:-}; [ -n "$res" ] || die "reserve <resource>"
+  local kind; kind=$(jq -r --arg r "$res" '.serial_resources[$r].kind // empty' "$S/config.json")
+  [ -n "$kind" ] || refuse "no serial resource '$res' in the config"
+  lock_state
+  case "$kind" in
+    pool)
+      mkdir -p "$S/pools/$res"
+      local v
+      for v in $(jq -r --arg r "$res" '.serial_resources[$r].values[]' "$S/config.json"); do
+        if [ -f "$S/pools/$res/$v" ] && [ "$(cat "$S/pools/$res/$v")" = "$SLOT" ]; then unlock_state; echo "$v"; return 0; fi
+      done
+      for v in $(jq -r --arg r "$res" '.serial_resources[$r].values[]' "$S/config.json"); do
+        local holder; holder=$(cat "$S/pools/$res/$v" 2>/dev/null || true)
+        if [ -z "$holder" ] || ! slot_owner_live "$holder"; then
+          echo "$SLOT" > "$S/pools/$res/$v"; unlock_state; echo "$v"; return 0
+        fi
+      done
+      unlock_state; refuse "pool '$res' is exhausted" ;;
+    counter)
+      holds_turn || { unlock_state; refuse "counter '$res' is assigned only inside the merge turn (fleet turn enter)"; }
+      local cmd ref max
+      cmd=$(jq -r --arg r "$res" '.serial_resources[$r].max_cmd' "$S/config.json")
+      ref=$(jq -r .main_ref "$S/config.json")
+      max=$(cd "$SLOT_PATH" && REF="$ref" sh -c "$cmd") || { unlock_state; refuse "max_cmd for '$res' failed"; }
+      case "$max" in ""|*[!0-9]*) unlock_state; refuse "max_cmd for '$res' printed '$max', not a number" ;; esac
+      unlock_state; echo $((max + 1)) ;;
+  esac
+}
+
+# --- the suite lock: owned by this wrapper process, never stolen on time ---
+cmd_with_lock() {
+  need_state
+  local name=${1:-}; shift || true
+  local limit=""
+  [ "${1:-}" = "--timeout" ] && { limit=$2; shift 2; }
+  [ "${1:-}" = "--" ] || die "with-lock <name> [--timeout S] -- <command...>"
+  shift; [ $# -ge 1 ] || die "with-lock: no command"
+  case "$name" in ""|*/*|.*) die "bad lock name '$name'" ;; esac
+  if [ -z "$limit" ]; then
+    local cmdline="$*" p b
+    limit=1800
+    while IFS="	" read -r p b; do
+      [ -n "$p" ] && printf '%s' "$cmdline" | grep -Eq -- "$p" && limit=$b
+    done < <(jq -r '.heavy_commands[] | "\(.pattern)\t\(.bound_seconds // 1800)"' "$S/config.json")
+  fi
+  local d="$S/locks/$name.d" waited=0 o
+  while ! mkdir "$d" 2>/dev/null; do
+    o=$(cat "$d/owner" 2>/dev/null || true)
+    if [ -n "$o" ] && ! alive "$(echo "$o" | cut -d' ' -f1)" "$(echo "$o" | cut -d' ' -f2-)"; then
+      note "lock $name: owner gone, breaking it"; rm -rf "$d"; continue
+    fi
+    [ $((waited % 60)) -eq 0 ] && note "lock $name held by ${o:-?}; waiting"
+    sleep 5; waited=$((waited + 5))
+  done
+  printf '%s %s\n' "$$" "$(proc_start $$)" > "$d/owner"
+  local slot; slot=$(cd "$PWD" && git rev-parse --show-toplevel 2>/dev/null || echo "?")
+  echo "$slot" > "$d/slot"
+  trap 'rm -rf "$d"' EXIT
+  trap 'exit 130' INT TERM
+  FLEET_LOCK_HELD=$name perl -e 'alarm shift; exec @ARGV or exit 127' "$limit" "$@"
+  local st=$?
+  rm -rf "$d"; trap - EXIT
+  [ "$st" -eq 142 ] && note "with-lock: the command hit its ${limit}s bound and was killed"
+  return "$st"
+}
+
+# --- land: the merge itself when there is no forge (a local fast-forward or squash, in the turn) ---
+cmd_land() {
+  need_state; require_owner
+  local squash="" msg=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --squash) squash=1; shift ;; -m|--message) msg=$2; shift 2 ;; *) die "land [--squash -m MSG]" ;; esac
+  done
+  holds_turn || refuse "land only inside the merge turn (fleet turn enter, fleet turn wait)"
+  local ref full
+  ref=$(jq -r .main_ref "$S/config.json")
+  full=$(cd "$SLOT_PATH" && git rev-parse --symbolic-full-name "$ref" 2>/dev/null)
+  case "$full" in refs/heads/*) ;; *) refuse "main_ref '$ref' is not a local branch; with a forge, merge through the forge instead" ;; esac
+  [ -z "$(cd "$SLOT_PATH" && git status --porcelain)" ] || refuse "the slot's tree is not clean"
+  if (cd "$SLOT_PATH" && git worktree list --porcelain) | grep -qx "branch $full"; then
+    refuse "${full#refs/heads/} is checked out in a worktree; detach that checkout (git switch --detach) while the fleet runs, or landing would leave it stale"
+  fi
+  local old head g stamp want
+  old=$(cd "$SLOT_PATH" && git rev-parse "$full"); head=$(cd "$SLOT_PATH" && git rev-parse HEAD)
+  (cd "$SLOT_PATH" && git merge-base --is-ancestor "$old" "$head") || refuse "HEAD does not contain ${full#refs/heads/}'s tip; merge it in first (never rebase)"
+  g=$(cd "$SLOT_PATH" && git rev-parse --path-format=absolute --git-common-dir); stamp="$g/verified/$head"
+  [ -f "$stamp" ] || refuse "HEAD $head has no verified stamp; run delivery/verify-head -- <the complete local suites> under fleet with-lock first"
+  want=$(jq -r '.verify_cmd // empty' "$SLOT_PATH/.claude/gates.json" 2>/dev/null)
+  [ -z "$want" ] || [ "$(head -1 "$stamp")" = "$want" ] || refuse "the stamp for $head was made by '$(head -1 "$stamp")', not the configured verify_cmd '$want'"
+  local new=$head
+  if [ -n "$squash" ]; then
+    [ -n "$msg" ] || die "land --squash needs -m MSG"
+    new=$(cd "$SLOT_PATH" && git commit-tree "$head^{tree}" -p "$old" -m "$msg") || refuse "commit-tree failed"
+  fi
+  (cd "$SLOT_PATH" && git update-ref -m "fleet land $SLOT" "$full" "$new" "$old") \
+    || refuse "${full#refs/heads/} moved under you (compare-and-swap failed); nothing landed"
+  echo "landed $new on ${full#refs/heads/}${squash:+ (squash of $head)}"
+}
+
+# --- halt / status / end ---
+cmd_halt() { need_state; local r="$*"; [ -n "$r" ] || die "halt <reason>"; echo "$r" > "$S/halt"; echo "halted: $r"; }
+cmd_unhalt() { need_state; rm -f "$S/halt"; echo "unhalted"; }
+cmd_status() {
+  need_state
+  echo "fleet at $S"
+  jq -r '"run: threshold \(.threshold)% · \(.workers) workers · look-ahead \(.lookahead) · merge: \(.merge_authority) · queue: \(.queue)" + (if .windows != "" then " · windows: \(.windows)" else "" end) + (if (.exclusions|length) > 0 then " · excluded: \(.exclusions|join(", "))" else "" end)' "$S/run.json"
+  [ -f "$S/halt" ] && echo "HALTED: $(cat "$S/halt")"
+  local f s
+  for f in "$S"/slots/*.json; do
+    s=$(jq -r .slot "$f")
+    printf '  %-8s %s  owner %s (%s)\n' "$s" "$(jq -r .path "$f")" "$(jq -r '.pid // "-"' "$f")" "$(slot_owner_live "$s" && echo live || echo gone)"
+  done
+  echo "claims:"; for f in "$S"/claims/*.json; do [ -f "$f" ] && jq -r '"  \(.item) → \(.slot)" + (if .area != "" then " [\(.area)]" else "" end)' "$f"; done
+  echo "merge queue:"; sed 's/^/  #/' "$S/turn/queue"
+  echo "locks:"; for f in "$S"/locks/*.d; do [ -d "$f" ] && echo "  $(basename "$f" .d) by $(cat "$f/slot" 2>/dev/null) ($(cat "$f/owner" 2>/dev/null))"; done
+  echo "budget reservations:"; for f in "$S"/budget/*.json; do [ -f "$f" ] && echo "  $(basename "$f" .json): $(jq -r .pct "$f")%"; done
+  return 0
+}
+cmd_exclude() { need_state; local i=${1:-}; [ -n "$i" ] || die "exclude <item>"; lock_state; jset "$S/run.json" '.exclusions += [$i] | .exclusions |= unique' --arg i "$i"; unlock_state; echo "excluded $i"; }
+cmd_end() {
+  need_state
+  local f s live=""
+  for f in "$S"/claims/*.json; do
+    [ -f "$f" ] || continue
+    s=$(jq -r .slot "$f"); slot_owner_live "$s" && live="$live $(jq -r .item "$f")@$s"
+  done
+  [ -z "$live" ] || refuse "claims with a live owner:$live"
+  local paths; paths=$(for f in "$S"/slots/*.json; do jq -r .path "$f"; done)
+  rm -rf "$S"
+  echo "fleet ended. The slot worktrees are left in place; remove each with: git worktree remove <path>"
+  printf '  %s\n' $paths
+}
+
+# --- self-test ---
+self_test() {
+  local self tmp fails=0 out st
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fleet-self.XXXXXX"); tmp=$(cd "$tmp" && pwd -P)
+  ok()  { echo "ok   $1"; }
+  bad() { echo "FAIL $1"; printf '%s\n' "${2:-}" | sed 's/^/     /'; fails=$((fails + 1)); }
+  expect() { # name want-exit want-text dir cmd... (CLAUDE_PID from $PIDV)
+    local name=$1 want=$2 text=$3 dir=$4; shift 4
+    out=$(cd "$dir" && CLAUDE_PID=$PIDV "$@" 2>&1); st=$?
+    if [ "$st" -eq "$want" ] && printf '%s' "$out" | grep -q -- "$text"; then ok "$name"; else bad "$name (exit $st, want $want / $text)" "$out"; fi
+  }
+  git init -q --bare "$tmp/origin.git"
+  git clone -q "$tmp/origin.git" "$tmp/main" 2>/dev/null
+  ( cd "$tmp/main" && git config user.email t@example.invalid && git config user.name t \
+    && git checkout -q -b main && echo 7 > max.txt && git add . && git commit -qm base && git push -q origin main ) || { echo "setup failed"; return 1; }
+  sleep 600 & local P1=$!; sleep 600 & local P2=$!; sleep 600 & local P3=$!
+  PIDV=$P1
+  expect "init without a config refuses and prints the template" 3 '"heavy_commands"' "$tmp/main" \
+    "$self" init --workers 2 --threshold 60 --queue q --merge-authority "merge on green"
+  mkdir -p "$tmp/main/.claude"
+  cat > "$tmp/main/.claude/fleet.json" <<'EOF'
+{ "worktree_root": "wt", "main_ref": "origin/main", "build_dir": "per-slot",
+  "heavy_commands": [ { "pattern": "slowsuite", "bound_seconds": 2 } ],
+  "serial_resources": { "code": { "kind": "counter", "max_cmd": "git show $REF:max.txt" },
+                        "port": { "kind": "pool", "values": ["p1"] } },
+  "mechanical_files": [], "branch_update": "merge", "areas": ["core", "cli"] }
+EOF
+  expect "init creates the slots" 0 "slot-2" "$tmp/main" \
+    "$self" init --workers 2 --threshold 60 --queue q --merge-authority "merge on green"
+  local W1="$tmp/main/wt/slot-1" W2="$tmp/main/wt/slot-2"
+  [ -d "$W1" ] && [ -d "$W2" ] && ok "slot worktrees exist" || bad "slot worktrees exist"
+  expect "init twice is refused" 3 "already exists" "$tmp/main" \
+    "$self" init --workers 2 --threshold 60 --queue q --merge-authority x
+  expect "whoami registers slot-1" 0 "slot-1" "$W1" "$self" whoami
+  PIDV=$P2; expect "a second live process in a slot is refused" 3 "one process per slot" "$W1" "$self" whoami
+  expect "whoami registers slot-2" 0 "slot-2" "$W2" "$self" whoami
+  PIDV=$P1; expect "claim an item" 0 "claimed A-1" "$W1" "$self" claim A-1 --area core --usage 10
+  PIDV=$P2; expect "another slot cannot take a claimed item" 3 "claimed by slot-1" "$W2" "$self" claim A-1 --area cli --usage 10
+  expect "the same area is refused" 3 "area 'core'" "$W2" "$self" claim A-2 --area core --usage 10
+  expect "the claim line counts live workers" 3 "over budget" "$W2" "$self" claim A-2 --area cli --usage 54.5
+  expect "an ask: claim parks a question" 0 "claimed ask:A-9" "$W2" "$self" claim ask:A-9 --usage 10
+  expect "a different area and under the line is fine" 0 "claimed A-2" "$W2" "$self" claim A-2 --area cli --usage 10
+  expect "a reservation that does not fit is refused" 3 "does not fit" "$W2" "$self" budget reserve 50 --usage 10
+  expect "a reservation that fits" 0 "reserved 5%" "$W2" "$self" budget reserve 5 --usage 10
+  PIDV=$P1; expect "others' reservations count against the line" 3 "over budget" "$W1" "$self" budget check --usage 50
+  expect "pace waits at 85% of the 5-hour window" 10 "wait" "$W1" "$self" budget pace --five-hour 90
+  expect "a counter outside the turn is refused" 3 "inside the merge turn" "$W1" "$self" reserve code
+  expect "a pool value is reserved at first use" 0 "p1" "$W1" "$self" reserve port
+  PIDV=$P2; expect "an exhausted pool is refused" 3 "exhausted" "$W2" "$self" reserve port
+  PIDV=$P1; expect "turn enter: first in holds it" 0 "your turn" "$W1" "$self" turn enter
+  PIDV=$P2; expect "turn enter: second waits" 10 "position 2" "$W2" "$self" turn enter
+  (cd "$W1" && "$self" turn holds) && ok "turn holds: the head's slot" || bad "turn holds: the head's slot"
+  (cd "$W2" && "$self" turn holds) && bad "turn holds: not the second slot" || ok "turn holds: not the second slot"
+  expect "a live head's turn is never taken" 3 "never taken" "$W2" "$self" turn take-dead
+  PIDV=$P1; expect "a counter inside the turn is max+1 on the main ref" 0 "^8" "$W1" "$self" reserve code
+  expect "leave --requeue goes to the back" 0 "back of the queue" "$W1" "$self" turn leave --requeue
+  PIDV=$P2; expect "the next ticket now holds the turn" 0 "your turn" "$W2" "$self" turn enter
+  # The suite lock.
+  PIDV=$P1
+  ( cd "$W1" && "$self" with-lock suite -- sh -c 'sleep 3' ) & local LK=$!
+  sleep 1
+  local t0; t0=$(date +%s)
+  out=$(cd "$W2" && "$self" with-lock suite --timeout 20 -- sh -c 'exit 7' 2>&1); st=$?
+  local waited=$(( $(date +%s) - t0 ))
+  wait $LK
+  [ "$st" -eq 7 ] && [ "$waited" -ge 1 ] && ok "with-lock waits for a live holder and keeps the exit status" || bad "with-lock waits (exit $st, waited ${waited}s)" "$out"
+  expect "with-lock applies the declared bound" 142 "bound" "$W1" "$self" with-lock suite -- sh -c 'sleep 5; : slowsuite'
+  mkdir "$tmp/main/.git/fleet/locks/suite.d"; echo "999999 Thu Jan 1 00:00:00 1970" > "$tmp/main/.git/fleet/locks/suite.d/owner"
+  expect "a dead owner's lock is broken" 0 "" "$W1" "$self" with-lock suite --timeout 10 -- true
+  # Dead owner: adoption and take-dead.
+  kill "$P1" 2>/dev/null; wait "$P1" 2>/dev/null
+  PIDV=$P2; expect "a dead owner's claim is still not reassigned" 3 "never reassigned" "$W2" "$self" claim A-1 --usage 10
+  expect "turn leave by the holder" 0 "left the turn" "$W2" "$self" turn leave
+  expect "a dead head is reported, not skipped" 11 "no live owner" "$W2" "$self" turn enter
+  expect "take-dead removes a dead head's ticket" 0 "your turn" "$W2" "$self" turn take-dead
+  expect "leave again" 0 "left the turn" "$W2" "$self" turn leave
+  PIDV=$P3; expect "a new process adopts the dead slot" 0 "slot-1" "$W1" "$self" whoami
+  expect "the adopter owns the old claims" 0 "already yours" "$W1" "$self" claim A-1 --usage 10
+  # Halt.
+  expect "halt" 0 "halted" "$W1" "$self" halt "auth expired"
+  expect "a halted fleet claims nothing" 3 "halted" "$W1" "$self" claim B-1 --usage 10
+  expect "status reports the halt" 0 "HALTED" "$W1" "$self" status
+  expect "end is refused while a claim has a live owner" 3 "live owner" "$tmp/main" "$self" end
+  kill "$P2" "$P3" 2>/dev/null; wait "$P2" "$P3" 2>/dev/null
+  expect "end once every owner is gone" 0 "fleet ended" "$tmp/main" "$self" end
+  [ ! -d "$tmp/main/.git/fleet" ] && ok "end removes the state" || bad "end removes the state"
+  # No forge: a repo with no remote lands by fleet land.
+  local L="$tmp/local"
+  git init -q -b main "$L" && ( cd "$L" && git config user.email t@example.invalid && git config user.name t \
+    && echo 1 > f && git add f && mkdir .claude \
+    && printf '%s\n' '{"worktree_root":"wt","main_ref":"main","heavy_commands":[],"serial_resources":{},"mechanical_files":[],"branch_update":"merge","areas":[]}' > .claude/fleet.json \
+    && printf 'wt/\n' > .gitignore && git add . && git commit -qm base ) || bad "no-forge setup"
+  sleep 600 & local P4=$!; PIDV=$P4
+  expect "no forge: init with no remote" 0 "slot-1" "$L" "$self" init --workers 1 --threshold 60 --queue q --merge-authority x
+  local LW="$L/wt/slot-1"
+  expect "no forge: whoami" 0 "slot-1" "$LW" "$self" whoami
+  (cd "$LW" && git config user.email t@example.invalid && git config user.name t && git checkout -q -b feat && echo 2 > f && git commit -qam two)
+  expect "no forge: land outside the turn is refused" 3 "inside the merge turn" "$LW" "$self" land
+  expect "no forge: enter the turn" 0 "your turn" "$LW" "$self" turn enter
+  expect "no forge: a checked-out main is refused" 3 "detach that checkout" "$LW" "$self" land
+  (cd "$L" && git checkout -q --detach)
+  expect "no forge: land without a stamp is refused" 3 "no verified stamp" "$LW" "$self" land
+  mkdir -p "$L/.git/verified"; printf 'suite\nt\n' > "$L/.git/verified/$(git -C "$LW" rev-parse HEAD)"
+  expect "no forge: a stamped head fast-forwards main" 0 "landed" "$LW" "$self" land
+  [ "$(git -C "$L" rev-parse main)" = "$(git -C "$LW" rev-parse HEAD)" ] && ok "no forge: main is at the landed head" || bad "no forge: main is at the landed head"
+  kill "$P4" 2>/dev/null; wait "$P4" 2>/dev/null
+  rm -rf "$tmp"
+  [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }
+  echo "self-test: $fails failed"; return 1
+}
+
+sub=${1:-}; shift || true
+case "$sub" in
+  init) cmd_init "$@" ;;
+  whoami) cmd_whoami ;;
+  claim) cmd_claim "$@" ;;
+  release) cmd_release "$@" ;;
+  reserve) cmd_reserve "$@" ;;
+  land) cmd_land "$@" ;;
+  with-lock) cmd_with_lock "$@"; exit $? ;;
+  turn) cmd_turn "$@"; exit $? ;;
+  budget) cmd_budget "$@" ;;
+  halt) cmd_halt "$@" ;;
+  unhalt) cmd_unhalt ;;
+  exclude) cmd_exclude "$@" ;;
+  status) cmd_status ;;
+  end) cmd_end ;;
+  --self-test) self_test; exit $? ;;
+  ""|-h|--help) sed -n '2,29p' "$0"; exit 2 ;;
+  *) die "unknown subcommand '$sub' (fleet --help)" ;;
+esac

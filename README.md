@@ -157,7 +157,15 @@ The source is under `claude/mods/`. Each plugin has tests (`claude plugin test c
 
 ## Compaction hook
 
-After an auto-compaction, Claude Code re-attaches only skills invoked through the Skill tool, and truncates them; the skill files a powerup command read (delivery, design-doc, queue-run, ...) do not come back. `claude/hooks/skills-after-compact.sh` is a `SessionStart` hook (matcher `startup|compact`) that puts them back in force: each powerup-family command records itself with `skills/powerup/powerup-mark` on its opening read, and after a compaction the hook injects the gate card (`skills/powerup/gates.md`) and the absolute paths of the files to re-read. A fresh process start deletes the record; a `/clear` handoff keeps it. Needs `jq`. Installed with `powerup` and `powerup-auto`; add the printed entry to `~/.claude/settings.json`. `--self-test` checks it.
+After an auto-compaction, Claude Code re-attaches only skills invoked through the Skill tool, and truncates them; the skill files a powerup command read (delivery, design-doc, queue-run, ...) do not come back. `claude/hooks/skills-after-compact.sh` is a `SessionStart` hook (matcher `startup|compact`) that puts them back in force: each powerup-family command records itself with `skills/powerup/powerup-mark` on its opening read, and after a compaction the hook injects the gate card (`skills/powerup/gates.md`) and the absolute paths of the files to re-read. A fresh process start deletes the record; a `/clear` handoff keeps it. Needs `jq`. Installed with every powerup bundle; add the printed entry to `~/.claude/settings.json`. `--self-test` checks it.
+
+## Gate hook
+
+`claude/hooks/gate.sh` is a `PreToolUse` hook on Bash that turns the hard gates into code, in every session and every repo. It denies a merge that does not pin the reviewed head or whose verification has not passed at that head (CI checks where there is CI, else a `verified <sha>` stamp written by `skills/delivery/verify-head`); `git stash` other than `list`/`show`; a force push, a `+refspec` or `git rebase` (ask the user first); and `git commit` with no user.email. While a queue fleet runs it also denies a merge outside the slot's merge turn and a declared heavy command outside `fleet with-lock`. Each denial is one line naming the way through. A project describes its forge in `.claude/gates.json` (forge, merge/head/checks commands, CI present, required checks, local verify command); GitHub with CI needs no config, a repo with no remote gates a local `git merge` into the default branch, and an unrecognized setup is logged and allowed. Only a merge touches the network; the hook's own errors allow. Needs `jq`. Installed with every powerup bundle, or alone as `gate-hook`; `--self-test` checks it.
+
+## Queue fleet
+
+`/powerup-fleet start <N> …` (install `powerup-fleet`) runs N queue workers in one repository, one per worktree slot. `skills/queue-fleet/fleet` holds every shared decision — claims, locks, a FIFO merge turn, budget reservations — under the repository's common git dir; the project's `.claude/fleet.json` declares its heavy commands, serial resources and areas. A repo without a forge lands with `fleet land`. `fleet --self-test` checks it.
 
 ## Keeping a checkout and an install in step
 
