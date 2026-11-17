@@ -658,6 +658,7 @@ EOF
   grep -q "head_cmd for 12 failed" "$GATE_LOG" && echo "ok   the gh failure was logged" || { echo "FAIL the gh failure was logged"; fails=$((fails + 1)); }
   # protected paths: the two configs always, plus the default branch's own protected_paths
   denies "protected: a change to .claude/gates.json"  "protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES="src/a.rs,.claude/gates.json"
+  denies "protected: a protected path with a check still pending denies once" "protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".claude/gates.json" GH_CHECKS="$PENDING"
   denies "protected: a change to .claude/fleet.json"  "protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".claude/fleet.json"
   allows "protected: an ordinary workflow change"     "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".github/workflows/ci.yml,src/a.rs"
   setgates "$R" '{"protected_paths":["LICENSE*",".github/workflows/cla.yml"]}'
