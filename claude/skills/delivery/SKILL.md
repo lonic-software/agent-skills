@@ -1,5 +1,5 @@
 ---
-description: Delivery mode — mode-independent doctrines for shipping work in any session: grounding handed-down findings, code-review routing and tiers, one-finding-one-PR shipping cadence, and fix-the-class execution discipline. User-invoked only.
+description: Delivery mode — mode-independent doctrines for shipping work in any session: grounding handed-down findings, code-review routing and tiers, one-finding-one-PR shipping cadence, fix-the-class execution discipline, and reuse-then-promote for helper scripts. User-invoked only.
 disable-model-invocation: true
 ---
 
@@ -431,3 +431,21 @@ regression test while the class stays broken.
   the same PR.
 - **Never sync docs to defective code.** "Code wins over docs" is dangerous exactly when the code
   is the bug — reconciling a doc to match buggy behavior documents the defect instead of fixing it.
+
+## E. Helpers: reuse, then promote
+
+A helper rewritten in a scratchpad each session comes back with new bugs each time; a helper kept
+as a tool is fixed once. (evolve owns the promotion loop; this is its delivery-time half.)
+
+- **Look before you write.** Before writing a helper script, check the tools shipped beside the
+  skills (`${CLAUDE_SKILL_DIR}/`: `revert-check`, `verify-head`, `wait-pr-ci`, ...) and wherever the
+  project declares its own (its `bin/`, or the tool list its contributing guide or CLAUDE.md names).
+- **A helper written a second time is promoted, not rewritten** — whether the first copy is in this
+  session or an earlier one's scratchpad. Project-neutral: into the owning skill's folder, with a
+  `--self-test`. Project-specific: into the project's tool location, through its normal change
+  process.
+- **A tool that misbehaves is fixed in place, never bypassed** with a one-off. The fix carries a
+  self-test case that reproduces the failure.
+- **Name tools by stable path.** Handoff prompts and run parameters cite a skill or repository
+  path, never a scratchpad path: a scratchpad can be wiped, and the next session cannot reuse or
+  fix what it cannot find.
