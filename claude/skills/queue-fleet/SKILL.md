@@ -181,7 +181,8 @@ final report rather than into the files, since every slot reads them.
 Two checked-in files. `fleet init` reads `.claude/fleet.json`; when it is absent, init refuses and
 prints a template (and the gate template, when that file is absent too). Its fields:
 - the worktree root and the build-directory policy;
-- `main_ref`, the ref slots branch from: `origin/main` with a forge, the local `main` without one;
+- `main_ref`, the ref slots branch from: `origin/main` with a forge, the local `main` without one.
+  It names the default branch: `fleet init` refuses one that is not origin's HEAD;
 - the heavy commands that need the suite lock, as regexes, each with its bound;
 - the serial resources, each `pool` (with its values) or `counter` (with a command that prints the
   current maximum on `$REF`);
@@ -197,7 +198,8 @@ prints a template (and the gate template, when that file is absent too). Its fie
 `.claude/gates.json` is the merge gate's config, read by `gate.sh` in every session, fleet or not.
 The gate, `wait-pr-ci` and `fleet` read the default branch's committed copy (origin's, else the local
 branch; `fleet` reads its `main_ref`'s), never the work tree's: a change, or an uncommitted edit, cannot loosen the rules that judge it, and an edit is in
-force once it is on the default branch. Every field is optional, and GitHub with CI needs none of them:
+force once it is on the default branch. A committed copy that does not parse denies every merge
+until the user fixes it; commits and pushes still run on the defaults. Every field is optional, and GitHub with CI needs none of them:
 - `forge` — `github`, `gitlab`, `other` or `none`. Default: `github` when origin is on github.com,
   `none` with no remote. Any other remote is unrecognized: its merges are logged, not gated, until
   configured.
@@ -215,7 +217,9 @@ force once it is on the default branch. Every field is optional, and GitHub with
   `.claude/gates.json` and `.claude/fleet.json` are always protected, renames included.
 - `commit_email` — the author email every commit and push must carry. The gate refuses a commit
   set up otherwise (in git's order: `--author`, `GIT_AUTHOR_EMAIL`, `user.email`, in the repository
-  `git -C` names) and a push carrying another author or naming commits it cannot list, and `fleet init` refuses a repository whose
+  `git -C` names) and a push carrying another author or naming commits it cannot list (in a
+  repository the command names readably; a `git -C` given by an expansion is refused only where the
+  working directory sets `commit_email`), and `fleet init` refuses a repository whose
   configured email differs.
 - `verify_cmd` — the complete local suite command. With no CI, its `verify-head` stamp on the
   merged head is the merge evidence.

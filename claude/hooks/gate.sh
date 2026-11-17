@@ -19,7 +19,9 @@
 #   - `git commit` with no user.email at all (a scratch HOME, an unconfigured box): the commit would
 #     carry an unlinked author. With commit_email configured, a commit whose author email (-c
 #     user.email, GIT_AUTHOR_EMAIL=, --author, else git config) differs is refused, best-effort,
-#     and a `git push` carrying a commit authored by another email is refused, authoritatively.
+#     and a `git push` carrying a commit authored by another email is refused, authoritatively, for
+#     a repository the command names readably (cwd, or a literal or quoted -C/--git-dir path). A
+#     push to one named by an expansion is refused where cwd sets commit_email, else not checked.
 # Only while $(git rev-parse --git-common-dir)/fleet/ exists (queue-fleet):
 #   - a forge merge also needs this slot to hold the merge turn (fleet turn holds), the pinned sha
 #     to be this slot's HEAD, and `fleet collisions` to pass on it (no counter both sides bumped);
@@ -75,6 +77,8 @@ parse_segment() {
     case "$w" in
       '>'|'>>'|'<'|'<<'|'<<<'|'>|'|'&>'|'&>>'|[0-9]'>'|[0-9]'>>'|[0-9]'<') skip=1 ;;
       '>'*|'<'*|'&>'*|[0-9]'>'*|[0-9]'<'*) ;;
+      # main>log: the word ends at the operator (a ref name holds neither > nor <)
+      *'>'*|*'<'*) kept+=("${w%%[<>]*}"); case "${w#*[<>]}" in ''|'>'|'<'|'<<') skip=1 ;; esac ;;
       *) kept+=("$w") ;;
     esac
   done
@@ -98,11 +102,13 @@ base() { local w=${1##*/}; printf '%s' "$w"; }
 # GIT_TARGET_UNKNOWN=1 when one of those names a path this hook cannot read (a quoted value it
 # cannot recover unambiguously, or an expansion).
 GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""; GIT_GLOBAL=(); GIT_TARGET_UNKNOWN=""
-# The value of a quoted repository option, from RAW_CMD; empty unless exactly one value is found.
+# The value of a quoted repository option given to git (git's own options, before the
+# subcommand), from RAW_CMD; empty unless exactly one value is found.
 unq_opt() { # option
   local vals
-  vals=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' | grep -o -E -- "(^|[[:space:]])$1[[:space:]]+(\"[^\"]*\"|'[^']*')" \
-    | sed -E "s/^[[:space:]]*$1[[:space:]]+[\"']//; s/[\"']\$//" | sort -u)
+  vals=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' \
+    | grep -o -E -- "(^|[;&|(\`[:space:]/])git[[:space:]]+((-[^[:space:];&|\"']*|\"[^\"]*\"|'[^']*')[[:space:]]+)*$1[[:space:]]+(\"[^\"]*\"|'[^']*')" \
+    | sed -E "s/.*[[:space:]]$1[[:space:]]+[\"']//; s/[\"']\$//" | sort -u)
   [ -n "$vals" ] && [ "$(printf '%s\n' "$vals" | wc -l | tr -d ' ')" = 1 ] && printf '%s' "$vals"
 }
 parse_git() {
@@ -257,8 +263,12 @@ config_branch() { # cwd
   for b in main master; do
     (cd "$1" && { git show-ref -q --verify "refs/remotes/origin/$b" || git show-ref -q --verify "refs/heads/$b"; }) 2>/dev/null && { echo "$b"; return; }
   done
-  (cd "$1" 2>/dev/null && git rev-parse -q --verify HEAD >/dev/null 2>&1) \
-    && log "no default branch found (no origin/HEAD, main or master) in $1: .claude/gates.json not read, defaults apply. Set it with git remote set-head origin --auto."
+  # Once per repository: this runs on every command.
+  local m
+  m=$(cd "$1" 2>/dev/null && git rev-parse -q --verify HEAD >/dev/null 2>&1 && git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+  [ -e "$m/gate-no-default-branch" ] && return 0
+  : 2>/dev/null > "$m/gate-no-default-branch"
+  log "no default branch found (no origin/HEAD, main or master) in $1: .claude/gates.json not read, defaults apply. Set it with git remote set-head origin --auto."
 }
 # Prints the default branch's .claude/gates.json (a JSON object), or nothing.
 config_file() { # cwd
@@ -268,11 +278,20 @@ config_file() { # cwd
     (cd "$1" 2>/dev/null && git rev-parse -q --verify "$ref" >/dev/null 2>&1) || continue
     j=$(cd "$1" 2>/dev/null && git show "$ref:.claude/gates.json" 2>/dev/null) || return 0
     if printf '%s' "$j" | jq -e 'type == "object"' >/dev/null 2>&1; then printf '%s\n' "$j"
-    else log "unparsable .claude/gates.json on $ref; using defaults"; fi
+    else jq -n --arg r "$ref" '{"gate.unparsable": $r}'; fi
     return 0
   done
 }
-load_config() { CFG=$(config_file "$1"); }
+# An unparsable config is no config (defaults, so commit and push stay possible to fix it), and
+# CFG_BAD names its ref: every merge is then denied, as wait-pr-ci and fleet refuse it too.
+CFG_BAD=""
+load_config() {
+  CFG=$(config_file "$1"); CFG_BAD=$(cfg gate.unparsable)
+  [ -z "$CFG_BAD" ] || { CFG=""; log "unparsable .claude/gates.json on $CFG_BAD; defaults apply, merges denied"; }
+}
+bad_config_deny() { # what
+  [ -z "$CFG_BAD" ] || deny "$1 is refused: .claude/gates.json on $CFG_BAD does not parse, so the rules it sets cannot be read. The user fixes it."
+}
 # has(), not //: jq's // treats false as absent, so a configured "ci": false would fall back to the default.
 cfg() { [ -n "$CFG" ] && printf '%s' "$CFG" | jq -r --arg k "$1" 'if has($k) and .[$k] != null then .[$k] | if type == "array" then .[] else tostring end else empty end' 2>/dev/null; }
 # required_checks as a JSON array of strings ([] when unset).
@@ -314,7 +333,7 @@ EOF
 # as GitLab itself passes the pipeline over it; a pipeline waiting on a manual job is pending.
 GL_HEAD_CMD='glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR" | jq -er .sha'
 # changes_count reads "N+" once the merge request is past the instance's diff limit: exit 3.
-GL_FILES_CMD='n=$(glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR" | jq -r .changes_count) || exit 1; case "$n" in *+*) exit 3 ;; esac; glab api --paginate "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR/diffs?per_page=100" | jq -r ".[] | .old_path, .new_path"'
+GL_FILES_CMD='n=$(glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR" | jq -r .changes_count) || exit 1; case "$n" in *+*) exit 3 ;; esac; d=$(glab api --paginate "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR/diffs?per_page=100") || exit 1; printf "%s" "$d" | jq -r ".[] | .old_path, .new_path"'
 GL_CHECKS_CMD=
 IFS= read -r -d '' GL_CHECKS_CMD <<'EOF' || true
 mr=$(glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR") || exit 1
@@ -379,6 +398,7 @@ need_stamp() { # cwd sha what
 # A forge merge: the merged head must be the reviewed head, and every verification must pass on it.
 check_forge_merge() { # cwd
   local cwd=$1 i=1 n=${#WORDS[@]} w pr="" sha="" repo="" shaflag
+  bad_config_deny "the merge"
   shaflag=$(setting sha_flag)
   # skip the words the merge pattern itself matched: the shortest prefix of words that matches it
   local re; re=$(setting merge_cmd); i=1
@@ -470,6 +490,7 @@ check_local_merge() { # cwd → sets LOCAL_MERGE when gated
   def=$(default_branch "$cwd"); [ -n "$def" ] || { log "no default branch found; local merge not gated"; return 0; }
   [ "$cur" = "$def" ] || return 0
   LOCAL_MERGE=1
+  bad_config_deny "git merge into $def"
   for a in ${GIT_REST[@]+"${GIT_REST[@]}"}; do
     case "$a" in -m|-F|-s|-X) ;; -*) ;; *) target=$a; break ;; esac
   done
@@ -629,7 +650,7 @@ EOF
 [ "$2" = --paginate ] && shift
 case "$2" in
   */jobs*) printf '%s\n' "${GL_JOBS:-[]}" ;;
-  */diffs*) printf '%s\n' "${GL_FILES:-[]}" ;;
+  */diffs*) [ -z "${GL_DIFFS_FAIL:-}" ] || { printf '%s\n' '[{"old_path":"a","new_path":"a"}]'; exit 1; }; printf '%s\n' "${GL_FILES:-[]}" ;;
   *) p=${2#projects/}; iid=${p##*/merge_requests/}; p=${p%%/merge_requests/*}
      sha=$GL_SHA
      { [ "$p" = "${GL_EXPECT:-:fullpath}" ] && [ "$iid" = "${GL_IID:-12}" ]; } || sha=ffffffffffffffffffffffffffffffffffffffff
@@ -755,6 +776,8 @@ EOF
   allows "identity: a push whose new commits all match"     "$I" "git push -u origin HEAD"
   allows "identity: redirections are not refspecs"          "$I" "git push -u origin HEAD 2>&1 > /dev/null"
   allows "identity: an attached redirection is not a refspec" "$I" "git push -u origin HEAD >/dev/null 2>/tmp/x"
+  allows "identity: a redirection with no space is not a refspec" "$I" "git push origin HEAD>/dev/null"
+  allows "identity: another tool's quoted -C is not git's"  "$I" "make -C \"x\" && git -C \"$I\" push origin HEAD"
   git -C "$I" branch amb && git -C "$I" tag amb
   allows "identity: an ambiguous refname's warning is not an author" "$I" "git push origin amb"
   SG_EMAIL=good@example.invalid setgates "$I" ''
@@ -769,7 +792,18 @@ EOF
   denies "config: origin/main is read with no origin/HEAD or local main" "not the project's commit_email" "$FB" "git -c user.email=bad@x.invalid commit -m x"
   ( cd "$FB" && git update-ref -d refs/remotes/origin/main ) || return 1
   allows "config: no default branch at all: defaults apply" "$FB" "git -c user.email=bad@x.invalid commit -m x"
-  grep -q "no default branch found" "$GATE_LOG" && echo "ok   no default branch is logged" || { echo "FAIL no default branch is logged"; fails=$((fails + 1)); }
+  allows "config: no default branch, a second command"    "$FB" "git status"
+  [ "$(grep -c "no default branch found (no origin/HEAD, main or master) in $FB" "$GATE_LOG")" = 1 ] \
+    && echo "ok   no default branch is logged, once" || { echo "FAIL no default branch is logged, once"; fails=$((fails + 1)); }
+  # an unparsable config: commits and pushes stay possible (to fix it), merges are denied
+  local UB="$tmp/ubrepo"
+  ( git init -q -b main "$UB" && cd "$UB" && git remote add origin https://github.com/o/r.git && mkdir .claude \
+    && printf '{"commit_email":\n' > .claude/gates.json && git add . && git config user.email u@example.invalid \
+    && git -c user.name=u commit -qm c && git update-ref refs/remotes/origin/main HEAD ) || return 1
+  denies "config: an unparsable config denies a forge merge" "does not parse" "$UB" "gh pr merge 12 --match-head-commit $SHA"
+  allows "config: an unparsable config still allows a commit" "$UB" "git commit -m x"
+  ( cd "$UB" && git remote remove origin ) || return 1
+  denies "config: an unparsable config denies a local merge" "does not parse" "$UB" "git merge feature"
   # a configured non-GitHub forge
   G="$tmp/glrepo"
   allows "other forge: sha pinned, checks green"   "$G" "forgecli merge 7 --sha $SHA"
@@ -792,6 +826,9 @@ EOF
   allows "gitlab: a URL names the merge request"    "$L" "glab mr merge https://gitlab.com/o/r/-/merge_requests/12 --sha=$SHA" GL_SHA=$SHA
   allows "gitlab: --squash-message's value is not the iid" "$L" "glab mr merge --squash-message 99 12 --sha $SHA" GL_SHA=$SHA
   denies "gitlab: past the instance's diff limit"   "more files than the forge lists" "$L" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA GL_CHANGES=1000+
+  : > "$GATE_LOG"
+  allows "gitlab: a failing diffs call is logged and allowed" "$L" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA GL_JOBS="$JOBS" GL_DIFFS_FAIL=1
+  grep -q "files_cmd for 12 failed" "$GATE_LOG" && echo "ok   gitlab: the diffs failure was logged" || { echo "FAIL gitlab: the diffs failure was logged"; fails=$((fails + 1)); }
   denies "gitlab: a protected path in the diffs"    "protected path" "$L" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA GL_FILES='[{"old_path":".claude/fleet.json","new_path":".claude/fleet.json"}]'
   setgates "$G" '{"forge":"gitlab"}'
   allows "self-hosted: \"forge\": \"gitlab\" alone uses the preset" "$G" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA
