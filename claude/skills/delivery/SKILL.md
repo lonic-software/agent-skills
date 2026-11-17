@@ -9,7 +9,7 @@ disable-model-invocation: true
 Delivery is on — I'll ground handed-down findings — and my own checkable claims — before acting on
 or durably writing them,
 route pre-merge review through
-`/code-review` (launched beside CI once the local suites pass; **run on my own authority,
+`/code-review` (launched once the local suites pass, beside any CI; **run on my own authority,
 capped at medium**), ship one finding per PR, and
 fix the class with the evidence each clause's class calls for.
 
@@ -154,30 +154,38 @@ documented — routing decisions elsewhere should cite this section, not restate
   body which entries the change touched, or that none applied. If the project keeps no such list,
   say so in the PR body. Checked docs fail CI when stale; unchecked ones fail nobody, so a run of
   merged PRs can leave a changelog silently behind.
-- **Review runs beside CI, not after it.** Intent: spend no wall-clock waiting on a gate that
-  rarely fails first, while still never merging a head CI has not passed. Once the complete local
-  suites (the first bullet) have passed on the head you push, open the PR and launch `/code-review`
-  in the same turn; do not wait for CI. Later rounds resume the reviewer after the fix commit is
-  pushed, again without a CI wait between rounds. Make **one push per review round** — the round's
-  fixes together — so each round has one head and CI one run. Green CI is still necessary and never
-  sufficient: **only the merge needs green, on the final head, read through the project's full check
-  set** — the order of the gates changed, not their number.
-  - **Wait for CI first** only where the local suites could not run what the change risks (another
-    OS, a service this machine lacks, a suite too long to run here). Then a red pipeline surfaces
-    mechanical breakage far more cheaply than a reviewer would, and a review of a diff CI would
-    reject spends the expensive gate on findings the cheap one owns. Skip the wait entirely when
-    there is no forge or no CI. Don't grind on a stuck or flaky pipeline: if CI can't go green for
-    reasons unrelated to the diff, say so rather than blocking.
+- **Review starts once the local suites pass; CI, where it exists, runs in parallel.** Intent: the
+  merged head is exactly the reviewed head, and every verification the project has passed on that
+  head — without spending wall-clock waiting on a gate that rarely fails first. Once the complete
+  local suites (the first bullet) have passed on the head you push, open the change for review and
+  launch `/code-review` in the same turn. Later rounds resume the reviewer after the fix commit.
+  Make **one push per review round** — the round's fixes together — so each round has one head.
+  **Only the merge needs the evidence, on the final head:**
+  - **With CI**, that is the project's full required check set, green at that sha. Rounds need no CI
+    wait between them, because CI retests every pushed fix.
+  - **Without CI** (a forge with none, or a local-only repo), the complete local suites on the final
+    head are the merge evidence, recorded with `${CLAUDE_SKILL_DIR}/verify-head -- <suites>`. Nothing
+    else retests the fix commits, so **every review round's fix commit needs its own local suite
+    run** before the reviewer resumes.
+  - **Wait for CI before review** only where the local suites could not run what the change risks
+    (another OS, a service this machine lacks, a suite too long to run here): a red pipeline then
+    surfaces mechanical breakage far more cheaply than a reviewer would. Don't grind on a stuck or
+    flaky pipeline: if CI can't go green for reasons unrelated to the diff, say so rather than
+    blocking.
   - Design-doc reviews are exempt — they run inside the design loop (see the design-doc bullet
     below) and gate the doc's content, which CI does not check.
-  - Trap seen: a first CI run fails on only a small share of PRs whose local suites ran green, so
-    waiting before every review cost about ten minutes per PR to avoid a case that produces a fix
-    round anyway.
-  - **Gate:** wait for CI with `${CLAUDE_SKILL_DIR}/wait-pr-ci <PR>` (shipped beside this skill)
-    run in the background — never a hand-written loop; read its exit status, never a piped summary
-    of it, and confirm the full check set with the forge's own check listing right before merging. A
-    wrapper preserves the status of what it wraps: no `| tail`/`| head`/`| grep` on a command whose
-    exit status is the verdict — read the status first, trim afterwards.
+  - Trap seen: a first CI run fails on only a small share of changes whose local suites ran green,
+    so waiting before every review cost about ten minutes per change to avoid a case that produces a
+    fix round anyway.
+  - **Gate, enforced by the `gate.sh` hook:** a merge must pin the head it merges (on GitHub,
+    `--match-head-commit <sha>`), that sha must be the change's head, and the evidence above must
+    pass at it — CI checks, or a `verify-head` stamp where there is no CI. The project's
+    `.claude/gates.json` names its forge commands and required checks; GitHub with CI needs none.
+    Wait for CI with `${CLAUDE_SKILL_DIR}/wait-pr-ci <PR>` (GitHub Actions; shipped beside this
+    skill) in the background, or the forge's own equivalent — never a hand-written loop. Read its exit
+    status, never a piped summary of it. A wrapper preserves the status of what it wraps: no
+    `| tail`/`| head`/`| grep` on a command whose exit status is the verdict — read the status first,
+    trim afterwards.
 - **One reviewer per change, resumed across rounds.** Invoke `/code-review` **once**; drive later
   rounds by `SendMessage` to that instance. Verified: a completed review agent resumes with its diff,
   its mutation runs and its findings intact. A repeat `Skill` call always starts a new one. **A
