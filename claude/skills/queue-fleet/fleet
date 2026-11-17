@@ -104,15 +104,17 @@ check_halt() { [ ! -f "$S/halt" ] || refuse "the fleet is halted: $(cat "$S/halt
 gates_template() {
   cat <<'EOF'
 {
-  "forge": "github | gitlab | other | none  (default: github when origin is on github.com, none with no remote)",
+  "forge": "github | gitlab | other | none  (default: github or gitlab when origin is on github.com or gitlab.com, none with no remote; name gitlab for a self-hosted instance)",
   "default_branch": "main  (default: origin/HEAD, else main or master)",
-  "ci": "true | false  (default: true for github; elsewhere true iff checks_cmd is set)",
-  "merge_cmd": "ERE matching the forge's merge command  (github default: ^gh pr merge; none: local git merge)",
-  "sha_flag": "the merge command's flag pinning the head  (github default: --match-head-commit)",
-  "head_cmd": "shell printing change $PR's head sha  (github default: gh pr view)",
-  "checks_cmd": "shell printing JSON [{name, bucket}] for change $PR  (github default: gh pr checks)",
+  "ci": "true | false  (default: true for github and gitlab; elsewhere true iff checks_cmd is set)",
+  "merge_cmd": "ERE matching the forge's merge command  (github default: ^gh pr merge; gitlab: ^glab mr merge; none: local git merge)",
+  "sha_flag": "the merge command's flag pinning the head  (github default: --match-head-commit; gitlab: --sha)",
+  "head_cmd": "shell printing change $PR's head sha  (github default: gh pr view; gitlab: glab api, the merge request's sha)",
+  "checks_cmd": "shell printing JSON [{name, bucket}] for change $PR  (github default: gh pr checks; gitlab: the head pipeline and its jobs)",
   "required_checks": ["check names that must pass  (default: every listed check)"],
-  "verify_cmd": "the complete local suite command; with no CI its verified stamp is the merge evidence"
+  "verify_cmd": "the complete local suite command; with no CI its verified stamp is the merge evidence",
+  "test_failure_re": "ERE for a failed test in the test runner's output, if revert-check does not know the runner",
+  "build_error_re": "ERE for a build error in that output, likewise"
 }
 EOF
 }

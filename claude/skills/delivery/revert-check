@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# revert-check [--timeout SECS] <file> <old> <new> -- <test command...>
+# revert-check [--timeout SECS] [--fail-re ERE] [--build-error-re ERE] <file> <old> <new> -- <test command...>
 # revert-check --self-test
 #
 # Applies ONE mutation (the exact string <old>, which must occur exactly once in <file>, becomes
@@ -13,6 +13,13 @@
 #   TIMEOUT    exit 4  the watchdog fired (default 1800 s); nothing was proved
 #   refused    exit 3  usage error, a dirty tree, or <old> not matching exactly once
 #
+# The verdict reads the command's output. Built in: the failure and build-error lines of Rust,
+# Go, Python (pytest, unittest), JS/TS (Jest, Vitest, Mocha, tsc), Ruby (RSpec, Minitest), Java,
+# and TAP. Another toolchain names its own patterns, either with --fail-re / --build-error-re or in
+# .claude/gates.json as "test_failure_re" / "build_error_re" (extended regexes, added to the
+# built-in ones). An output that matches neither is NOCOMPILE, never RED: an unrecognised runner
+# costs a verdict, never a false one.
+#
 # Why it refuses a dirty tree: the restore is `git checkout -- <file>`, and a restore over
 # uncommitted work has destroyed it more than once. Commit first.
 # Why NOCOMPILE is not RED: a mutant that does not build fails every test, so its red certifies
@@ -24,22 +31,44 @@ die() { echo "revert-check: $*" >&2; exit 3; }
 
 # Lines that mean the mutant did not build. Deliberately NOT a bare `^error:` — cargo prints
 # "error: test failed, to rerun pass ..." for an ordinary test failure.
-COMPILE_RE='^error\[E[0-9]+\]|could not compile|^error: (expected|cannot find|aborting due to)|SyntaxError|error TS[0-9]+|cannot find symbol|compilation failed|syntax error'
-# Lines that mean a test failed.
-FAIL_RE='FAILED|panicked at|AssertionError|assertion .* failed|[Aa]ssert(ion)? ?[Ff]ailed|^not ok|^FAIL|failures:|✗'
+# Go: "[build failed]"/"[setup failed]"; pytest: a collection error; RSpec: a spec file that
+# does not load; javac's closing "N errors".
+COMPILE_RE='^error\[E[0-9]+\]|could not compile|^error: (expected|cannot find|aborting due to)|SyntaxError|error TS[0-9]+|cannot find symbol|compilation failed|syntax error|\[(build|setup) failed\]|ERROR collecting|ImportError while importing|An error occurred while loading|^[0-9]+ errors?$'
+# Lines that mean a test failed. A count of failures must be nonzero: "0 failures" is a pass.
+FAIL_RE='FAILED|panicked at|AssertionError|assertion .* failed|[Aa]ssert(ion)? ?[Ff]ailed|^not ok|^ *FAIL|--- FAIL:|[Ff]ailures:|(^|[^0-9])[1-9][0-9]* (failures?|failed)([^a-z]|$)|✗|✕'
 # The line naming the failing assertion, in the order a reader wants them.
 ASSERT_RE='panicked at|assertion|[Aa]ssert|AssertionError|[Ee]xpected'
 
 run_check() {
-  local limit=1800
-  if [ "${1:-}" = "--timeout" ]; then limit=${2:?--timeout needs seconds}; shift 2; fi
-  [ $# -ge 5 ] || die "usage: revert-check [--timeout SECS] <file> <old> <new> -- <test command...>"
+  local limit=1800 fail_re="" build_re=""
+  while :; do
+    case "${1:-}" in
+      --timeout) limit=${2:?--timeout needs seconds}; shift 2 ;;
+      --fail-re) fail_re=${2:?--fail-re needs a pattern}; shift 2 ;;
+      --build-error-re) build_re=${2:?--build-error-re needs a pattern}; shift 2 ;;
+      *) break ;;
+    esac
+  done
+  [ $# -ge 5 ] || die "usage: revert-check [--timeout SECS] [--fail-re ERE] [--build-error-re ERE] <file> <old> <new> -- <test command...>"
   local file=$1 old=$2 new=$3; shift 3
   [ "$1" = "--" ] || die "expected -- before the test command"
   shift
   [ $# -ge 1 ] || die "no test command given"
 
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git work tree"
+  # The project's own patterns: options, then .claude/gates.json, each added to the built-ins.
+  local cfg v pat
+  cfg="$(git rev-parse --show-toplevel)/.claude/gates.json"
+  for pat in "$fail_re" "$build_re"; do
+    [ -z "$pat" ] || printf '' | grep -Eq -- "$pat" 2>/dev/null; [ $? -le 1 ] || die "not an extended regex: $pat"
+  done
+  if [ -f "$cfg" ]; then
+    command -v jq >/dev/null 2>&1 || die "$cfg exists but jq is not installed to read it"
+    jq -e 'type == "object"' "$cfg" >/dev/null 2>&1 || die "unparsable $cfg"
+    v=$(jq -r '.test_failure_re // empty' "$cfg"); [ -z "$v" ] || fail_re=${fail_re:+$fail_re|}$v
+    v=$(jq -r '.build_error_re // empty' "$cfg"); [ -z "$v" ] || build_re=${build_re:+$build_re|}$v
+  fi
+  local FAIL="$FAIL_RE${fail_re:+|$fail_re}" BUILD="$COMPILE_RE${build_re:+|$build_re}"
   [ -f "$file" ] || die "no such file: $file"
   git ls-files --error-unmatch -- "$file" >/dev/null 2>&1 || die "$file is not tracked by git, so it cannot be restored"
   local dirty
@@ -73,15 +102,15 @@ $dirty"
   if [ "$status" -eq 0 ]; then
     echo "SURVIVED: the command passed with the mutant (log: $log)"; tail -5 "$log"; return 1
   fi
-  if grep -Eq "$COMPILE_RE" "$log"; then
-    echo "NOCOMPILE: the mutant did not build (log: $log)"; grep -Em3 "$COMPILE_RE" "$log"; return 2
+  if grep -Eq -- "$BUILD" "$log"; then
+    echo "NOCOMPILE: the mutant did not build (log: $log)"; grep -Em3 -- "$BUILD" "$log"; return 2
   fi
-  if ! grep -Eq "$FAIL_RE" "$log"; then
+  if ! grep -Eq -- "$FAIL" "$log"; then
     echo "NOCOMPILE: exit $status with no test failure in the output (log: $log)"; tail -5 "$log"; return 2
   fi
   local line
   line=$(grep -En "$ASSERT_RE" "$log" | head -1 | cut -d: -f1)
-  [ -n "$line" ] || line=$(grep -En "$FAIL_RE" "$log" | head -1 | cut -d: -f1)
+  [ -n "$line" ] || line=$(grep -En -- "$FAIL" "$log" | head -1 | cut -d: -f1)
   echo "RED (exit $status; log: $log)"
   sed -n "${line},$((line + 2))p" "$log"
   return 0
@@ -134,6 +163,55 @@ EOF
   expect "an <old> that matches twice is refused" 3 "exactly once" \
     "$self" lib.sh '$' 'X' -- bash test.sh
 
+  # Each toolchain's output, through a command that prints it and exits 1. RED needs the failure
+  # read from the output; a build error must read NOCOMPILE even beside a failure line.
+  printf '%s\n' '1) add returns the sum' 'Failure/Error: expect(add(2, 3)).to eq(5)' \
+    '  expected: 5' '       got: -1' '' 'Finished in 0.01 seconds' '1 example, 1 failure' > "$dir/rspec.out"
+  printf '%s\n' ' FAIL  src/add.test.ts' '  ✕ adds (3 ms)' '    Expected: 5' '    Received: -1' \
+    'Tests:       1 failed, 3 passed, 4 total' > "$dir/jest.out"
+  printf '%s\n' ' ❯ src/add.test.ts (1 test | 1 failed)' '   × adds' \
+    ' Test Files  1 failed (1)' > "$dir/vitest.out"
+  printf '%s\n' 'tests/test_add.py F' 'E       assert -1 == 5' \
+    '=========== 1 failed, 2 passed in 0.03s ===========' > "$dir/pytest.out"
+  printf '%s\n' '--- FAIL: TestAdd (0.00s)' '    add_test.go:9: expected 5, got -1' 'FAIL' > "$dir/go.out"
+  printf '%s\n' '# example.com/add' './add.go:3:9: undefined: sum' \
+    'FAIL	example.com/add [build failed]' > "$dir/gobuild.out"
+  printf '%s\n' '==== ERRORS ====' '____ ERROR collecting tests/test_add.py ____' \
+    'ImportError while importing test module' '==== 1 error in 0.05s ====' > "$dir/pycollect.out"
+  printf '%s\n' 'An error occurred while loading ./spec/add_spec.rb.' \
+    '0 examples, 0 failures, 1 error occurred outside of examples' > "$dir/rspecload.out"
+  printf '%s\n' '42 examples, 0 failures' 'rake aborted!' > "$dir/zero.out"
+  printf '%s\n' 'Add.java:3: error: incompatible types: String cannot be converted to int' \
+    '1 error' > "$dir/javac.out"
+  printf '%s\n' '[[ case add ]] verdict=BROKEN' 'summary: 1 broken' > "$dir/custom.out"
+  local tool
+  for tool in rspec jest vitest pytest go; do
+    expect "$tool: a failure in its output reads RED" 0 "RED" \
+      "$self" lib.sh '# a comment' '# x' -- sh -c "cat $tool.out; exit 1"
+  done
+  for tool in gobuild pycollect rspecload javac; do
+    expect "$tool: a build error reads NOCOMPILE" 2 "did not build" \
+      "$self" lib.sh '# a comment' '# x' -- sh -c "cat $tool.out; exit 1"
+  done
+  expect "a count of 0 failures is no failure" 2 "no test failure" \
+    "$self" lib.sh '# a comment' '# x' -- sh -c 'cat zero.out; exit 1'
+  expect "an unknown runner's failure is NOCOMPILE without a pattern" 2 "no test failure" \
+    "$self" lib.sh '# a comment' '# x' -- sh -c 'cat custom.out; exit 1'
+  expect "--fail-re names an unknown runner's failure" 0 "verdict=BROKEN" \
+    "$self" --fail-re 'verdict=BROKEN' lib.sh '# a comment' '# x' -- sh -c 'cat custom.out; exit 1'
+  expect "--build-error-re names an unknown runner's build error" 2 "did not build" \
+    "$self" --build-error-re '^summary: [0-9]+ broken' lib.sh '# a comment' '# x' -- sh -c 'cat custom.out; exit 1'
+  expect "an invalid pattern is refused" 3 "extended regex" \
+    "$self" --fail-re 'a(' lib.sh '# a comment' '# x' -- sh -c 'cat custom.out; exit 1'
+  mkdir -p "$dir/.claude" && printf '%s\n' '{"test_failure_re":"verdict=BROKEN"}' > "$dir/.claude/gates.json"
+  (cd "$dir" && git add .claude && git commit -qm config)
+  expect ".claude/gates.json names an unknown runner's failure" 0 "verdict=BROKEN" \
+    "$self" lib.sh '# a comment' '# x' -- sh -c 'cat custom.out; exit 1'
+  printf 'not json\n' > "$dir/.claude/gates.json"; (cd "$dir" && git commit -qam broken)
+  expect "an unparsable .claude/gates.json is refused" 3 "unparsable" \
+    "$self" lib.sh '# a comment' '# x' -- sh -c 'cat custom.out; exit 1'
+  (cd "$dir" && git rm -q .claude/gates.json && git commit -qm unconfig)
+
   # A dirty tree is refused and its uncommitted edit survives.
   printf 'echo extra\n' >> "$dir/lib.sh"
   local out status
@@ -151,6 +229,6 @@ EOF
 
 case "${1:-}" in
   --self-test) self_test; exit $? ;;
-  ""|-h|--help) sed -n '2,20p' "$0"; exit 3 ;;
+  ""|-h|--help) sed -n '2,27p' "$0"; exit 3 ;;
   *) run_check "$@"; exit $? ;;
 esac

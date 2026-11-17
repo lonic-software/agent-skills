@@ -26,7 +26,9 @@
 # Forge: .claude/gates.json in the work tree, the fields gate.sh reads: forge, ci, head_cmd (prints
 # the head sha; $PR is the change number), checks_cmd (prints [{"name","bucket"}] with bucket
 # pass|fail|pending|skipping|cancel). origin on github.com needs no config (gh, every check gh pr
-# checks lists, Actions and external statuses alike); no remote, or "ci": false, is NO CI.
+# checks lists, Actions and external statuses alike); nor does gitlab.com, or "forge": "gitlab"
+# alone for a self-hosted instance (glab: the head pipeline and its jobs); no remote, or
+# "ci": false, is NO CI.
 # Bash 3.2 compatible; needs jq and perl (macOS has no timeout).
 set -u
 
@@ -58,20 +60,48 @@ load_config() {
 }
 # has(), not //: a configured false must read as false, not as absent.
 cfg() { [ -n "$CFG" ] && jq -r --arg k "$1" 'if has($k) then .[$k] | tostring else empty end' "$CFG" 2>/dev/null; }
+# The GitLab preset (origin on gitlab.com, or "forge": "gitlab" for a self-hosted instance), run
+# with sh -c, $PR the merge request's iid and $GL_PROJECT the URL-encoded project path (glab's
+# :fullpath, the current repository, when unset). The checks are the head pipeline, as one entry
+# named "pipeline" whose status is the verdict, plus its jobs by name; a pipeline for an older sha,
+# or none yet, is pending or no checks, never green. A job failed with allow_failure is "skipping",
+# as GitLab itself passes the pipeline over it; a pipeline waiting on a manual job is pending.
+GL_HEAD_CMD='glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR" | jq -er .sha'
+GL_CHECKS_CMD=
+IFS= read -r -d '' GL_CHECKS_CMD <<'EOF' || true
+mr=$(glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR") || exit 1
+p=$(printf '%s' "$mr" | jq -er 'if .head_pipeline == null then "none" elif .head_pipeline.sha != .sha then "stale" else .head_pipeline.id end') || exit 1
+case $p in
+  none)  echo '[]' ;;
+  stale) echo '[{"name":"pipeline","bucket":"pending"}]' ;;
+  *) glab api "projects/${GL_PROJECT:-:fullpath}/pipelines/$p/jobs?per_page=100" | jq -c --argjson mr "$mr" '
+       [{name: "pipeline", status: $mr.head_pipeline.status, allow_failure: false, pipe: true}]
+       + map({name, status, allow_failure, pipe: false})
+       | map({name, bucket: (
+           if .status == "success" then "pass"
+           elif .status == "failed" then (if .allow_failure then "skipping" else "fail" end)
+           elif .status == "canceled" or .status == "canceling" then "cancel"
+           elif .status == "skipped" then "skipping"
+           elif .status == "manual" and (.pipe | not) then "skipping"
+           else "pending" end)})' ;;
+esac
+EOF
+
 FORGE=""
 detect_forge() {
   FORGE=$(cfg forge); [ -n "$FORGE" ] && return 0
   local url; url=$(git remote get-url origin 2>/dev/null)
   if [ -z "$url" ] && [ -z "$(git remote 2>/dev/null)" ]; then FORGE=none
-  else case "$url" in *github.com[:/]*) FORGE=github ;; *) FORGE=unknown ;; esac; fi
+  else case "$url" in *github.com[:/]*) FORGE=github ;; *gitlab.com[:/]*) FORGE=gitlab ;; *) FORGE=unknown ;; esac; fi
 }
 setting() {
   local v; v=$(cfg "$1"); [ -n "$v" ] && { printf '%s\n' "$v"; return; }
-  [ "$FORGE" = "github" ] || return 0
-  case "$1" in
-    head_cmd)   echo 'gh pr view "$PR" --json headRefOid -q .headRefOid' ;;
-    checks_cmd) echo 'gh pr checks "$PR" --json name,bucket' ;;
-    ci)         echo true ;;
+  case "$FORGE:$1" in
+    github:head_cmd)   echo 'gh pr view "$PR" --json headRefOid -q .headRefOid' ;;
+    github:checks_cmd) echo 'gh pr checks "$PR" --json name,bucket' ;;
+    gitlab:head_cmd)   printf '%s\n' "$GL_HEAD_CMD" ;;
+    gitlab:checks_cmd) printf '%s\n' "$GL_CHECKS_CMD" ;;
+    github:ci|gitlab:ci) echo true ;;
   esac
 }
 
@@ -181,12 +211,30 @@ printf '%s\n' "$line"
 exit 0
 EOF
   chmod +x "$tmp/bin/gh"; cp "$tmp/bin/gh" "$tmp/bin/forgecli"
+  # glab: the merge request is GL_IID (default 12) of project GL_EXPECT (default glab's
+  # unexpanded :fullpath); asked for any other, it answers with a different head. GL_PIPE is the
+  # head pipeline's status ("none": no pipeline), GL_PIPE_SHA its sha, GL_JOBS its jobs.
+  cat > "$tmp/bin/glab" <<'EOF'
+#!/bin/sh
+[ "$1" = api ] || exit 2
+case "$2" in
+  */jobs*) printf '%s\n' "${GL_JOBS:-[]}" ;;
+  *) p=${2#projects/}; iid=${p##*/merge_requests/}; p=${p%%/merge_requests/*}
+     sha=$GL_SHA
+     { [ "$p" = "${GL_EXPECT:-:fullpath}" ] && [ "$iid" = "${GL_IID:-12}" ]; } || sha=ffffffffffffffffffffffffffffffffffffffff
+     if [ "${GL_PIPE:-success}" = none ]; then jq -n --arg s "$sha" '{sha: $s, head_pipeline: null}'
+     else jq -n --arg s "$sha" --arg ps "${GL_PIPE_SHA:-$sha}" --arg st "${GL_PIPE:-success}" \
+       '{sha: $s, head_pipeline: {id: 5, sha: $ps, status: $st}}'; fi ;;
+esac
+EOF
+  chmod +x "$tmp/bin/glab"
   local r
-  for r in gh none gl unk noci; do git init -q "$tmp/$r" || return 1; done
+  for r in gh none gl unk noci glc; do git init -q "$tmp/$r" || return 1; done
   git -C "$tmp/gh" remote add origin https://github.com/o/r.git
   git -C "$tmp/noci" remote add origin git@github.com:o/r.git
   git -C "$tmp/gl" remote add origin https://gitlab.example.com/o/r.git
   git -C "$tmp/unk" remote add origin https://gitlab.example.com/o/r.git
+  git -C "$tmp/glc" remote add origin https://gitlab.com/o/r.git
   mkdir -p "$tmp/gl/.claude" "$tmp/noci/.claude"
   printf '%s\n' '{"forge":"gitlab","head_cmd":"forgecli head $PR","checks_cmd":"forgecli checks $PR"}' > "$tmp/gl/.claude/gates.json"
   printf '%s\n' '{"forge":"github","ci":false}' > "$tmp/noci/.claude/gates.json"
@@ -246,6 +294,10 @@ $H1" "$MANY_PENDING"
   case_ "no remote is NO CI" 3 "NO CI" 3 "$tmp/none" -- $F 7 20
   case_ "an unrecognised forge with no config is refused" 5 "gates.json" 3 "$tmp/unk" -- $F 7 20
   case_ "a non-numeric change is refused" 5 "usage" 3 "$G" -- abc
+  local L="$tmp/glc" OK='[{"name":"test","status":"success","allow_failure":false},{"name":"lint","status":"failed","allow_failure":true}]'
+  case_ "gitlab.com: a green pipeline is GREEN" 0 "GREEN $H0: 3 check" 6 "$L" GL_SHA=$H0 GL_JOBS="$OK" -- $F 12 20
+  case_ "gitlab.com: a failed job is RED and named" 1 "test: fail" 6 "$L" GL_SHA=$H0 GL_PIPE=failed GL_JOBS='[{"name":"test","status":"failed","allow_failure":false}]' -- $F 12 20
+  case_ "gitlab.com: a pipeline for an older head is no verdict" 2 "DEADLINE" 6 "$L" GL_SHA=$H0 GL_PIPE_SHA=$H1 -- $F 12 3
 
   rm -rf "$tmp"
   [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }
