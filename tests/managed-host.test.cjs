@@ -41,7 +41,7 @@ for (const failure of ['declined-label', 'changed-second-sample']) test('reenrol
 test('real host adapters plus managed CLI run own Node doubles and deliver clean incomplete bytes', {skip: process.platform !== 'win32'}, async () => hostFixture(async f => {
   await enroll(f);
   const runtime = path.join(f.root, 'runtime.json'), authority = path.join(f.root, 'authority.txt');
-  fs.writeFileSync(runtime, JSON.stringify({schema: 1, codex: process.execPath, model: 'gpt-6.1-sol'})); fs.writeFileSync(authority, 'EXAMPLE bounded task');
+  fs.writeFileSync(runtime, JSON.stringify({schema: 1, codex: process.execPath, model: 'gpt-6.2-sol'})); fs.writeFileSync(authority, 'EXAMPLE bounded task');
   const stdout = new PassThrough(), stderr = new PassThrough(); let bytes = Buffer.alloc(0), diagnostic = '';
   stdout.on('data', b => { bytes = Buffer.concat([bytes, b]); }); stderr.on('data', b => { diagnostic += b; });
   const code = await main(['--managed', '--config', runtime, '--project', f.project, '--profile', f.profile, '--state-root', f.stateRoot, '--queue-kind', 'file', '--queue', 'task.md', '--authority-file', authority, '--threshold', '60', '--timeout-ms', '60000'], {stdout, stderr, createHost: cfg => f.createHost(cfg)});

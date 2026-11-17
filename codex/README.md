@@ -147,7 +147,7 @@ Example test prompt (synthetic demo data):
 
 ```text
 Use $consult for this diagnostic and respond in English.
-For this session only, use gpt-6.1-sol with low advisor effort.
+For this session only, use gpt-6.2-sol with low advisor effort.
 Ask one lonic-advisor-low to read example.txt and report its non-empty line
 count and last line. Then ask the same completed advisor to repeat the last
 line from memory. Do not edit files or save preferences.

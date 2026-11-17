@@ -12,7 +12,7 @@ lines.on('line', text => {
   if (m.method === 'initialize') { meter = m.params.clientInfo.name.endsWith('meter'); send({id: m.id, result: {}}); }
   else if (m.method === 'account/read') send({id: m.id, result: {account: {type: 'chatgpt'}, workspaceRouting: {chatgptAccountId: 'PRIVATE-ID', backendOrigin: 'PRIVATE-ORIGIN'}}});
   else if (m.method === 'account/rateLimits/read') send({id: m.id, result: {accountId: 'PRIVATE-ID', ordinaryUsageAllowed: true, rateLimits: {limitId: 'codex', primary: {windowDurationMins: 300, usedPercent: 10, resetsAt: 1800003600}, secondary: {windowDurationMins: 10080, usedPercent: 25, resetsAt: 1800604800}}}});
-  else if (m.method === 'thread/start') { if (meter) process.exit(3); send({id: m.id, result: {thread: {id: threadId}, model: 'gpt-6.1-sol', modelProvider: 'openai', reasoningEffort: 'medium'}}); }
+  else if (m.method === 'thread/start') { if (meter) process.exit(3); send({id: m.id, result: {thread: {id: threadId}, model: 'gpt-6.2-sol', modelProvider: 'openai', reasoningEffort: 'medium'}}); }
   else if (m.method === 'turn/start') {
     const grant = JSON.parse(m.params.input[0].text.split('Host grant: ')[1].split('\n')[0]);
     const ordinal = grant.task.itemId === 'fixed-item' ? process.argv[2] : 'invalid';

@@ -19,7 +19,7 @@ test('S28 requires exact explicit Windows project trust and rejects ambiguous or
 });
 
 test('S28 enrollment CLI returns a clear clean refusal before prompt/thread with settled journal', {skip:process.platform!=='win32'},()=>hostFixture(async f=>{
-  const runtime=path.join(f.root,'runtime.json');fs.writeFileSync(runtime,JSON.stringify({schema:1,codex:process.execPath,model:'gpt-6.1-sol'}));
+  const runtime=path.join(f.root,'runtime.json');fs.writeFileSync(runtime,JSON.stringify({schema:1,codex:process.execPath,model:'gpt-6.2-sol'}));
   const stderr=new PassThrough(),stdout=new PassThrough();let diagnostic='';stderr.on('data',b=>diagnostic+=b);
   const code=await main(['--managed','--enroll','--config',runtime,'--project',f.project,'--profile',f.profile,'--state-root',f.stateRoot],{stdout,stderr,terminal:{inputTTY:true,outputTTY:true,confirm:()=>assert.fail('no prompt before project trust')},createHost:cfg=>f.createHost(cfg)});
   assert.equal(code,4);const result=JSON.parse(diagnostic.trim());assert.equal(result.ruleId,'CFG_PROJECT_TRUSTED');assert.equal(result.recoveryRequired,false);assert.match(result.diagnostic,/before any thread/);assert.doesNotMatch(diagnostic,/PRIVATE/);

@@ -19,7 +19,7 @@ function fixture(variant = '') {
   const enrollment = {schema: 1, algorithm: 'm2-account-v1', fingerprint: accountFingerprint(account(), usage())};
   const runId = 'EXAMPLE-' + randomUUID();
   const grant = {continuation: true, runId, budget: {runId, relative: 10}, enrollment, instructions,
-    selection: {model: 'gpt-6.1-sol', provider: 'openai', effort: 'medium'}, task: {kind: 'file', locator: 'EXAMPLE-task.md', itemId: 'fixed-item'}, authority: 'EXAMPLE bounded task', exclusions: [], developerInstructions: 'EXAMPLE', timeoutMs: 5000, meterTimeoutMs: 2000, processTimeoutMs: 1000, closeTimeoutMs: 2000,
+    selection: {model: 'gpt-6.2-sol', provider: 'openai', effort: 'medium'}, task: {kind: 'file', locator: 'EXAMPLE-task.md', itemId: 'fixed-item'}, authority: 'EXAMPLE bounded task', exclusions: [], developerInstructions: 'EXAMPLE', timeoutMs: 5000, meterTimeoutMs: 2000, processTimeoutMs: 1000, closeTimeoutMs: 2000,
     launch: {exe: 'EXAMPLE-never-executed', args: [], cwd: 'EXAMPLE', env: {CODEX_HOME: 'EXAMPLE-unread', SystemRoot: 'EXAMPLE', TEMP: 'EXAMPLE', TMP: 'EXAMPLE'}}};
   const runBudget = createManagedRunBudget({mode: 'managed', grant: grant.budget});
   const host = {now: () => now, runBudget,

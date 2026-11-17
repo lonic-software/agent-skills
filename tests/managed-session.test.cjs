@@ -5,7 +5,7 @@ const {accountFingerprint}=require('../codex/runtime/managed-admission.cjs');
 const {createManagedRunBudget}=require('../codex/runtime/managed-run-budget.cjs');
 const {createManagedRpc}=require('../codex/runtime/managed-rpc.cjs');
 const hash=v=>crypto.createHash('sha256').update(v).digest('hex');
-const now=1800000000000,selection={model:'gpt-6.1-sol',provider:'openai',effort:'medium'};
+const now=1800000000000,selection={model:'gpt-6.2-sol',provider:'openai',effort:'medium'};
 const instructions={complete:true,scopeKey:'EXAMPLE-bounded-inputs',sources:[{key:'host:developer',identity:'EXAMPLE-grant',sha256:hash('EXAMPLE developer')}]};
 const account=()=>({account:{type:'chatgpt',email:'PRIVATE-email'},workspaceRouting:{chatgptAccountId:'PRIVATE-account',backendOrigin:'PRIVATE-origin'}});
 const usage=()=>({accountId:'PRIVATE-account',ordinaryUsageAllowed:true,rateLimits:{limitId:'codex',primary:{windowDurationMins:300,usedPercent:10,resetsAt:now/1000+3600},secondary:{windowDurationMins:10080,usedPercent:25,resetsAt:now/1000+604800}}});

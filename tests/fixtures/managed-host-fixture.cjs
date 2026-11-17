@@ -22,7 +22,7 @@ async function hostFixture(action, scenario = 'normal') {
     if (record.closed || record.child.exitCode !== null || record.child.signalCode !== null) return {verified: true, status: 'gone'};
     record.child.kill(); return {verified: true, status: 'signalled'};
   }};
-  const cfg = {project, profile, stateRoot, codex: process.execPath, model: 'gpt-6.1-sol', effort: 'medium', task: {kind: 'file', locator: path.join(project, 'task.md'), itemId: 'fixed-item'}, authority: 'EXAMPLE no project edits', exclusions: [], budget: {relative: 10}, timeoutMs: 60000, gitEnvironment};
+  const cfg = {project, profile, stateRoot, codex: process.execPath, model: 'gpt-6.2-sol', effort: 'medium', task: {kind: 'file', locator: path.join(project, 'task.md'), itemId: 'fixed-item'}, authority: 'EXAMPLE no project edits', exclusions: [], budget: {relative: 10}, timeoutMs: 60000, gitEnvironment};
   function createHost(config = cfg) {
     const state = projectState(stateRoot, project);
     const gateAdapter = createWindowsGateAdapter({mode: 'managed', gatePath: state.gatePath, timeoutMs: 10000, adapters: {tree: backend, checkPolicy: async () => ({allowed: true, policy: 'RemoteSigned'}), spawnHelper: () => retain(spawn(process.execPath, [path.join(__dirname, 'managed-node-stub.cjs'), 'gate-protocol', 'EXAMPLE-host'], {windowsHide: true, detached: true, stdio: ['pipe', 'pipe', 'pipe']}))}});
