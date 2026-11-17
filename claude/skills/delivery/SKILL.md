@@ -140,6 +140,15 @@ documented — routing decisions elsewhere should cite this section, not restate
   suite too long to run here, named with its measured duration so the reader can overrule the call
   — and say which you left. The seeding incident ran filtered e2e subsets locally; CI then went red
   on three OSes over six assertions a few-second run of the one test file would have caught.
+- **Bringing a branch up to date is not a new change.** Merging the target branch into yours
+  (never a rebase, which needs a force-push) leaves your diff as it was, so it reopens neither
+  review nor the local-suite rule above when it merges cleanly, or its conflicts lie only in files
+  the project declares mechanical: generated docs, changelog ordering, auto-numbered values,
+  regenerated after the merge. CI on the updated head is then the test, read through the full
+  check set like any other head. A conflict resolved by hand in real code is new code: run the
+  local suites of the packages it touches, and one review round over the resolution alone. The
+  risk a clean merge still carries is a semantic conflict — the target changed something your
+  branch relies on without touching the same lines — and CI on the merged head is what sees it.
 - **Bookkeeping is part of the diff.** Before opening a PR, walk the project's own list of
   hand-kept files (its contributing guide or equivalent, the changelog first) and write in the PR
   body which entries the change touched, or that none applied. If the project keeps no such list,

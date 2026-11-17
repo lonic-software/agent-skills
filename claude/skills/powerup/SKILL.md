@@ -173,7 +173,8 @@ never at the whole ledger.
 
 `design-doc`'s rules about *when* a design is required and *who reviews it* still govern — the loop
 is the review. Never ask the user whether they have reviewed a design, and never write a user review
-into a handoff prompt or memory.
+into a handoff prompt or memory. A decision design-doc assigns to the user (a design system, a stack,
+a feature set) is not a review and is asked as that skill says.
 
 | Role | Owns |
 |---|---|

@@ -51,7 +51,9 @@ route: tetel
   continue; whether to fall back is your call.
 
 **Neither path includes a user review.** The rounds are the review; the user does not read the
-design before implementation, and nothing here waits for them to.
+design before implementation, and nothing here waits for them to. The decisions no source can settle
+are the exception, and they are decisions, not reviews: see "Dispatch rules" and, for a UI, "Frontend
+work: the design system comes first".
 
 The rest of this skill applies to both. The method is the same; only who checks it differs.
 
@@ -318,6 +320,39 @@ This skill exists because of one repeatedly-observed failure: a design doc state
 the code as a step in an argument, nobody notices it is a checkable fact rather than reasoning,
 and it survives several rounds of adversarial review intact because reviewers argue with the
 reasoning instead of opening the file.
+
+## Frontend work: the design system comes first
+
+A UI's visual language — its tokens (colour, type, spacing, radius, elevation, motion), its components
+and their states, and its layout rules — is a decision no source can settle, the same class as a stack
+or a product feature set (see "Dispatch rules that are not negotiable"). So it is **settled with the
+user**, not authored and closed by the loop. This is the user deciding, not the user reviewing a
+design: "Neither path includes a user review" still covers everything else, the screens' own design
+included. Data flow, state and contracts follow the ordinary design-first rules.
+
+- **When it applies.**
+  - **A new UI: always.** The design system exists, settled, before any screen is built.
+  - **A UI that already has a design system: always.** If the work needs something the system lacks,
+    such as a new kind of component, a new token or a new pattern, it goes into the system first and
+    is settled with the user. The screen then uses it from there.
+  - **An existing UI with no design system: only when the user explicitly asks.**
+    Do not propose a retrofit as a side effect of other work.
+- **The artifact is an HTML page** that renders every token and every component in each of its
+  states, in light and dark if the UI has both. The user looks at it, rather than reading prose
+  about it. It lives in the repo that ships the UI, because the implementation is checked against
+  it. Render-check it before showing it.
+- **Settled means the user said so.** Iterate on the page with the user until they accept it, and
+  their acceptance is the close. No attacker or grounder grades it.
+- **Then the whole UI follows it.** Every screen is built only from the approved system's tokens and
+  components, which is what keeps the UI consistent everywhere. A screen that seems to need a
+  one-off, such as a raw colour, a bespoke spacing or a component variant the system lacks, is a
+  change to the system and goes back to the user first, never inline. Where the stack allows it,
+  enforce this with a mechanism rather than a reminder (delivery §D): for example, a check that
+  fails on a colour or size literal outside the token source. A review of a UI diff is
+  briefed with the page's path and told to check the diff against it (delivery §B owns the brief).
+- **Unattended runs.** Settling the system is a question for the user, so queue-run §1d governs when
+  it is asked and when the item is parked. Park it with the draft page ready. The agent never settles
+  it alone.
 
 ## The one rule
 
