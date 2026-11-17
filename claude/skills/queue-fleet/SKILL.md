@@ -75,8 +75,8 @@ turn. Inside it:
    non-mechanical file, or any real red, means leave the turn:** `fleet turn leave --requeue`, fix
    and review outside it, come back.
 5. **Verify the merged head the project's way.** With CI: wait with `delivery/wait-pr-ci <PR>
-   <deadline>` (GitHub Actions) or the forge's equivalent. A queued run is not a stuck one: pass a
-   deadline long enough for the fleet's CI load. With no CI: run the complete local suites on that
+   <deadline>` (forge commands from `.claude/gates.json`). A queued run is not a stuck one: pass
+   a deadline long enough for the fleet's CI load. With no CI: run the complete local suites on that
    exact head under the suite lock — `fleet with-lock suite -- delivery/verify-head -- <suites>` —
    which stamps it. Then confirm the default branch's tip is still the one you merged.
 6. **Merge.** On a forge, use its merge command pinned to the verified head (on GitHub,
