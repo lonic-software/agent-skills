@@ -9,7 +9,9 @@
 # the slot only when the old one is gone. Nothing is ever taken over on elapsed time.
 #
 #   fleet init --workers N --threshold PCT --queue LOCATOR --merge-authority TEXT
-#              [--windows TEXT] [--lookahead K] [--worktree-root DIR]
+#              [--windows TEXT] [--lookahead K] [--worktree-root DIR] [--command NAME]
+#              (NAME: the slash command each slot's worker runs and every handoff starts with;
+#              default queue-fleet, powerup-fleet for the powerup workflow)
 #   fleet whoami                       register this process as the slot's owner; print the slot
 #   fleet claim <item> [--area A] --usage PCT    claim a queue item (or ask:<item>)
 #   fleet release <item>
@@ -137,19 +139,20 @@ EOF
 }
 
 cmd_init() {
-  local workers="" thr="" queue="" auth="" windows="" look="" root=""
+  local workers="" thr="" queue="" auth="" windows="" look="" root="" command=queue-fleet
   while [ $# -gt 0 ]; do
     case "$1" in
       --workers) workers=$2; shift 2 ;; --threshold) thr=$2; shift 2 ;;
       --queue) queue=$2; shift 2 ;; --merge-authority) auth=$2; shift 2 ;;
       --windows) windows=$2; shift 2 ;; --lookahead) look=$2; shift 2 ;;
-      --worktree-root) root=$2; shift 2 ;;
+      --worktree-root) root=$2; shift 2 ;; --command) command=${2#/}; shift 2 ;;
       *) die "init: unknown argument $1" ;;
     esac
   done
   [ -n "$workers" ] && [ -n "$thr" ] && [ -n "$queue" ] && [ -n "$auth" ] \
     || die "init needs --workers --threshold --queue --merge-authority"
   case "$workers$thr" in *[!0-9.]*) die "init: --workers and --threshold are numbers" ;; esac
+  case "$command" in ""|*[!a-z0-9:-]*) die "init: --command is a slash command's name, such as queue-fleet" ;; esac
   local top cfg
   top=$(git rev-parse --show-toplevel) || die "not inside a work tree"
   cfg="$top/$CONFIG_REL"
@@ -181,9 +184,9 @@ cmd_init() {
   mkdir -p "$S"/slots "$S"/claims "$S"/locks "$S"/pools "$S"/counters "$S"/turn "$S"/budget
   cp "$cfg" "$S/config.json"
   jq -n --argjson w "$workers" --argjson t "$thr" --arg q "$queue" --arg a "$auth" --arg win "$windows" \
-        --argjson l "$look" --arg r "$root" \
+        --argjson l "$look" --arg r "$root" --arg c "$command" \
     '{workers: $w, threshold: $t, queue: $q, merge_authority: $a, windows: $win, exclusions: [],
-      lookahead: $l, worktree_root: $r}' > "$S/run.json"
+      lookahead: $l, worktree_root: $r, command: $c}' > "$S/run.json"
   echo 0 > "$S/turn/next"; : > "$S/turn/queue"
   local i path
   for i in $(seq 1 "$workers"); do
@@ -194,7 +197,7 @@ cmd_init() {
   done
   echo "fleet: $workers slot(s) at $root, state at $S"
   echo "Open one terminal per slot and run, in each:"
-  for i in $(seq 1 "$workers"); do echo "  cd $root/slot-$i && claude      # then: /powerup-fleet"; done
+  for i in $(seq 1 "$workers"); do echo "  cd $root/slot-$i && claude      # then: /$command"; done
 }
 
 # --- whoami ---
@@ -479,7 +482,7 @@ cmd_unhalt() { need_state; rm -f "$S/halt"; echo "unhalted"; }
 cmd_status() {
   need_state
   echo "fleet at $S"
-  jq -r '"run: threshold \(.threshold)% · \(.workers) workers · look-ahead \(.lookahead) · merge: \(.merge_authority) · queue: \(.queue)" + (if .windows != "" then " · windows: \(.windows)" else "" end) + (if (.exclusions|length) > 0 then " · excluded: \(.exclusions|join(", "))" else "" end)' "$S/run.json"
+  jq -r '"run: /\(.command) · threshold \(.threshold)% · \(.workers) workers · look-ahead \(.lookahead) · merge: \(.merge_authority) · queue: \(.queue)" + (if .windows != "" then " · windows: \(.windows)" else "" end) + (if (.exclusions|length) > 0 then " · excluded: \(.exclusions|join(", "))" else "" end)' "$S/run.json"
   [ -f "$S/halt" ] && echo "HALTED: $(cat "$S/halt")"
   local f s
   for f in "$S"/slots/*.json; do
@@ -535,13 +538,16 @@ self_test() {
                         "port": { "kind": "pool", "values": ["p1"] } },
   "mechanical_files": [], "branch_update": "merge", "areas": ["core", "cli"] }
 EOF
-  expect "init creates the slots" 0 "slot-2" "$tmp/main" \
-    "$self" init --workers 2 --threshold 60 --queue q --merge-authority "merge on green"
+  expect "init refuses a command that is not a name" 2 "slash command" "$tmp/main" \
+    "$self" init --workers 2 --threshold 60 --queue q --merge-authority x --command "a b"
+  expect "init creates the slots, naming the worker command" 0 "then: /powerup-fleet" "$tmp/main" \
+    "$self" init --workers 2 --threshold 60 --queue q --merge-authority "merge on green" --command /powerup-fleet
   local W1="$tmp/main/wt/slot-1" W2="$tmp/main/wt/slot-2"
   [ -d "$W1" ] && [ -d "$W2" ] && ok "slot worktrees exist" || bad "slot worktrees exist"
   expect "init twice is refused" 3 "already exists" "$tmp/main" \
     "$self" init --workers 2 --threshold 60 --queue q --merge-authority x
   expect "whoami registers slot-1" 0 "slot-1" "$W1" "$self" whoami
+  expect "status names the worker command" 0 "run: /powerup-fleet" "$W1" "$self" status
   PIDV=$P2; expect "a second live process in a slot is refused" 3 "one process per slot" "$W1" "$self" whoami
   expect "whoami registers slot-2" 0 "slot-2" "$W2" "$self" whoami
   PIDV=$P1; expect "claim an item" 0 "claimed A-1" "$W1" "$self" claim A-1 --area core --usage 10
@@ -601,7 +607,7 @@ EOF
     && printf '%s\n' '{"worktree_root":"wt","main_ref":"main","heavy_commands":[],"serial_resources":{},"mechanical_files":[],"branch_update":"merge","areas":[]}' > .claude/fleet.json \
     && printf 'wt/\n' > .gitignore && git add . && git commit -qm base ) || bad "no-forge setup"
   sleep 600 & local P4=$!; PIDV=$P4
-  expect "no forge: init with no remote" 0 "slot-1" "$L" "$self" init --workers 1 --threshold 60 --queue q --merge-authority x
+  expect "no forge: init with no remote, default command queue-fleet" 0 "slot-1 && claude      # then: /queue-fleet" "$L" "$self" init --workers 1 --threshold 60 --queue q --merge-authority x
   local LW="$L/wt/slot-1"
   expect "no forge: whoami" 0 "slot-1" "$LW" "$self" whoami
   (cd "$LW" && git config user.email t@example.invalid && git config user.name t && git checkout -q -b feat && echo 2 > f && git commit -qam two)

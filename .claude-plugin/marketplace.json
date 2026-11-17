@@ -10,7 +10,7 @@
     {
       "name": "powerup",
       "source": "./claude",
-      "description": "The powerup workflow skills and their agents: /powerup:powerup, /powerup:powerup-auto, /powerup:consult, /powerup:design-doc, /powerup:delivery, /powerup:evolve, /powerup:queue-run, /powerup:powerup-fleet."
+      "description": "The powerup workflow skills and their agents: /powerup:powerup, /powerup:powerup-auto, /powerup:consult, /powerup:design-doc, /powerup:delivery, /powerup:evolve, /powerup:queue-run, /powerup:queue-fleet, /powerup:powerup-fleet."
     },
     {
       "name": "phase-handoff",

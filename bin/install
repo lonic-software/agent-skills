@@ -5,10 +5,12 @@
 #
 # tool  : which coding tool to install into (currently only "claude")
 # skill : powerup | consult | design-doc | delivery | evolve
-#         | queue-run | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
+#         | queue-run | queue-fleet | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
 #         "powerup" installs the whole bundle: all five skills + their agents.
 #         "powerup-auto" is that bundle plus queue-run and its wrapper.
 #         "powerup-fleet" is that bundle plus queue-run, queue-fleet and its wrapper.
+#         "queue-fleet" is the raw fleet: queue-run, queue-fleet and delivery (its CI waiter and
+#         verify-head), with the gate and compaction hooks.
 #         The powerup bundles also copy the gate and compaction hooks; "gate-hook" copies
 #         the gate hook alone.
 #
@@ -25,7 +27,7 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 die() { echo "install: $*" >&2; exit 1; }
 
 [ -n "$tool" ]  || die "no tool given (expected: claude)"
-[ -n "$skill" ] || die "no skill given (expected: powerup | consult | design-doc | delivery | evolve | queue-run | powerup-auto | powerup-fleet | test-filter-hook | gate-hook)"
+[ -n "$skill" ] || die "no skill given (expected: powerup | consult | design-doc | delivery | evolve | queue-run | queue-fleet | powerup-auto | powerup-fleet | test-filter-hook | gate-hook)"
 
 # One door, OS-native behind it. pult always runs this via `sh`, so on Linux and
 # macOS the copy logic below is the whole story. On Windows (this runs under Git
@@ -83,6 +85,10 @@ case "$skill" in
   powerup-fleet)
     skills=("${bundle_skills[@]}" queue-run queue-fleet powerup-fleet)
     agents=("${bundle_agents[@]}")
+    hooks=(skills-after-compact.sh gate.sh)
+    ;;
+  queue-fleet)
+    skills=(queue-run queue-fleet delivery)
     hooks=(skills-after-compact.sh gate.sh)
     ;;
   gate-hook)
@@ -161,8 +167,8 @@ elif [ "$skill" = "test-filter-hook" ]; then
   echo '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
   echo "    { \"type\": \"command\", \"command\": \"bash $dst_hooks/filter-test-output.sh\" }"
   echo '  ] } ] }'
-elif [ "$skill" = "powerup-fleet" ]; then
-  echo "From the main checkout, run /powerup-fleet start <N> stop at <N>%; it prints one command per slot."
+elif [ "$skill" = "powerup-fleet" ] || [ "$skill" = "queue-fleet" ]; then
+  echo "From the main checkout, run /$skill start <N> stop at <N>%; it prints one command per slot."
 elif [ "$skill" = "gate-hook" ]; then
   :
 elif [ "$skill" = "queue-run" ] || [ "$skill" = "powerup-auto" ]; then

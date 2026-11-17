@@ -16,27 +16,17 @@ them in force. Record the run for compaction recovery as powerup says, under thi
 
 ## Two forms
 
-- **`/powerup-fleet start N <queue-run args>`: setting up, run once by the user from the main
-  checkout.**
-  1. Resolve queue-run §1 once, with the user: threshold, queue, merge authority, windows. Use
-     N = 2 unless the user names another count.
-  2. Run `${CLAUDE_SKILL_DIR}/../queue-fleet/fleet init --workers N --threshold … --queue …
-     --merge-authority … [--windows …]`. If it refuses for a missing project config, show the user
-     the template it printed, propose a filled-in config from the repository, and stop until they
-     accept it and it is committed.
-  3. Init creates the slot worktrees, detached at the main ref, under the config's in-repo worktree
-     root, and prints one `cd <slot> && claude` line per slot. Relay those lines to the user, then
-     stop. This session works no item.
-- **`/powerup-fleet` (no args), or a handoff prompt that starts with it: a worker, in a slot.** Open
-  with powerup's announcement and one line naming the slot. Then follow queue-fleet: `fleet whoami`
-  first, then the item loop.
+As in queue-fleet ("Two forms"), with **`powerup-fleet` as the fleet's command**: setting up is
+`/powerup-fleet start N <queue-run args>` and passes `--command powerup-fleet` to `fleet init`; a
+worker is `/powerup-fleet` in a slot, and opens with powerup's announcement before the slot line.
+Record the run under this command's name, as above, not queue-fleet's.
 
 ## Composition
 
 - **Order of work.** Queue-fleet (and the queue-run it overrides) picks and claims the item and owns
   the merge. Powerup governs how the item is done.
-- **Handoff prompts start with `/powerup-fleet`** (`/powerup:powerup-fleet` under the plugin install).
-  This overrides powerup's and powerup-auto's rule. The prompt names the slot, the claimed item and
+- **Handoff prompts start with `/powerup-fleet`** (`/powerup:powerup-fleet` under the plugin install),
+  the fleet's command. This overrides powerup's and powerup-auto's rule. The prompt names the slot, the claimed item and
   its phase, and the files the next phase reads first.
 - **Boundaries are as in powerup-auto.** An item boundary and a closed design always hand off. Any
   other phase boundary follows powerup's break-even weighing. Check usage and `fleet budget pace`

@@ -1,5 +1,5 @@
 ---
-description: Queue fleet — N queue-run workers in one repository at once, each in its own worktree slot, coordinated by the `fleet` script (claims, locks, a FIFO merge turn, a shared budget). Read by /powerup-fleet; not invoked on its own. User-invoked only.
+description: Queue fleet — queue-run with N concurrent workers in one repository, each in its own worktree slot, coordinated by the `fleet` script (claims, locks, a FIFO merge turn, a shared budget). `/queue-fleet start N <queue-run args>` sets the fleet up once; `/queue-fleet` in each slot's session runs a worker. Also the protocol /powerup-fleet runs on. User-invoked only.
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,32 @@ disable-model-invocation: true
 Several sessions work one project's queue at the same time, each in its own worktree (a **slot**).
 This skill is the protocol between them. It is queue-run with overrides: read
 `${CLAUDE_SKILL_DIR}/../queue-run/SKILL.md` in full and follow it, except where a section below
-replaces a part of it by name.
+replaces a part of it by name. Run on its own, it is the fleet form of `/queue-run`; under
+`/powerup-fleet` it is the fleet form of `/powerup-auto`, and that wrapper says how.
+
+## Two forms
+
+The **fleet's command** is the slash command its workers run: `queue-fleet` when this skill was
+invoked directly, or the wrapper that read it (`powerup-fleet`). `fleet init --command` records it,
+and `fleet status` prints it.
+
+- **`/<command> start N <queue-run args>`: setting up, run once by the user from the main
+  checkout.** This session works no item.
+  1. Resolve queue-run §1 once, with the user: threshold, queue, merge authority, windows. Use
+     N = 2 unless the user names another count.
+  2. Run `${CLAUDE_SKILL_DIR}/fleet init --workers N --threshold … --queue … --merge-authority …
+     [--windows …] --command <command>`. If it refuses for a missing project config, show the
+     user the template it printed, propose a filled-in config from the repository, and stop until
+     they accept it and it is committed.
+  3. Init creates the slot worktrees, detached at the main ref, under the config's in-repo worktree
+     root, and prints one `cd <slot> && claude` line per slot, each naming the command. Relay those
+     lines to the user, then stop.
+- **`/<command>` (no args), or a handoff prompt that starts with it: a worker, in a slot.** When
+  invoked directly, record the run for compaction recovery:
+  `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark set queue-fleet` (where powerup is installed; skip
+  it otherwise). Open with one line naming the slot, then run `fleet whoami` before anything else,
+  then the item loop. If `fleet status` names a different command than the one this session was
+  started with, stop and tell the user: the fleet was set up for the other workflow.
 
 **Intent.** N workers should finish N items in roughly the time one takes, with no worker ever
 undoing, racing or second-guessing another. Two things make that safe. First, **every shared
@@ -92,7 +117,7 @@ session (SendMessage, naming the slot) and notify the user.
 
 ## Overrides of queue-run
 
-- **§1, run parameters:** resolved once, by `/powerup-fleet start`, and recorded in the fleet's
+- **§1, run parameters:** resolved once, by the fleet's `start` form, and recorded in the fleet's
   `run.json` (threshold, queue locator, merge authority, windows, exclusions, look-ahead window). A
   worker reads them from `fleet status`, never by asking again.
 - **§2 step 2, picking the item:** take the first unfinished row in the queue's first `lookahead`
@@ -106,8 +131,8 @@ session (SendMessage, naming the slot) and notify the user.
   reaches the user once. A question the user declines goes into the exclusions with
   `fleet exclude <item>`.
 - **§3, usage:** the 5-hour window is no longer ignored. Pace on it with `fleet budget pace`.
-- **§4, handoff:** the prompt starts with `/powerup-fleet`, and names the slot and the claimed item
-  in flight. The run parameters are in `run.json`, so it does not need to repeat them.
+- **§4, handoff:** the prompt starts with the fleet's command (`fleet status` prints it), and names
+  the slot and the claimed item in flight. The run parameters are in `run.json`, so it does not need to repeat them.
 - **§5, stopping:** a worker stops when the claim line refuses every eligible row, the queue is
   done, or the fleet is halted. **The last worker out writes the summary** (check `fleet status`:
   no other live owner holds a claim), covering the whole fleet. `fleet end` is the user's command;

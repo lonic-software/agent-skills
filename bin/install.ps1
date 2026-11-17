@@ -12,7 +12,9 @@
 
     "powerup" installs the whole bundle (all five skills + their agents);
     "powerup-auto" is that bundle plus queue-run and its wrapper;
-    "powerup-fleet" adds queue-fleet and its wrapper as well; a single
+    "powerup-fleet" adds queue-fleet and its wrapper as well; "queue-fleet"
+    is the raw fleet (queue-run, queue-fleet, delivery, the gate and
+    compaction hooks); a single
     skill installs just that one and the agents it needs. "test-filter-hook"
     copies the hook scripts and prints the settings.json entry to add.
 
@@ -20,7 +22,7 @@
     Which coding tool to install into (currently only "claude").
 
 .PARAMETER Skill
-    powerup | consult | design-doc | delivery | evolve | queue-run
+    powerup | consult | design-doc | delivery | evolve | queue-run | queue-fleet
     | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
 #>
 [CmdletBinding()]
@@ -31,7 +33,7 @@ param(
 
     [Parameter(Mandatory = $true, Position = 1)]
     [ValidateSet('powerup', 'consult', 'design-doc', 'delivery', 'evolve', 'queue-run',
-                 'powerup-auto', 'powerup-fleet', 'test-filter-hook', 'gate-hook')]
+                 'queue-fleet', 'powerup-auto', 'powerup-fleet', 'test-filter-hook', 'gate-hook')]
     [string]$Skill
 )
 
@@ -76,6 +78,10 @@ switch ($Skill) {
     'powerup-fleet' {
         $skills = $bundleSkills + @('queue-run', 'queue-fleet', 'powerup-fleet')
         $agents = $advisors + $designPasses
+        $hooks = @('skills-after-compact.sh', 'gate.sh')
+    }
+    'queue-fleet' {
+        $skills = @('queue-run', 'queue-fleet', 'delivery')
         $hooks = @('skills-after-compact.sh', 'gate.sh')
     }
     'gate-hook' {
@@ -163,8 +169,8 @@ if ($Skill -eq 'powerup') {
     Write-Host '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
     Write-Host "    { `"type`": `"command`", `"command`": `"$hookCmd`" }"
     Write-Host '  ] } ] }'
-} elseif ($Skill -eq 'powerup-fleet') {
-    Write-Host 'From the main checkout, run /powerup-fleet start <N> stop at <N>%; it prints one command per slot.'
+} elseif ($Skill -eq 'powerup-fleet' -or $Skill -eq 'queue-fleet') {
+    Write-Host "From the main checkout, run /$Skill start <N> stop at <N>%; it prints one command per slot."
 } elseif ($Skill -eq 'gate-hook') {
 } elseif ($Skill -eq 'queue-run' -or $Skill -eq 'powerup-auto') {
     Write-Host "Start a session and run /$Skill stop at <N>%."

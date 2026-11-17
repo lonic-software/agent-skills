@@ -6,7 +6,7 @@ keeps none of them.
 
 **Composition.** Every "if an advisor / consult mode is active" in these skills resolves to true. A
 handoff prompt starts with the command that started this session (`/powerup`, `/powerup-auto`,
-`/powerup-fleet`, `/queue-run`). The session's mode is whatever that command set, not what the
+`/powerup-fleet`, `/queue-run`, `/queue-fleet`). The session's mode is whatever that command set, not what the
 summary paraphrases.
 
 **Enforced by the `gate.sh` hook** (every session, any repo; a denial names the way through — do
