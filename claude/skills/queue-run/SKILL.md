@@ -12,6 +12,11 @@ This skill only owns the *chain*: finding the queue, the stop rule, and the hand
 actually done (design first or not, review tier, PR cadence, commit style) comes from the project's
 own CLAUDE.md, memory and any other active skills. Follow those inside each item.
 
+Run alone (`/queue-run`, no powerup wrapper), record it for compaction recovery on the first read:
+`${CLAUDE_SKILL_DIR}/../powerup/powerup-mark set queue-run` (where powerup is installed; skip it
+otherwise). A wrapper that sent you here has already recorded its own name. Each session's opening
+read refreshes it the same way.
+
 ## 1. Resolve the run parameters (first session only)
 
 A session started by a handoff gets every parameter of this section in its prompt. In that case, do
@@ -136,6 +141,9 @@ If the handoff tool is unavailable, stop (§5) and print the ready-to-paste prom
 Stop when any of these holds: the threshold is reached, the queue has no unblocked items left (an
 item parked as blocked on the user counts as blocked, §1d), or something is broken in a way the chain shouldn't guess
 past (CI infrastructure down, auth expired, repeated review non-convergence).
+
+Run `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark clear` at the stop, whichever command started the
+chain, so a later unrelated compaction in this tree injects nothing.
 
 The final report covers:
 - **Done this run:** items with PR or merge links.

@@ -155,6 +155,10 @@ The source is under `claude/mods/`. Each plugin has tests (`claude plugin test c
 
 `claude/hooks/filter-test-output.sh` is a `PreToolUse` hook on Bash that keeps test-runner output out of the model's context: an un-piped `jest`/`vitest`/`npm test`/`pytest`/`go test` command is rewritten to print only failures and summary lines, keeping the runner's exit status. Put `FULL_TEST_OUTPUT=1` in a command to bypass it. Needs `jq`. Install with `install claude test-filter-hook`, then add the printed entry to `~/.claude/settings.json`.
 
+## Compaction hook
+
+After an auto-compaction, Claude Code re-attaches only skills invoked through the Skill tool, and truncates them; the skill files a powerup command read (delivery, design-doc, queue-run, ...) do not come back. `claude/hooks/skills-after-compact.sh` is a `SessionStart` hook (matcher `startup|compact`) that puts them back in force: each powerup-family command records itself with `skills/powerup/powerup-mark` on its opening read, and after a compaction the hook injects the gate card (`skills/powerup/gates.md`) and the absolute paths of the files to re-read. A fresh process start deletes the record; a `/clear` handoff keeps it. Needs `jq`. Installed with `powerup` and `powerup-auto`; add the printed entry to `~/.claude/settings.json`. `--self-test` checks it.
+
 ## Keeping a checkout and an install in step
 
 `bin/check-sync claude` (or `pult check-sync claude`) is read-only: it reports which skills, agents, scripts and mods differ between this repo and `~/.claude`, and leaves the direction to you.

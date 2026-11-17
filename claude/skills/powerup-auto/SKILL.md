@@ -13,7 +13,9 @@ follow both. That includes everything powerup tells you to read in turn. Both sk
 `disable-model-invocation: true`, so reading them here is what puts them in force. The arguments of
 this command are queue-run's arguments.
 
-Open with powerup's announcement, then queue-run's parameter confirmation, in that order.
+Open with powerup's announcement, then queue-run's parameter confirmation, in that order. Record
+the run for compaction recovery as powerup says, under this command's name:
+`${CLAUDE_SKILL_DIR}/../powerup/powerup-mark set powerup-auto`.
 
 ## Composition
 

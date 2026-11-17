@@ -70,10 +70,12 @@ case "$skill" in
   powerup)
     skills=("${bundle_skills[@]}")
     agents=("${bundle_agents[@]}")
+    hooks=(skills-after-compact.sh)
     ;;
   powerup-auto)
     skills=("${bundle_skills[@]}" queue-run powerup-auto)
     agents=("${bundle_agents[@]}")
+    hooks=(skills-after-compact.sh)
     ;;
   consult)
     skills=(consult)
@@ -122,6 +124,16 @@ done
 
 echo
 echo "Installed '$skill' for $tool."
+for h in ${hooks[@]+"${hooks[@]}"}; do
+  if [ "$h" = "skills-after-compact.sh" ]; then
+    echo "Keeps the rules across a compaction once wired in — add to ~/.claude/settings.json (needs jq):"
+    echo
+    echo '  "hooks": { "SessionStart": [ { "matcher": "startup|compact", "hooks": ['
+    echo "    { \"type\": \"command\", \"command\": \"bash $dst_hooks/skills-after-compact.sh\" }"
+    echo '  ] } ] }'
+    echo
+  fi
+done
 if [ "$skill" = "powerup" ]; then
   echo "Start a session and run /powerup to switch on full-rigor mode."
 elif [ "$skill" = "test-filter-hook" ]; then

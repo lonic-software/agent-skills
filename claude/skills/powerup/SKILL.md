@@ -20,6 +20,16 @@ here is what puts them in force; nothing below substitutes for reading them. des
 tetel route) are read in full when a design starts, as its "Read when a design starts" section says —
 not now, and never skipped once a design is under way.
 
+**Keep these rules across a compaction.** Intent: an auto-compaction re-attaches only skills
+invoked through the Skill tool, truncated, and drops every file read here, so the rules would lapse
+mid-session. Right after the reads above, run `${CLAUDE_SKILL_DIR}/powerup-mark set <command>`,
+naming the command that started this session (`powerup`, `powerup-auto`, `powerup-fleet`; a
+wrapper's name, not `powerup`, when a wrapper sent you here). It records the active skills for this
+work tree; the `skills-after-compact.sh` SessionStart hook reads it after a compaction and injects
+`${CLAUDE_SKILL_DIR}/gates.md` (the gate card) plus the files to re-read. It survives a handoff. At
+a stop — the item done under bare `/powerup`, or a chain's final stop — run `powerup-mark clear`.
+After a compaction that injected the card, re-read the files it lists before the next action.
+
 Every conditional inside them — "if `/consult` is active," "if an advisor mode is active" — resolves
 to **true**. What follows is the composition detail none of them states on its own.
 

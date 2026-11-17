@@ -65,10 +65,12 @@ switch ($Skill) {
     'powerup' {
         $skills = $bundleSkills
         $agents = $advisors + $designPasses
+        $hooks = @('skills-after-compact.sh')
     }
     'powerup-auto' {
         $skills = $bundleSkills + @('queue-run', 'powerup-auto')
         $agents = $advisors + $designPasses
+        $hooks = @('skills-after-compact.sh')
     }
     'consult' {
         $skills = @('consult')
@@ -125,6 +127,15 @@ foreach ($n in $hooks) {
 
 Write-Host ''
 Write-Host "Installed '$Skill' for $Tool."
+if ($hooks -contains 'skills-after-compact.sh') {
+    $sacCmd = 'bash ' + ((Join-Path $dstHooks 'skills-after-compact.sh') -replace '\\', '/')
+    Write-Host 'Keeps the rules across a compaction once wired in - add to ~/.claude/settings.json (needs jq and Git Bash):'
+    Write-Host ''
+    Write-Host '  "hooks": { "SessionStart": [ { "matcher": "startup|compact", "hooks": ['
+    Write-Host "    { `"type`": `"command`", `"command`": `"$sacCmd`" }"
+    Write-Host '  ] } ] }'
+    Write-Host ''
+}
 if ($Skill -eq 'powerup') {
     Write-Host 'Start a session and run /powerup to switch on full-rigor mode.'
 } elseif ($Skill -eq 'test-filter-hook') {
