@@ -825,7 +825,11 @@ EOF
   sleep 600 & local P5=$!; PIDV=$P5
   expect "collisions: init" 0 "slot-1" "$CM" "$self" init --workers 1 --threshold 60 --queue q --merge-authority x
   local CW="$CM/wt/slot-1"
-  onmain() { ( cd "$CM" && sh -c "$1" && git commit -qam main && git push -q origin main ); }
+  # main moves in a separate clone: the slot shares the main checkout's refs, so a push from there
+  # would advance the slot's origin/main too, and it could never be stale.
+  local CP="$tmp/cpush"; git clone -q -b main "$CO" "$CP" 2>/dev/null
+  git -C "$CP" config user.email t@example.invalid; git -C "$CP" config user.name t
+  onmain() { ( cd "$CP" && git pull -q --ff-only origin main && sh -c "$1" && git commit -qam main && git push -q origin main ); }
   onslot() { ( cd "$CW" && sh -c "$1" && git commit -qam slot ); }
   csync()  { ( cd "$CW" && git fetch -q origin && git merge -q --no-edit origin/main ); }
   fresh()  { ( cd "$CW" && git fetch -q origin && git checkout -q -B "$1" origin/main ); }
@@ -847,7 +851,7 @@ EOF
   onslot "echo 'const SCHEMA_VERSION: u32 = 99;' >> other.txt"; onmain "echo 'const SCHEMA_VERSION: u32 = 99;' >> other.txt"; csync
   expect "collisions: identical lines that do not match, or lie outside the paths, pass" 0 "no collisions" "$CW" "$self" collisions
   onmain "echo w > b.txt"
-  expect "collisions: a main ref behind the remote is refused" 3 "fetch, merge it in" "$CW" "$self" collisions
+  expect "collisions: a main ref behind the remote is refused" 3 "but origin's main is at" "$CW" "$self" collisions
   git -C "$CW" fetch -q origin
   expect "collisions: HEAD lacking the main ref's tip is refused" 3 "does not contain origin/main's tip" "$CW" "$self" collisions
   kill "$P5" 2>/dev/null; wait "$P5" 2>/dev/null
