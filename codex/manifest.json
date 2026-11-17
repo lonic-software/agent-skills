@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "status": "full-bundle-local-candidate-demo-validated",
+  "selections": {
+    "consult": {
+      "skills": [
+        "consult"
+      ],
+      "agents": [
+        "lonic-advisor-low",
+        "lonic-advisor-medium",
+        "lonic-advisor-high",
+        "lonic-advisor-xhigh"
+      ]
+    },
+    "delivery": {
+      "skills": [
+        "delivery"
+      ],
+      "agents": [
+        "lonic-reviewer-low",
+        "lonic-reviewer-medium"
+      ]
+    },
+    "evolve": {
+      "skills": [
+        "evolve",
+        "consult"
+      ],
+      "agents": [
+        "lonic-advisor-low",
+        "lonic-advisor-medium",
+        "lonic-advisor-high",
+        "lonic-advisor-xhigh"
+      ]
+    },
+    "core-preview": {
+      "skills": [
+        "consult",
+        "delivery",
+        "evolve"
+      ],
+      "agents": [
+        "lonic-advisor-low",
+        "lonic-advisor-medium",
+        "lonic-advisor-high",
+        "lonic-advisor-xhigh",
+        "lonic-reviewer-low",
+        "lonic-reviewer-medium"
+      ]
+    },
+    "design-doc": {
+      "skills": [
+        "design-doc",
+        "delivery"
+      ],
+      "agents": [
+        "lonic-reviewer-low",
+        "lonic-reviewer-medium"
+      ],
+      "runtime": true
+    },
+    "queue-run": {
+      "skills": [
+        "queue-run"
+      ],
+      "agents": [],
+      "runtime": true
+    },
+    "powerup": {
+      "skills": [
+        "consult",
+        "design-doc",
+        "delivery",
+        "evolve",
+        "powerup"
+      ],
+      "agents": [
+        "lonic-advisor-low",
+        "lonic-advisor-medium",
+        "lonic-advisor-high",
+        "lonic-advisor-xhigh",
+        "lonic-reviewer-low",
+        "lonic-reviewer-medium"
+      ],
+      "runtime": true
+    },
+    "powerup-auto": {
+      "skills": [
+        "consult",
+        "design-doc",
+        "delivery",
+        "evolve",
+        "powerup",
+        "queue-run",
+        "powerup-auto"
+      ],
+      "agents": [
+        "lonic-advisor-low",
+        "lonic-advisor-medium",
+        "lonic-advisor-high",
+        "lonic-advisor-xhigh",
+        "lonic-reviewer-low",
+        "lonic-reviewer-medium"
+      ],
+      "runtime": true
+    },
+    "full-preview": {
+      "skills": [
+        "consult",
+        "design-doc",
+        "delivery",
+        "evolve",
+        "powerup",
+        "queue-run",
+        "powerup-auto"
+      ],
+      "agents": [
+        "lonic-advisor-low",
+        "lonic-advisor-medium",
+        "lonic-advisor-high",
+        "lonic-advisor-xhigh",
+        "lonic-reviewer-low",
+        "lonic-reviewer-medium"
+      ],
+      "runtime": true
+    },
+    "test-filter-hook": {
+      "skills": [],
+      "agents": [],
+      "runtime": true
+    }
+  },
+  "blocked": {},
+  "activationNotes": [
+    "Runtime configuration and tetel MCP setup are separate reviewed steps.",
+    "Hook files are inert until separately configured and trusted.",
+    "Bounded installed native workflow examples passed on Windows and Ubuntu; see runtime/README.md for limits."
+  ]
+}

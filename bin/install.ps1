@@ -19,28 +19,57 @@
     copies the hook scripts and prints the settings.json entry to add.
 
 .PARAMETER Tool
-    Which coding tool to install into (currently only "claude").
+    claude, or codex for the project-local development preview.
 
 .PARAMETER Skill
     powerup | consult | design-doc | delivery | evolve | queue-run | queue-fleet
     | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
+    Codex also accepts core-preview | full-preview.
+
+.PARAMETER Project
+    Existing project directory. Required for the Codex preview.
+
+.PARAMETER Apply
+    Apply the Codex preview after review. Without this switch, only preview.
+
+.PARAMETER Check
+    Compare installed Codex files with the selected source files.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('claude')]
+    [ValidateSet('claude', 'codex')]
     [string]$Tool,
 
     [Parameter(Mandatory = $true, Position = 1)]
     [ValidateSet('powerup', 'consult', 'design-doc', 'delivery', 'evolve', 'queue-run',
+                 'core-preview', 'full-preview',
                  'queue-fleet', 'powerup-auto', 'powerup-fleet', 'test-filter-hook', 'gate-hook')]
-    [string]$Skill
+    [string]$Skill,
+
+    [string]$Project,
+    [switch]$Apply,
+    [switch]$Check
 )
 
 $ErrorActionPreference = 'Stop'
 
 # pult calls the bash sibling; run directly, the repo root is this script's parent.
 $repoRoot = Split-Path -Parent $PSScriptRoot
+
+if ($Tool -eq 'codex') {
+    if (-not $Project) { throw 'Codex setup requires -Project with an existing project directory.' }
+    if ($Apply -and $Check) { throw 'Use either -Apply or -Check, not both.' }
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'Codex preview requires Node.js 18 or later; no installation was attempted.' }
+    $nodeArgs = @((Join-Path $PSScriptRoot 'install-codex.cjs'), '--project', $Project, '--skill', $Skill)
+    if ($Apply) { $nodeArgs += '--apply' }
+    if ($Check) { $nodeArgs += '--check' }
+    & node @nodeArgs
+    exit $LASTEXITCODE
+}
+if ($Project -or $Apply -or $Check -or $Skill -in @('core-preview', 'full-preview')) {
+    throw 'Project preview options apply only to the codex target.'
+}
 
 # --- Per-tool config layout -------------------------------------------------
 switch ($Tool) {

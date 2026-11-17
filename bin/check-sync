@@ -3,7 +3,7 @@
 #
 #   check-sync <tool>
 #
-# tool : which coding tool's config to compare against (currently only "claude")
+# tool : claude, or codex --project PATH --skill SELECTION
 #
 # Read-only: it never copies, edits, or deletes anything. `bin/install` is the
 # only writer, and this deliberately does not offer to "fix" what it finds —
@@ -31,7 +31,13 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 
 die() { echo "check-sync: $*" >&2; exit 1; }
 
-[ -n "$tool" ] || die "no tool given (expected: claude)"
+[ -n "$tool" ] || die "no tool given (expected: claude | codex)"
+
+if [ "$tool" = codex ]; then
+  command -v node >/dev/null 2>&1 || die "Codex preview requires Node.js 18 or later"
+  shift
+  exec node "$script_dir/install-codex.cjs" --check "$@"
+fi
 
 # --- Per-tool config layout -------------------------------------------------
 # Mirrors bin/install's dispatch. Keep the two in step: a tool added there

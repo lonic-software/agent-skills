@@ -1,0 +1,18 @@
+{
+  "revision": "cf2020b7d5aa971f4b7606ae26e52599702a03fa",
+  "sha256": {
+    "claude/agents/lonic-advisor-high.md": "d845a76bcaedf0e017d5927945604684557e02ebddf9020349160cd312150474",
+    "claude/agents/lonic-advisor-low.md": "3152af6a7a2d6795b10313d61ef21a75f823bc29e1944270bf86af78c56b33c9",
+    "claude/agents/lonic-advisor-medium.md": "9db23c7df1a33e9f517a3075eba611f946e29b5193587a031328d2430969b230",
+    "claude/agents/lonic-advisor-xhigh.md": "a2077acebc83819b2f6250eb70fc266da0e4348d9ae5429707f8d54e62887c4b",
+    "claude/agents/lonic-design-attacker.md": "083c922b7bb223cb8b057daadabc605afd03655ad23a0b7197ecda43c26176ce",
+    "claude/agents/lonic-grounder.md": "5412982dca96b8d74257da407150ad38d4cd96ec0b5ae5aea9bbb53530728b1a",
+    "claude/skills/consult/SKILL.md": "614513e5643e508f4c57758d15e66607042f01646dd598db0f67008e2934d2ca",
+    "claude/skills/delivery/SKILL.md": "25b39a4bcfe1578aeae3479a30b50b44e175f417bdbb7b5abc1337df36c66e59",
+    "claude/skills/design-doc/SKILL.md": "a0e48aca06680b66a76efe1ea24c3aa6aff1e011bd9fd78062dba2ad7bdce31f",
+    "claude/skills/evolve/SKILL.md": "6a2faf9ffee39af1e83c01f1d4eb7d40208b4c8a1f37cb76ade177dcab4eb2c3",
+    "claude/skills/powerup/SKILL.md": "41616b43acb3a977fce3d2fd32966bb055ae70931ca24cc237e233cc6cdf3664",
+    "claude/skills/powerup-auto/SKILL.md": "f6dbe3908e0d9e285890bba49b6a3348a4e56b3845f33804daa9285254aec850",
+    "claude/skills/queue-run/SKILL.md": "affd6ada13bccffe830fa3a1753b527e966481f731201af2cce2405ac50062af"
+  }
+}

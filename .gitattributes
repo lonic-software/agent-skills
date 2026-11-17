@@ -1,0 +1,2 @@
+bin/install text eol=lf
+bin/check-sync text eol=lf
