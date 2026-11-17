@@ -364,6 +364,15 @@ regression test while the class stays broken.
   itself: red in both worlds pins as little as green in both. At code time both worlds exist, so
   neither direction may be left owed at merge. (Design-doc names each invariant's observable,
   class and revert at contract depth; this gate owns the demonstration once the code exists.)
+  - **Gate:** run the mutation with `${CLAUDE_SKILL_DIR}/revert-check <file> <old> <new> -- <test
+    command>` (shipped beside this skill; `--self-test` checks it) — never a hand-rolled mutation
+    runner. It refuses an uncommitted tree, requires `<old>` to match exactly once, runs under a
+    watchdog, always restores and touches the file, and reads a mutant that does not build as
+    NOCOMPILE, never as RED. Report its verdict line and the assertion it prints.
+  - Traps seen: a restore over uncommitted work destroyed it, twice; a restored file with an older
+    timestamp let the build tool run a stale binary; a non-compiling mutant was counted as red; a
+    hand-written runner read the runner's own "test failed" line as a compile error. Each was a
+    session re-inventing the runner.
 - **A revert-check certifies only what its fixture can distinguish.** The rule above is necessary,
   not sufficient, and reads as more than it delivers: "red when reverted" certifies the claim only
   over the domain the fixture exercises. When the claim is that an observable is **computed from, or

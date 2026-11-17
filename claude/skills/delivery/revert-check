@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# revert-check [--timeout SECS] <file> <old> <new> -- <test command...>
+# revert-check --self-test
+#
+# Applies ONE mutation (the exact string <old>, which must occur exactly once in <file>, becomes
+# <new>), runs the test command under a watchdog, ALWAYS restores <file> from git, touches it so
+# build tools rebuild, and prints one verdict:
+#
+#   RED        exit 0  the command failed on a test failure; the first failing assertion is shown
+#   SURVIVED   exit 1  the command passed with the mutant in place
+#   NOCOMPILE  exit 2  a compile/syntax error, or a nonzero exit with no test failure in the
+#                      output: the mutant proved nothing (mutate by replacing, not by deleting)
+#   TIMEOUT    exit 4  the watchdog fired (default 1800 s); nothing was proved
+#   refused    exit 3  usage error, a dirty tree, or <old> not matching exactly once
+#
+# Why it refuses a dirty tree: the restore is `git checkout -- <file>`, and a restore over
+# uncommitted work has destroyed it more than once. Commit first.
+# Why NOCOMPILE is not RED: a mutant that does not build fails every test, so its red certifies
+# nothing about the assertion under check.
+# Bash 3.2 (macOS) compatible; the watchdog is perl's alarm, since macOS has no `timeout`.
+set -u
+
+die() { echo "revert-check: $*" >&2; exit 3; }
+
+# Lines that mean the mutant did not build. Deliberately NOT a bare `^error:` — cargo prints
+# "error: test failed, to rerun pass ..." for an ordinary test failure.
+COMPILE_RE='^error\[E[0-9]+\]|could not compile|^error: (expected|cannot find|aborting due to)|SyntaxError|error TS[0-9]+|cannot find symbol|compilation failed|syntax error'
+# Lines that mean a test failed.
+FAIL_RE='FAILED|panicked at|AssertionError|assertion .* failed|[Aa]ssert(ion)? ?[Ff]ailed|^not ok|^FAIL|failures:|✗'
+# The line naming the failing assertion, in the order a reader wants them.
+ASSERT_RE='panicked at|assertion|[Aa]ssert|AssertionError|[Ee]xpected'
+
+run_check() {
+  local limit=1800
+  if [ "${1:-}" = "--timeout" ]; then limit=${2:?--timeout needs seconds}; shift 2; fi
+  [ $# -ge 5 ] || die "usage: revert-check [--timeout SECS] <file> <old> <new> -- <test command...>"
+  local file=$1 old=$2 new=$3; shift 3
+  [ "$1" = "--" ] || die "expected -- before the test command"
+  shift
+  [ $# -ge 1 ] || die "no test command given"
+
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git work tree"
+  [ -f "$file" ] || die "no such file: $file"
+  git ls-files --error-unmatch -- "$file" >/dev/null 2>&1 || die "$file is not tracked by git, so it cannot be restored"
+  local dirty
+  dirty=$(git status --porcelain --untracked-files=no)
+  [ -z "$dirty" ] || die "the tree has uncommitted changes; commit before falsifying:
+$dirty"
+
+  local count
+  count=$(OLD="$old" perl -0777 -ne '$n = 0; $p = 0; while (($i = index($_, $ENV{OLD}, $p)) >= 0) { $n++; $p = $i + 1 } print $n' -- "$file")
+  [ "$count" = "1" ] || die "<old> occurs $count time(s) in $file; it must occur exactly once"
+
+  local log
+  log=$(mktemp "${TMPDIR:-/tmp}/revert-check.XXXXXX")
+  # From here on the file is mutated: restore it however this script ends.
+  trap 'git checkout -- "$file" 2>/dev/null; touch "$file"' EXIT
+  trap 'exit 130' INT TERM
+  OLD="$old" NEW="$new" perl -0777 -i -pe '$i = index($_, $ENV{OLD}); substr($_, $i, length($ENV{OLD})) = $ENV{NEW}' -- "$file" \
+    || die "could not write the mutant"
+  touch "$file"
+
+  perl -e 'alarm shift; exec @ARGV or exit 127' "$limit" "$@" >"$log" 2>&1
+  local status=$?
+
+  git checkout -- "$file" && touch "$file"
+  trap - EXIT
+  [ -z "$(git status --porcelain --untracked-files=no -- "$file")" ] || echo "revert-check: WARNING: $file did not restore cleanly" >&2
+
+  if [ "$status" -eq 142 ]; then
+    echo "TIMEOUT after ${limit}s (log: $log)"; tail -5 "$log"; return 4
+  fi
+  if [ "$status" -eq 0 ]; then
+    echo "SURVIVED: the command passed with the mutant (log: $log)"; tail -5 "$log"; return 1
+  fi
+  if grep -Eq "$COMPILE_RE" "$log"; then
+    echo "NOCOMPILE: the mutant did not build (log: $log)"; grep -Em3 "$COMPILE_RE" "$log"; return 2
+  fi
+  if ! grep -Eq "$FAIL_RE" "$log"; then
+    echo "NOCOMPILE: exit $status with no test failure in the output (log: $log)"; tail -5 "$log"; return 2
+  fi
+  local line
+  line=$(grep -En "$ASSERT_RE" "$log" | head -1 | cut -d: -f1)
+  [ -n "$line" ] || line=$(grep -En "$FAIL_RE" "$log" | head -1 | cut -d: -f1)
+  echo "RED (exit $status; log: $log)"
+  sed -n "${line},$((line + 2))p" "$log"
+  return 0
+}
+
+self_test() {
+  local self dir fails=0
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/revert-check-self.XXXXXX")
+  (
+    cd "$dir" || exit 1
+    git init -q . && git config user.email self-test@example.invalid && git config user.name self-test
+    printf 'add() { echo $(( $1 + $2 )); }\n# a comment\n' > lib.sh
+    cat > test.sh <<'EOF'
+bash -n lib.sh 2>/dev/null || { echo "error[E0001]: could not compile lib.sh"; exit 101; }
+. ./lib.sh
+got=$(add 2 3)
+[ "$got" = "5" ] || { echo "test add ... FAILED"; echo "assertion failed: expected 5, got $got"; exit 1; }
+echo "test add ... ok"
+EOF
+    git add . && git commit -qm base
+  )
+  local original
+  original=$(cat "$dir/lib.sh")
+
+  expect() { # name want-exit want-word cmd...
+    local name=$1 want=$2 word=$3; shift 3
+    local out status
+    out=$(cd "$dir" && "$@" 2>&1); status=$?
+    local restored
+    restored=$(cat "$dir/lib.sh")
+    if [ "$status" -eq "$want" ] && printf '%s' "$out" | grep -q "$word" && [ "$restored" = "$original" ] \
+       && [ -z "$(cd "$dir" && git status --porcelain --untracked-files=no)" ]; then
+      echo "ok   $name"
+    else
+      echo "FAIL $name (exit $status, want $want/$word)"; printf '%s\n' "$out" | sed 's/^/     /'; fails=$((fails + 1))
+    fi
+  }
+
+  expect "a real mutant reads RED with its assertion" 0 "expected 5" \
+    "$self" lib.sh '$1 + $2' '$1 - $2' -- bash test.sh
+  expect "a mutant the test cannot see SURVIVES" 1 "SURVIVED" \
+    "$self" lib.sh '# a comment' '# another comment' -- bash test.sh
+  expect "a mutant that does not build is NOCOMPILE, not RED" 2 "NOCOMPILE" \
+    "$self" lib.sh 'add() {' 'add() {{' -- bash test.sh
+  expect "a nonzero exit with no test failure is NOCOMPILE" 2 "no test failure" \
+    "$self" lib.sh '# a comment' '# x' -- sh -c 'exit 7'
+  expect "the watchdog fires and the file is restored" 4 "TIMEOUT" \
+    "$self" --timeout 1 lib.sh '# a comment' '# x' -- sleep 5
+  expect "an <old> that matches twice is refused" 3 "exactly once" \
+    "$self" lib.sh '$' 'X' -- bash test.sh
+
+  # A dirty tree is refused and its uncommitted edit survives.
+  printf 'echo extra\n' >> "$dir/lib.sh"
+  local out status
+  out=$(cd "$dir" && "$self" lib.sh '$1 + $2' '$1 - $2' -- bash test.sh 2>&1); status=$?
+  if [ "$status" -eq 3 ] && grep -q "echo extra" "$dir/lib.sh" && printf '%s' "$out" | grep -q "commit before"; then
+    echo "ok   a dirty tree is refused and its edit kept"
+  else
+    echo "FAIL a dirty tree is refused and its edit kept (exit $status)"; fails=$((fails + 1))
+  fi
+
+  rm -rf "$dir"
+  if [ "$fails" -eq 0 ]; then echo "self-test: all passed"; return 0; fi
+  echo "self-test: $fails failed"; return 1
+}
+
+case "${1:-}" in
+  --self-test) self_test; exit $? ;;
+  ""|-h|--help) sed -n '2,20p' "$0"; exit 3 ;;
+  *) run_check "$@"; exit $? ;;
+esac
