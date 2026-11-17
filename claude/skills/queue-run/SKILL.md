@@ -156,7 +156,10 @@ The final report covers:
 
 ## Always ask, even mid-chain
 
-Merging is the only outward action this skill authorizes, and only per §1c. Still stop and ask before:
+Merging is the only outward action this skill authorizes, and only per §1c — and only **the change
+for the item you are working**. Any other change, such as a PR someone else opened, a fix you
+noticed on the way or a change you were asked to look at, is filed or left for the user, never merged
+by you, even when it is small and green. Still stop and ask before:
 releases or publishing, deploys, anything touching live infrastructure, destructive git (force-push,
 history rewrites, deleting branches you didn't create), and anything the project's instructions mark
 as needing the user. Inside an availability window, ask and continue (§1d). Outside one, do not

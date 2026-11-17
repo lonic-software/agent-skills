@@ -5,8 +5,10 @@
 # Waits for the CI checks of one change (a PR or MR, by number) and prints one verdict, always for
 # the head that was current when it started. Run it with run_in_background; read its exit status.
 #
-#   GREEN     exit 0  every listed check passed (or was skipped) on that head
-#   RED       exit 1  a check failed or was cancelled on that head; each one is named
+#   GREEN     exit 0  every listed check passed (or was skipped) on that head, and every name in
+#                     the config's required_checks is listed and passed
+#   RED       exit 1  a check failed or was cancelled on that head, or a required check was
+#                     skipped; each one is named
 #   DEADLINE  exit 2  the deadline (default 1800 s) passed with no verdict: CI result UNKNOWN
 #   NO CI     exit 3  the project has no CI, so there is nothing to wait for (verify-head is the
 #                     evidence there)
@@ -14,7 +16,7 @@
 #   refused   exit 5  usage error, jq or perl missing, or a forge it cannot read with no config
 #
 # GREEN needs, all on the starting head: the head read before and after the checks call, at least
-# one check, every check terminal, the same check list as the previous poll (a matrix registers its
+# one check, every check terminal, every required check listed and passed, the same check list as the previous poll (a matrix registers its
 # jobs over time), and the grace period (default 60 s) past since the head was first seen (a watch
 # started right after a push otherwise sees only the first check to register). Any failed call, an
 # unparsable list or an empty one is no reading and restarts the stability clause. RED needs no
@@ -25,7 +27,7 @@
 #
 # Forge: .claude/gates.json in the work tree, the fields gate.sh reads: forge, ci, head_cmd (prints
 # the head sha; $PR is the change number), checks_cmd (prints [{"name","bucket"}] with bucket
-# pass|fail|pending|skipping|cancel). origin on github.com needs no config (gh, every check gh pr
+# pass|fail|pending|skipping|cancel), required_checks. origin on github.com needs no config (gh, every check gh pr
 # checks lists, Actions and external statuses alike); nor does gitlab.com, or "forge": "gitlab"
 # alone for a self-hosted instance (glab: the head pipeline and its jobs); no remote, or
 # "ci": false, is NO CI.
@@ -60,6 +62,12 @@ load_config() {
 }
 # has(), not //: a configured false must read as false, not as absent.
 cfg() { [ -n "$CFG" ] && jq -r --arg k "$1" 'if has($k) then .[$k] | tostring else empty end' "$CFG" 2>/dev/null; }
+# required_checks as a JSON array of strings ([] when unset).
+required_json() {
+  local j=""
+  [ -n "$CFG" ] && j=$(jq -c '.required_checks // [] | if type == "array" then map(tostring) else [tostring] end' "$CFG" 2>/dev/null)
+  printf '%s\n' "${j:-[]}"
+}
 # The GitLab preset (origin on gitlab.com, or "forge": "gitlab" for a self-hosted instance), run
 # with sh -c, $PR the merge request's iid and $GL_PROJECT the URL-encoded project path (glab's
 # :fullpath, the current repository, when unset). The checks are the head pipeline, as one entry
@@ -138,6 +146,7 @@ main() {
   head_cmd=$(setting head_cmd); checks_cmd=$(setting checks_cmd)
   [ -n "$head_cmd" ] && [ -n "$checks_cmd" ] || die "forge $FORGE: name head_cmd and checks_cmd in .claude/gates.json"
 
+  local req; req=$(required_json)
   local deadline; deadline=$(( $(date +%s) + limit ))
   call() { # shell → its stdout; 142 on timeout or when the deadline has passed
     local r=$(( deadline - $(date +%s) ))
@@ -145,7 +154,7 @@ main() {
     [ "$r" -le "$ctime" ] || r=$ctime
     PR=$pr bounded "$r" sh -c "$1" 2>/dev/null
   }
-  local h0="" seen=0 prev="" last="no reading yet" now ha hb checks st n bad pending sig s r
+  local h0="" seen=0 prev="" last="no reading yet" now ha hb checks st n bad pending sig s r missing
   moved() {
     echo "MOVED: change $pr's head moved from $h0 to $1 mid-wait; no verdict for $h0 (last reading: $last). Wait again for the new head."
     exit 4
@@ -160,15 +169,19 @@ main() {
       if [ "$st" -ne 142 ] && printf '%s' "$checks" | jq -e 'type == "array"' >/dev/null 2>&1 \
          && hb=$(call "$head_cmd") && [ "$hb" = "$h0" ]; then
         n=$(printf '%s' "$checks" | jq length)
-        bad=$(printf '%s' "$checks" | jq -r '.[] | select(.bucket == "fail" or .bucket == "cancel") | "\(.name): \(.bucket)"')
+        # A skipped required check never passes: final for that head, like a failure.
+        bad=$(printf '%s' "$checks" | jq -r --argjson req "$req" '
+          (.[] | select(.bucket == "fail" or .bucket == "cancel") | "\(.name): \(.bucket)"),
+          (.[] | select(.bucket == "skipping" and (.name as $n | $req | index($n))) | "\(.name): skipping (a required check must pass)")')
         if [ -n "$bad" ]; then
           echo "RED $h0: $(printf '%s\n' "$bad" | grep -c .) of $n check(s) failed or were cancelled"
           printf '%s\n' "$bad" | sed 's/^/  /'
           exit 1
         fi
         pending=$(printf '%s' "$checks" | jq -r '.[] | select(.bucket != "pass" and .bucket != "skipping") | .name')
+        missing=$(printf '%s' "$checks" | jq -r --argjson req "$req" '[.[].name] as $have | $req[] | select(. as $n | $have | index($n) | not)')
         sig=$(printf '%s' "$checks" | jq -r '[.[].name] | sort | join(",")')
-        if [ "$n" -ge 1 ] && [ -z "$pending" ] && [ "$sig" = "$prev" ] && [ $((now - seen)) -ge "$grace" ]; then
+        if [ "$n" -ge 1 ] && [ -z "$pending" ] && [ -z "$missing" ] && [ "$sig" = "$prev" ] && [ $((now - seen)) -ge "$grace" ]; then
           echo "GREEN $h0: $n check(s) passed or skipped"
           printf '%s' "$checks" | jq -r '.[] | "  \(.name): \(.bucket)"'
           exit 0
@@ -176,6 +189,7 @@ main() {
         prev=$sig
         if [ "$n" -eq 0 ]; then last="no checks listed yet"
         else last="$n check(s), $(printf '%s' "$pending" | grep -c .) not finished"; fi
+        [ -z "$missing" ] || last="$last; required check(s) not listed yet: $(printf '%s' "$missing" | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
       else
         prev=""
         if [ -n "$hb" ] && is_sha "$hb" && [ "$hb" != "$h0" ]; then moved "$hb"; fi
@@ -229,12 +243,14 @@ esac
 EOF
   chmod +x "$tmp/bin/glab"
   local r
-  for r in gh none gl unk noci glc; do git init -q "$tmp/$r" || return 1; done
+  for r in gh none gl unk noci glc req; do git init -q "$tmp/$r" || return 1; done
   git -C "$tmp/gh" remote add origin https://github.com/o/r.git
   git -C "$tmp/noci" remote add origin git@github.com:o/r.git
   git -C "$tmp/gl" remote add origin https://gitlab.example.com/o/r.git
   git -C "$tmp/unk" remote add origin https://gitlab.example.com/o/r.git
   git -C "$tmp/glc" remote add origin https://gitlab.com/o/r.git
+  git -C "$tmp/req" remote add origin https://github.com/o/r.git
+  mkdir -p "$tmp/req/.claude"; printf '%s\n' '{"required_checks":["ci passed","cla"]}' > "$tmp/req/.claude/gates.json"
   mkdir -p "$tmp/gl/.claude" "$tmp/noci/.claude"
   printf '%s\n' '{"forge":"gitlab","head_cmd":"forgecli head $PR","checks_cmd":"forgecli checks $PR"}' > "$tmp/gl/.claude/gates.json"
   printf '%s\n' '{"forge":"github","ci":false}' > "$tmp/noci/.claude/gates.json"
@@ -294,6 +310,17 @@ $H1" "$MANY_PENDING"
   case_ "no remote is NO CI" 3 "NO CI" 3 "$tmp/none" -- $F 7 20
   case_ "an unrecognised forge with no config is refused" 5 "gates.json" 3 "$tmp/unk" -- $F 7 20
   case_ "a non-numeric change is refused" 5 "usage" 3 "$G" -- abc
+  local Q="$tmp/req"
+  scenario "$H0" '[{"name":"cla","bucket":"pass"},{"name":"lint","bucket":"pass"}]'
+  case_ "required: a stable all-pass list without a required name is not GREEN" 2 "not listed yet: ci passed" 6 "$Q" -- $F 7 3
+  scenario "$H0" '[{"name":"cla","bucket":"pass"},{"name":"ci passed","bucket":"pass"},{"name":"lint","bucket":"skipping"}]'
+  case_ "required: every required name listed and passing is GREEN" 0 "GREEN $H0: 3 check" 6 "$Q" -- $F 7 20
+  scenario "$H0" '[{"name":"cla","bucket":"pass"},{"name":"ci passed","bucket":"fail"}]'
+  case_ "required: a required check failing is RED" 1 "ci passed: fail" 6 "$Q" -- $F 7 20
+  scenario "$H0" '[{"name":"cla","bucket":"pass"},{"name":"ci passed","bucket":"skipping"}]'
+  case_ "required: a required check skipped is RED" 1 "ci passed: skipping" 6 "$Q" -- $F 7 20
+  scenario "$H0" '[{"name":"cla","bucket":"pass"},{"name":"other","bucket":"skipping"}]'
+  case_ "required: no config, a skipped check is still fine" 0 "GREEN $H0: 2 check" 6 "$G" -- $F 7 20
   local L="$tmp/glc" OK='[{"name":"test","status":"success","allow_failure":false},{"name":"lint","status":"failed","allow_failure":true}]'
   case_ "gitlab.com: a green pipeline is GREEN" 0 "GREEN $H0: 3 check" 6 "$L" GL_SHA=$H0 GL_JOBS="$OK" -- $F 12 20
   case_ "gitlab.com: a failed job is RED and named" 1 "test: fail" 6 "$L" GL_SHA=$H0 GL_PIPE=failed GL_JOBS='[{"name":"test","status":"failed","allow_failure":false}]' -- $F 12 20

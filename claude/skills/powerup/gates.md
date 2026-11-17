@@ -14,10 +14,13 @@ not reword a command to slip past it):
 - a merge pins the reviewed head, and every verification the project has passed at it: CI checks
   where there is CI, else a `delivery/verify-head` stamp (the project's `.claude/gates.json` names
   its forge; a local `git merge` into the default branch counts where there is no forge);
+- no merge of a change touching a protected path (`.claude/gates.json`, `.claude/fleet.json`, the
+  project's `protected_paths`): the user merges those;
 - no `git stash` (except `list`/`show`); no force push, `+refspec` or `git rebase` without asking
-  the user; no `git commit` with no user.email;
-- in a fleet: merges only inside this slot's merge turn, declared heavy commands only under
-  `fleet with-lock`.
+  the user; no `git commit` with no user.email, or, where the project sets `commit_email`, a commit
+  or push authored by another email;
+- in a fleet: merges only inside this slot's merge turn, of this slot's HEAD, with
+  `fleet collisions` passing; declared heavy commands only under `fleet with-lock`.
 
 **Gates the skills hold** (intent and the rule; the named section has the detail):
 - **Cite nothing you have not opened in this session** (design-doc's one rule; delivery §A).
