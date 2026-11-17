@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# powerup-mark set <skill...>   record which powerup-family skills are in force in this tree
+# powerup-mark clear            remove the record (run at a stop)
+# powerup-mark path             print where the record lives
+# powerup-mark show             print the record
+#
+# The record lets the skills-after-compact hook re-inject the gate card and the re-read list after
+# an auto-compaction, which re-attaches only Skill-tool skills and drops files those skills read.
+# It lives on disk, keyed by the work tree (each fleet slot has its own), so it survives a handoff
+# (a /clear in the same process). The hook deletes it at a fresh process start (source "startup"),
+# so a record left by a session that never reached its stop cannot leak into an unrelated one.
+# Bash 3.2 compatible.
+set -u
+
+marker_path() {
+  local dir=${1:-$PWD} gd
+  if gd=$(cd "$dir" 2>/dev/null && git rev-parse --absolute-git-dir 2>/dev/null); then
+    printf '%s/powerup-active\n' "$gd"
+  else
+    local key
+    key=$(printf '%s' "$dir" | tr -c 'A-Za-z0-9._-' '_')
+    printf '%s/.claude/powerup-active/%s\n' "$HOME" "$key"
+  fi
+}
+
+case "${1:-}" in
+  set)
+    shift
+    [ $# -ge 1 ] || { echo "powerup-mark: name at least one skill" >&2; exit 2; }
+    p=$(marker_path)
+    mkdir -p "$(dirname "$p")"
+    for s in "$@"; do
+      case "$s" in *[!a-z-]*|"") echo "powerup-mark: bad skill name '$s'" >&2; exit 2 ;; esac
+    done
+    skills_dir=$(cd "$(dirname "$0")/.." && pwd)
+    { printf 'skills_dir=%s\n' "$skills_dir"; printf '%s\n' "$@"; } > "$p.tmp" && mv "$p.tmp" "$p"
+    echo "powerup-mark: $* -> $p"
+    ;;
+  clear) rm -f "$(marker_path)"; echo "powerup-mark: cleared" ;;
+  path) marker_path "${2:-$PWD}" ;;
+  show) cat "$(marker_path)" 2>/dev/null || echo "(none)" ;;
+  *) sed -n '2,6p' "$0"; exit 2 ;;
+esac

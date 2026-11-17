@@ -1,26 +1,259 @@
 #!/usr/bin/env bash
-# wait-pr-ci <pr> [deadline-seconds]   — run with run_in_background.
-# Exits 0 only on a reading it obtained: runs for the PR's CURRENT head sha, at least one,
-# all completed, and the same row count on two consecutive polls. Any gh error, an empty
-# list, or a stale sha is "no reading" and keeps polling. Exit 1 = terminal with a failure,
-# exit 2 = deadline passed WITHOUT a terminal reading (never implies a result).
-# Sees GitHub Actions runs only, not external commit statuses. A run that never completes
-# (action_required, waiting) ends in exit 2 — UNKNOWN is the honest answer there.
-# The stability clause is keyed to the sha, so a push mid-wait restarts it.
+# wait-pr-ci [--poll S] [--grace S] [--call-timeout S] <change> [deadline-seconds]
+# wait-pr-ci --self-test
+#
+# Waits for the CI checks of one change (a PR or MR, by number) and prints one verdict, always for
+# the head that was current when it started. Run it with run_in_background; read its exit status.
+#
+#   GREEN     exit 0  every listed check passed (or was skipped) on that head
+#   RED       exit 1  a check failed or was cancelled on that head; each one is named
+#   DEADLINE  exit 2  the deadline (default 1800 s) passed with no verdict: CI result UNKNOWN
+#   NO CI     exit 3  the project has no CI, so there is nothing to wait for (verify-head is the
+#                     evidence there)
+#   MOVED     exit 4  the head moved mid-wait: no verdict for the starting head; wait on the new one
+#   refused   exit 5  usage error, jq or perl missing, or a forge it cannot read with no config
+#
+# GREEN needs, all on the starting head: the head read before and after the checks call, at least
+# one check, every check terminal, the same check list as the previous poll (a matrix registers its
+# jobs over time), and the grace period (default 60 s) past since the head was first seen (a watch
+# started right after a push otherwise sees only the first check to register). Any failed call, an
+# unparsable list or an empty one is no reading and restarts the stability clause. RED needs no
+# stability: a failed check is final for that head.
+# Every external call runs under a hard timeout (default 60 s, never past the deadline) that kills
+# its whole process group, and the deadline holds through the sleeps: a stalled forge CLI cannot
+# hang the wait.
+#
+# Forge: .claude/gates.json in the work tree, the fields gate.sh reads: forge, ci, head_cmd (prints
+# the head sha; $PR is the change number), checks_cmd (prints [{"name","bucket"}] with bucket
+# pass|fail|pending|skipping|cancel). origin on github.com needs no config (gh, every check gh pr
+# checks lists, Actions and external statuses alike); no remote, or "ci": false, is NO CI.
+# Bash 3.2 compatible; needs jq and perl (macOS has no timeout).
 set -u
-pr=$1; deadline=$(( $(date +%s) + ${2:-1800} )); prev=""
-while [ "$(date +%s)" -lt "$deadline" ]; do
-  if head=$(gh pr view "$pr" --json headRefOid,headRefName -q '.headRefOid+" "+.headRefName' 2>/dev/null) \
-     && set -- $head && [ -n "${1:-}" ] && [ -n "${2:-}" ] \
-     && rows=$(gh run list --branch "$2" --commit "$1" --limit 50 \
-               --json status,conclusion -q '.[]|"\(.status) \(.conclusion)"' 2>/dev/null); then
-    n=$(printf '%s' "$rows" | grep -c . || true)
-    if [ "$n" -ge 1 ] && ! printf '%s\n' "$rows" | grep -qv '^completed ' && [ "$1:$n" = "$prev" ]; then
-      echo "head $1: $n run(s) completed"; printf '%s\n' "$rows" | sort | uniq -c
-      printf '%s\n' "$rows" | grep -qvE '^completed (success|skipped|neutral)$' && exit 1 || exit 0
-    fi
-    prev="$1:$n"
+
+die() { echo "wait-pr-ci: $*" >&2; exit 5; }
+
+# bounded SECS cmd...: cmd in its own process group; on timeout the whole group is killed, exit 142.
+# TERM first (a nested bounded passes it on to its own group), then KILL. Killing only the direct
+# child is not enough: a grandchild keeps the output pipe open, and the command substitution
+# reading it would wait forever.
+bounded() {
+  perl -e '
+    my $t = shift; $t = 1 if $t < 1;
+    my $pid = fork; defined $pid or exit 126;
+    if ($pid == 0) { setpgrp(0, 0); exec @ARGV or exit 127 }
+    setpgrp($pid, $pid);
+    $SIG{ALRM} = sub { kill "TERM", -$pid, $pid; select undef, undef, undef, 0.3; kill "KILL", -$pid, $pid; exit 142 };
+    $SIG{$_} = sub { kill "KILL", -$pid; exit 143 } for qw(TERM INT HUP);
+    alarm $t; waitpid $pid, 0; alarm 0;
+    exit($? & 127 ? 128 + ($? & 127) : $? >> 8)' "$@"
+}
+
+CFG=""
+load_config() {
+  local top
+  top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+  [ -f "$top/.claude/gates.json" ] || return 0
+  jq -e 'type == "object"' "$top/.claude/gates.json" >/dev/null 2>&1 || die "unparsable $top/.claude/gates.json"
+  CFG="$top/.claude/gates.json"
+}
+# has(), not //: a configured false must read as false, not as absent.
+cfg() { [ -n "$CFG" ] && jq -r --arg k "$1" 'if has($k) then .[$k] | tostring else empty end' "$CFG" 2>/dev/null; }
+FORGE=""
+detect_forge() {
+  FORGE=$(cfg forge); [ -n "$FORGE" ] && return 0
+  local url; url=$(git remote get-url origin 2>/dev/null)
+  if [ -z "$url" ] && [ -z "$(git remote 2>/dev/null)" ]; then FORGE=none
+  else case "$url" in *github.com[:/]*) FORGE=github ;; *) FORGE=unknown ;; esac; fi
+}
+setting() {
+  local v; v=$(cfg "$1"); [ -n "$v" ] && { printf '%s\n' "$v"; return; }
+  [ "$FORGE" = "github" ] || return 0
+  case "$1" in
+    head_cmd)   echo 'gh pr view "$PR" --json headRefOid -q .headRefOid' ;;
+    checks_cmd) echo 'gh pr checks "$PR" --json name,bucket' ;;
+    ci)         echo true ;;
+  esac
+}
+
+is_sha() { printf '%s' "$1" | grep -Eq '^[0-9a-f]{40}$'; }
+
+main() {
+  local poll=30 grace=60 ctime=60
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --poll) poll=${2:-}; shift 2 ;;
+      --grace) grace=${2:-}; shift 2 ;;
+      --call-timeout) ctime=${2:-}; shift 2 ;;
+      --) shift; break ;;
+      -*) die "unknown option $1" ;;
+      *) break ;;
+    esac
+  done
+  local pr=${1:-} limit=${2:-1800} v
+  case "$pr" in ""|*[!0-9]*) die "usage: wait-pr-ci [--poll S] [--grace S] [--call-timeout S] <change-number> [deadline-seconds]" ;; esac
+  for v in "$poll" "$grace" "$ctime" "$limit"; do case "$v" in ""|*[!0-9]*) die "not a number of seconds: '$v'" ;; esac; done
+  command -v jq >/dev/null 2>&1 || die "needs jq"
+  command -v perl >/dev/null 2>&1 || die "needs perl"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git work tree"
+
+  load_config; detect_forge
+  [ "$FORGE" = "unknown" ] && [ -z "$CFG" ] \
+    && die "origin is not a forge this recognises; name head_cmd and checks_cmd in .claude/gates.json"
+  local ci; ci=$(setting ci); [ -n "$ci" ] || { [ -n "$(cfg checks_cmd)" ] && ci=true || ci=false; }
+  if [ "$FORGE" = "none" ] || [ "$ci" != "true" ]; then
+    echo "NO CI: this project has no CI (forge $FORGE), so there is nothing to wait for; the merge evidence is a verify-head stamp."
+    exit 3
   fi
-  sleep 30
-done
-echo "DEADLINE: no terminal reading for PR $pr — CI result UNKNOWN" >&2; exit 2
+  local head_cmd checks_cmd
+  head_cmd=$(setting head_cmd); checks_cmd=$(setting checks_cmd)
+  [ -n "$head_cmd" ] && [ -n "$checks_cmd" ] || die "forge $FORGE: name head_cmd and checks_cmd in .claude/gates.json"
+
+  local deadline; deadline=$(( $(date +%s) + limit ))
+  call() { # shell → its stdout; 142 on timeout or when the deadline has passed
+    local r=$(( deadline - $(date +%s) ))
+    [ "$r" -ge 1 ] || return 142
+    [ "$r" -le "$ctime" ] || r=$ctime
+    PR=$pr bounded "$r" sh -c "$1" 2>/dev/null
+  }
+  local h0="" seen=0 prev="" last="no reading yet" now ha hb checks st n bad pending sig s r
+  moved() {
+    echo "MOVED: change $pr's head moved from $h0 to $1 mid-wait; no verdict for $h0 (last reading: $last). Wait again for the new head."
+    exit 4
+  }
+  while now=$(date +%s); [ "$now" -lt "$deadline" ]; do
+    hb=""
+    if ha=$(call "$head_cmd") && is_sha "$ha"; then
+      if [ -z "$h0" ]; then h0=$ha; seen=$now; echo "watching change $pr at head $h0"; fi
+      [ "$ha" = "$h0" ] || moved "$ha"
+      # gh exits nonzero while a check is pending or failed, yet prints the list: judge the JSON.
+      checks=$(call "$checks_cmd"); st=$?
+      if [ "$st" -ne 142 ] && printf '%s' "$checks" | jq -e 'type == "array"' >/dev/null 2>&1 \
+         && hb=$(call "$head_cmd") && [ "$hb" = "$h0" ]; then
+        n=$(printf '%s' "$checks" | jq length)
+        bad=$(printf '%s' "$checks" | jq -r '.[] | select(.bucket == "fail" or .bucket == "cancel") | "\(.name): \(.bucket)"')
+        if [ -n "$bad" ]; then
+          echo "RED $h0: $(printf '%s\n' "$bad" | grep -c .) of $n check(s) failed or were cancelled"
+          printf '%s\n' "$bad" | sed 's/^/  /'
+          exit 1
+        fi
+        pending=$(printf '%s' "$checks" | jq -r '.[] | select(.bucket != "pass" and .bucket != "skipping") | .name')
+        sig=$(printf '%s' "$checks" | jq -r '[.[].name] | sort | join(",")')
+        if [ "$n" -ge 1 ] && [ -z "$pending" ] && [ "$sig" = "$prev" ] && [ $((now - seen)) -ge "$grace" ]; then
+          echo "GREEN $h0: $n check(s) passed or skipped"
+          printf '%s' "$checks" | jq -r '.[] | "  \(.name): \(.bucket)"'
+          exit 0
+        fi
+        prev=$sig
+        if [ "$n" -eq 0 ]; then last="no checks listed yet"
+        else last="$n check(s), $(printf '%s' "$pending" | grep -c .) not finished"; fi
+      else
+        prev=""
+        if [ -n "$hb" ] && is_sha "$hb" && [ "$hb" != "$h0" ]; then moved "$hb"; fi
+      fi
+    else
+      prev=""
+    fi
+    s=$poll; r=$(( deadline - $(date +%s) ))
+    [ "$r" -ge "$s" ] || s=$r
+    [ "$s" -le 0 ] || sleep "$s"
+  done
+  echo "DEADLINE: no verdict for change $pr${h0:+ at head $h0} within ${limit}s (last reading: $last); CI result UNKNOWN"
+  exit 2
+}
+
+self_test() {
+  local self tmp fails=0
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/wait-pr-ci-self.XXXXXX"); tmp=$(cd "$tmp" && pwd -P)
+  mkdir -p "$tmp/bin" "$tmp/state"
+  # The stand-in forge CLI, as gh and as forgecli. Call n of each kind prints line n of
+  # state/heads or state/checks (the last line repeats). WPC_HANG=head|checks|all makes that kind
+  # hang in a child process, the way a stalled network call does.
+  cat > "$tmp/bin/gh" <<'EOF'
+#!/bin/sh
+case "$1 $2" in "pr view") k=heads ;; "pr checks") k=checks ;; *)
+  case "$1" in head) k=heads ;; checks) k=checks ;; *) exit 2 ;; esac ;; esac
+case "${WPC_HANG:-}" in all|"${k%s}"|"$k") sleep 1000 ;; esac
+n=$(( $(cat "$WPC_STATE/$k.n" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$WPC_STATE/$k.n"
+line=$(awk -v n="$n" 'NR <= n { l = $0 } END { print l }' "$WPC_STATE/$k")
+printf '%s\n' "$line"
+[ "$k" = checks ] && printf '%s' "$line" | grep -q '"pending"' && exit 8
+exit 0
+EOF
+  chmod +x "$tmp/bin/gh"; cp "$tmp/bin/gh" "$tmp/bin/forgecli"
+  local r
+  for r in gh none gl unk noci; do git init -q "$tmp/$r" || return 1; done
+  git -C "$tmp/gh" remote add origin https://github.com/o/r.git
+  git -C "$tmp/noci" remote add origin git@github.com:o/r.git
+  git -C "$tmp/gl" remote add origin https://gitlab.example.com/o/r.git
+  git -C "$tmp/unk" remote add origin https://gitlab.example.com/o/r.git
+  mkdir -p "$tmp/gl/.claude" "$tmp/noci/.claude"
+  printf '%s\n' '{"forge":"gitlab","head_cmd":"forgecli head $PR","checks_cmd":"forgecli checks $PR"}' > "$tmp/gl/.claude/gates.json"
+  printf '%s\n' '{"forge":"github","ci":false}' > "$tmp/noci/.claude/gates.json"
+
+  local H0=0123456789abcdef0123456789abcdef01234567 H1=fedcba9876543210fedcba9876543210fedcba98
+  local ONE='[{"name":"cla","bucket":"pass"}]' i MANY_PENDING MANY_PASS
+  MANY_PENDING=$(for i in 1 2 3 4 5 6 7 8 9 10 11 12 13; do printf '{"name":"job%s","bucket":"pending"}\n' "$i"; done \
+    | jq -sc '[{"name":"cla","bucket":"pass"}] + .')
+  MANY_PASS=$(printf '%s' "$MANY_PENDING" | jq -c 'map(.bucket = "pass")')
+  scenario() { # heads-lines checks-lines (each newline-separated)
+    rm -f "$tmp/state/"*; printf '%s\n' "$1" > "$tmp/state/heads"; printf '%s\n' "$2" > "$tmp/state/checks"
+  }
+  # case_ name want-exit want-text max-seconds dir [VAR=val...] -- wait-pr-ci args...
+  case_() {
+    local name=$1 want=$2 text=$3 max=$4 dir=$5; shift 5
+    local envs=()
+    while [ "$1" != "--" ]; do envs+=("$1"); shift; done; shift
+    local t0 out st took
+    t0=$(date +%s)
+    out=$(cd "$dir" && bounded $((max + 15)) env PATH="$tmp/bin:$PATH" WPC_STATE="$tmp/state" ${envs[@]+"${envs[@]}"} "$self" "$@" 2>&1); st=$?
+    took=$(( $(date +%s) - t0 ))
+    if [ "$st" -eq "$want" ] && [ "$took" -le "$max" ] && printf '%s' "$out" | grep -q -- "$text"; then
+      echo "ok   $name"
+    else
+      echo "FAIL $name (exit $st, want $want; ${took}s, max ${max}s; want text: $text)"
+      printf '%s\n' "$out" | sed 's/^/     /'; fails=$((fails + 1))
+    fi
+  }
+  local G="$tmp/gh" F="--poll 1 --grace 0 --call-timeout 1"
+
+  scenario "$H0" "$ONE"
+  case_ "a checks call that hangs still ends at the deadline" 2 "DEADLINE" 6 "$G" WPC_HANG=checks -- $F 7 3
+  scenario "$H0" "$ONE"
+  case_ "a head call that hangs still ends at the deadline" 2 "UNKNOWN" 6 "$G" WPC_HANG=all -- $F 7 3
+  scenario "$H0" "$ONE
+$MANY_PENDING
+$MANY_PASS"
+  case_ "a list that grows from 1 to 14 is judged at 14" 0 "GREEN $H0: 14 check" 10 "$G" -- $F 7 20
+  scenario "$H0" "$ONE
+$ONE
+$MANY_PASS"
+  case_ "no reading counts inside the grace period" 0 "GREEN $H0: 14 check" 12 "$G" -- --poll 1 --grace 3 --call-timeout 1 7 20
+  scenario "$H0" '[{"name":"cla","bucket":"pass"},{"name":"test","bucket":"fail"},{"name":"lint","bucket":"cancel"},{"name":"mac","bucket":"pending"}]'
+  case_ "a failed check is RED and named" 1 "test: fail" 6 "$G" -- $F 7 20
+  case_ "a cancelled check is RED and named" 1 "lint: cancel" 6 "$G" -- $F 7 20
+  scenario "$H0
+$H0
+$H1" "$MANY_PENDING"
+  case_ "a head that moves mid-wait is MOVED, naming both" 4 "from $H0 to $H1" 8 "$G" -- $F 7 20
+  scenario "$H0" "[]"
+  case_ "no checks yet is no verdict" 2 "no checks listed yet" 6 "$G" -- $F 7 3
+  scenario "$H0" "not json"
+  case_ "an unparsable list is no verdict" 2 "DEADLINE" 6 "$G" -- $F 7 3
+  scenario "$H0" "$MANY_PASS"
+  case_ "a configured forge's commands are used" 0 "GREEN $H0: 14 check" 8 "$tmp/gl" -- $F 7 20
+  case_ "\"ci\": false is NO CI" 3 "NO CI" 3 "$tmp/noci" -- $F 7 20
+  case_ "no remote is NO CI" 3 "NO CI" 3 "$tmp/none" -- $F 7 20
+  case_ "an unrecognised forge with no config is refused" 5 "gates.json" 3 "$tmp/unk" -- $F 7 20
+  case_ "a non-numeric change is refused" 5 "usage" 3 "$G" -- abc
+
+  rm -rf "$tmp"
+  [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }
+  echo "self-test: $fails failed"; return 1
+}
+
+case "${1:-}" in
+  --self-test) self_test; exit $? ;;
+  ""|-h|--help) sed -n '2,30p' "$0"; exit 5 ;;
+  *) main "$@" ;;
+esac

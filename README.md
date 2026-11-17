@@ -64,6 +64,8 @@ Two of the agents in this repo (`lonic-design-attacker`, `lonic-grounder`) exist
 | **evolve** | Lets a recurring pattern harden into a durable rule, so the skills sharpen with use instead of drifting | Portable idea; the advisor-gate + memory system are Claude Code |
 | **queue-run** | Works through a project's queue unattended, one item per fresh session, until weekly usage reaches a threshold you set for the run (`/queue-run stop at 60%`) | Claude Code; hands off via the `phase-handoff` mod |
 | **powerup-auto** | `/powerup` + `/queue-run` in one: the queue, worked at full rigor | As above |
+| **queue-fleet** | `/queue-run` with N workers at once, one per worktree slot, coordinated by one script (`/queue-fleet start 2 stop at 60%`, then `/queue-fleet` in each slot) | Claude Code; git worktrees; see [Queue fleet](#queue-fleet) |
+| **powerup-fleet** | `/powerup-auto` as a fleet: the same slots, each worked at full rigor | As above |
 
 `orchestrate` and its `lonic-exec-*` executors were retired in favour of the main session authoring the work itself; see *You are the author* in `powerup`.
 
@@ -104,7 +106,7 @@ pult x github.com/lonic-software/agent-skills install
 
 Drop the trailing args for the guided flow: `pult x github.com/lonic-software/agent-skills` lists the tools (currently only `claude`) and then the skills, with **powerup** on top. A bare source takes the latest tag; pin explicitly with `@v2` if you want.
 
-Selecting **powerup** installs the full bundle (the five skills and their agents); **powerup-auto** adds `queue-run` and its wrapper on top (add the `phase-handoff` [mod](#mods) to let it chain sessions); selecting a single skill installs just that one and what it needs. **test-filter-hook** copies the hook below and prints the `settings.json` entry to add — the installer never edits your settings.
+Selecting **powerup** installs the full bundle (the five skills and their agents); **powerup-auto** adds `queue-run` and its wrapper on top, **powerup-fleet** adds `queue-fleet` as well, and **queue-fleet** installs the fleet without the powerup bundle (add the `phase-handoff` [mod](#mods) to let it chain sessions); selecting a single skill installs just that one and what it needs. **test-filter-hook** copies the hook below and prints the `settings.json` entry to add — the installer never edits your settings.
 
 If you reach for it often, `pult includes add github.com/lonic-software/agent-skills --prefix skills` pins it into your own `pult.yaml` so it's `pult skills:install`. Or `git clone` and run `pult install claude powerup` from inside the checkout.
 
@@ -154,6 +156,18 @@ The source is under `claude/mods/`. Each plugin has tests (`claude plugin test c
 ## Test-output filter hook
 
 `claude/hooks/filter-test-output.sh` is a `PreToolUse` hook on Bash that keeps test-runner output out of the model's context: an un-piped `jest`/`vitest`/`npm test`/`pytest`/`go test` command is rewritten to print only failures and summary lines, keeping the runner's exit status. Put `FULL_TEST_OUTPUT=1` in a command to bypass it. Needs `jq`. Install with `install claude test-filter-hook`, then add the printed entry to `~/.claude/settings.json`.
+
+## Compaction hook
+
+After an auto-compaction, Claude Code re-attaches only skills invoked through the Skill tool, and truncates them; the skill files a powerup command read (delivery, design-doc, queue-run, ...) do not come back. `claude/hooks/skills-after-compact.sh` is a `SessionStart` hook (matcher `startup|compact`) that puts them back in force: each powerup-family command records itself with `skills/powerup/powerup-mark` on its opening read, and after a compaction the hook injects the gate card (`skills/powerup/gates.md`) and the absolute paths of the files to re-read. A fresh process start deletes the record; a `/clear` handoff keeps it. Needs `jq`. Installed with every powerup bundle; add the printed entry to `~/.claude/settings.json`. `--self-test` checks it.
+
+## Gate hook
+
+`claude/hooks/gate.sh` is a `PreToolUse` hook on Bash that turns the hard gates into code, in every session and every repo. It denies a merge that does not pin the reviewed head or whose verification has not passed at that head (CI checks where there is CI, else a `verified <sha>` stamp written by `skills/delivery/verify-head`); `git stash` other than `list`/`show`; a force push, a `+refspec` or `git rebase` (ask the user first); and `git commit` with no user.email. While a queue fleet runs it also denies a merge outside the slot's merge turn and a declared heavy command outside `fleet with-lock`. Each denial is one line naming the way through. A project describes its forge in `.claude/gates.json` (forge, merge/head/checks commands, CI present, required checks, local verify command); GitHub with CI needs no config, a repo with no remote gates a local `git merge` into the default branch, and an unrecognized setup is logged and allowed. Only a merge touches the network; the hook's own errors allow. Needs `jq`. Installed with every powerup bundle, or alone as `gate-hook`; `--self-test` checks it.
+
+## Queue fleet
+
+`/queue-fleet start <N> …` (install `queue-fleet`) runs N queue-run workers in one repository, one per worktree slot; `/powerup-fleet start <N> …` (install `powerup-fleet`) runs the same fleet with the powerup workflow in each slot, as `/powerup-auto` does for one session. `skills/queue-fleet/fleet` holds every shared decision — claims, locks, a FIFO merge turn, budget reservations — under the repository's common git dir; the project's `.claude/fleet.json` declares its heavy commands, serial resources and areas. A repo without a forge lands with `fleet land`. `fleet --self-test` checks it.
 
 ## Keeping a checkout and an install in step
 

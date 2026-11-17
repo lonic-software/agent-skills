@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# verify-head [--timeout SECS] -- <complete local suite command...>
+# verify-head --check <sha>        exit 0 when <sha> carries a stamp; prints it
+# verify-head --self-test
+#
+# Runs the project's complete local suites on the exact committed HEAD and, only when they pass on
+# a clean tree that is still at that HEAD afterwards, writes a stamp:
+#   $(git rev-parse --git-common-dir)/verified/<sha>   (line 1: the command, line 2: UTC time)
+# The stamp is the merge evidence where there is no CI: gate.sh requires one for the head being
+# merged. A stamp certifies one sha; any new commit needs a new run.
+#
+#   VERIFIED <sha>   exit 0
+#   FAILED   <sha>   exit 1  (the command's own status is printed)
+#   refused          exit 3  dirty tree, HEAD moved during the run, or usage
+#   TIMEOUT          exit 4
+# Bash 3.2 compatible; the watchdog is perl's alarm (macOS has no timeout).
+set -u
+
+die() { echo "verify-head: $*" >&2; exit 3; }
+stamp_dir() { local g; g=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || die "not inside a git repository"; printf '%s/verified\n' "$g"; }
+
+run() {
+  local limit=3600
+  [ "${1:-}" = "--timeout" ] && { limit=${2:?}; shift 2; }
+  [ "${1:-}" = "--" ] || die "usage: verify-head [--timeout SECS] -- <command...>"
+  shift; [ $# -ge 1 ] || die "no command"
+  local sha dirty
+  sha=$(git rev-parse --verify -q HEAD) || die "no HEAD commit"
+  dirty=$(git status --porcelain)
+  [ -z "$dirty" ] || die "the tree is not clean; a stamp certifies a commit, so commit first:
+$dirty"
+  perl -e 'alarm shift; exec @ARGV or exit 127' "$limit" "$@"
+  local st=$?
+  [ "$st" -ne 142 ] || { echo "TIMEOUT $sha after ${limit}s"; return 4; }
+  [ "$st" -eq 0 ] || { echo "FAILED   $sha (exit $st)"; return 1; }
+  [ "$(git rev-parse HEAD)" = "$sha" ] || die "HEAD moved during the run; nothing stamped"
+  [ -z "$(git status --porcelain)" ] || die "the run left the tree dirty; nothing stamped"
+  local d; d=$(stamp_dir); mkdir -p "$d"
+  { printf '%s\n' "$*"; date -u '+%Y-%m-%dT%H:%M:%SZ'; } > "$d/$sha.tmp" && mv "$d/$sha.tmp" "$d/$sha"
+  echo "VERIFIED $sha"
+}
+
+check() {
+  local sha=${1:-}; [ -n "$sha" ] || die "--check <sha>"
+  local full; full=$(git rev-parse --verify -q "$sha^{commit}") || die "no such commit: $sha"
+  local f; f="$(stamp_dir)/$full"
+  [ -f "$f" ] || { echo "no stamp for $full"; return 1; }
+  echo "stamp $full: $(head -1 "$f") ($(sed -n 2p "$f"))"
+}
+
+self_test() {
+  local self tmp fails=0 out st
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/verify-head-self.XXXXXX")
+  ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; printf '%s\n' "${2:-}" | sed 's/^/     /'; fails=$((fails + 1)); }
+  ( cd "$tmp" && git init -q . && git config user.email t@example.invalid && git config user.name t \
+    && echo a > f && git add f && git commit -qm a ) || return 1
+  local sha; sha=$(git -C "$tmp" rev-parse HEAD)
+  out=$(cd "$tmp" && "$self" -- sh -c 'exit 1' 2>&1); st=$?
+  [ "$st" -eq 1 ] && [ ! -e "$tmp/.git/verified/$sha" ] && ok "a failing suite writes no stamp" || bad "a failing suite writes no stamp" "$out"
+  out=$(cd "$tmp" && "$self" -- true 2>&1); st=$?
+  [ "$st" -eq 0 ] && [ -f "$tmp/.git/verified/$sha" ] && ok "a passing suite stamps the head" || bad "a passing suite stamps the head" "$out"
+  out=$(cd "$tmp" && "$self" --check "$sha" 2>&1) && ok "--check finds the stamp" || bad "--check finds the stamp" "$out"
+  echo b > "$tmp/f"
+  out=$(cd "$tmp" && "$self" -- true 2>&1); st=$?
+  [ "$st" -eq 3 ] && ok "a dirty tree is refused" || bad "a dirty tree is refused" "$out"
+  (cd "$tmp" && git commit -qam b)
+  out=$(cd "$tmp" && "$self" --check HEAD 2>&1); st=$?
+  [ "$st" -eq 1 ] && ok "a new commit carries no stamp" || bad "a new commit carries no stamp" "$out"
+  out=$(cd "$tmp" && "$self" -- sh -c 'echo x > g' 2>&1); st=$?
+  [ "$st" -eq 3 ] && [ ! -e "$tmp/.git/verified/$(git -C "$tmp" rev-parse HEAD)" ] && ok "a run that dirties the tree stamps nothing" || bad "a run that dirties the tree stamps nothing" "$out"
+  rm -rf "$tmp"
+  [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }
+  echo "self-test: $fails failed"; return 1
+}
+
+case "${1:-}" in
+  --self-test) self_test; exit $? ;;
+  --check) shift; check "$@"; exit $? ;;
+  ""|-h|--help) sed -n '2,18p' "$0"; exit 3 ;;
+  *) run "$@"; exit $? ;;
+esac

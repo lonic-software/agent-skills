@@ -185,6 +185,10 @@ export const register: Register = on => {
       name: 'handoff',
       description: 'Handoff to a fresh session: /handoff now | cancel | <prompt>',
     })
+    await $.command.register({
+      name: 'budget',
+      description: 'Context, session cost, rate limits and their pace: /budget [R tokens] [breakdown]',
+    })
     return next(e)
   })
 
@@ -216,6 +220,13 @@ export const register: Register = on => {
     const r = typeof input.next_phase_tokens === 'number' ? input.next_phase_tokens : undefined
     const text = await contextReport($, r, input.breakdown === true)
     return { result: text }
+  })
+
+  // The same report for the person: `/budget`, `/budget 40000`, `/budget breakdown`.
+  on('command.run', { command: 'budget' }, async ($, e) => {
+    const words = e.args.trim().split(/\s+/).filter(Boolean)
+    const r = words.map(Number).find(n => Number.isFinite(n) && n > 0)
+    return { text: await contextReport($, r, words.includes('breakdown')) }
   })
 
   on('turn.complete', async ($, e, next) => {

@@ -1,7 +1,7 @@
 {
   "name": "powerup",
   "version": "2.1.0",
-  "description": "Full-rigor engineering workflow: /powerup:powerup (design-first, disciplined delivery, a consulted advisor, a learning loop) and /powerup:powerup-auto (the same, unattended across a queue within a weekly-usage budget).",
+  "description": "Full-rigor engineering workflow: /powerup:powerup (design-first, disciplined delivery, a consulted advisor, a learning loop) and /powerup:powerup-auto (the same, unattended across a queue within a weekly-usage budget), and /powerup:powerup-fleet (N concurrent queue workers, one per worktree; /powerup:queue-fleet is the same fleet without the powerup workflow).",
   "author": {
     "name": "kolonicsmate"
   },

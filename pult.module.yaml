@@ -23,7 +23,9 @@ commands:
       config. Pick "powerup" to install the full disciplined-workflow bundle
       (all five skills + their agents), or "powerup-auto" for that bundle plus
       the unattended queue runner; pick a single skill for just that one.
-      "test-filter-hook" copies the hook and prints the settings entry to add.
+      "powerup-fleet" adds the concurrent queue fleet; "queue-fleet" is that fleet
+      without the powerup workflow. "test-filter-hook" and
+      "gate-hook" copy a hook and print the settings entry to add.
     params:
       # Only "claude" today; the list grows as other tools (codex, …) are ported.
       tool:
@@ -32,7 +34,7 @@ commands:
       # powerup first: it's the bundle and the recommended entry point.
       skill:
         pick:
-          options: [powerup, powerup-auto, consult, design-doc, delivery, evolve, queue-run, test-filter-hook]
+          options: [powerup, powerup-auto, powerup-fleet, consult, design-doc, delivery, evolve, queue-run, queue-fleet, test-filter-hook, gate-hook]
     run: "${module.dir}/bin/install {tool} {skill}"
 
   - id: check-sync

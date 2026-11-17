@@ -15,7 +15,20 @@ tetel whenever it is installed — that is not a choice to offer (design-doc's r
 Read `${CLAUDE_SKILL_DIR}/../consult/SKILL.md`, `${CLAUDE_SKILL_DIR}/../design-doc/SKILL.md`,
 `${CLAUDE_SKILL_DIR}/../delivery/SKILL.md`, and `${CLAUDE_SKILL_DIR}/../evolve/SKILL.md` now, in full. They carry
 `disable-model-invocation: true`, so this is the only way to activate them together — reading them
-here is what puts them in force; nothing below substitutes for reading them.
+here is what puts them in force; nothing below substitutes for reading them. design-doc's
+`SKILL.md` is its always-read core; the two files beside it (`method.md`, and `loop-tetel.md` on the
+tetel route) are read in full when a design starts, as its "Read when a design starts" section says —
+not now, and never skipped once a design is under way.
+
+**Keep these rules across a compaction.** Intent: an auto-compaction re-attaches only skills
+invoked through the Skill tool, truncated, and drops every file read here, so the rules would lapse
+mid-session. Right after the reads above, run `${CLAUDE_SKILL_DIR}/powerup-mark set <command>`,
+naming the command that started this session (`powerup`, `powerup-auto`, `powerup-fleet`; a
+wrapper's name, not `powerup`, when a wrapper sent you here). It records the active skills for this
+work tree; the `skills-after-compact.sh` SessionStart hook reads it after a compaction and injects
+`${CLAUDE_SKILL_DIR}/gates.md` (the gate card) plus the files to re-read. It survives a handoff. At
+a stop — the item done under bare `/powerup`, or a chain's final stop — run `powerup-mark clear`.
+After a compaction that injected the card, re-read the files it lists before the next action.
 
 Every conditional inside them — "if `/consult` is active," "if an advisor mode is active" — resolves
 to **true**. What follows is the composition detail none of them states on its own.
@@ -52,8 +65,8 @@ mechanism and one pass is never enough — but a round count is not the rule and
 
 **The stopping rule is: no blocker findings remain.** A blocker is **for a design** a finding that
 changes *what gets built*; **for code** a finding that affects the *semantics* of the code. Everything
-else is recorded and fixed but buys no further round. `design-doc`'s "When the loop stops" owns the
-design side in full — do not restate it here. A reviewer always returns *something*; the count is
+else is recorded and fixed but buys no further round. `design-doc`'s "When the loop stops" (in its
+`loop-tetel.md`) owns the design side in full — do not restate it here. A reviewer always returns *something*; the count is
 noise and the class is the signal.
 
 The waste was never the rounds. It was **conflating "fresh agent" with "independent round."**
@@ -173,7 +186,8 @@ never at the whole ledger.
 
 `design-doc`'s rules about *when* a design is required and *who reviews it* still govern — the loop
 is the review. Never ask the user whether they have reviewed a design, and never write a user review
-into a handoff prompt or memory.
+into a handoff prompt or memory. A decision design-doc assigns to the user (a design system, a stack,
+a feature set) is not a review and is asked as that skill says.
 
 | Role | Owns |
 |---|---|

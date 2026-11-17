@@ -1,5 +1,5 @@
 ---
-description: Delivery mode — mode-independent doctrines for shipping work in any session: grounding handed-down findings, code-review routing and tiers, one-finding-one-PR shipping cadence, and fix-the-class execution discipline. User-invoked only.
+description: Delivery mode — mode-independent doctrines for shipping work in any session: grounding handed-down findings, code-review routing and tiers, one-finding-one-PR shipping cadence, fix-the-class execution discipline, and reuse-then-promote for helper scripts. User-invoked only.
 disable-model-invocation: true
 ---
 
@@ -9,9 +9,9 @@ disable-model-invocation: true
 Delivery is on — I'll ground handed-down findings — and my own checkable claims — before acting on
 or durably writing them,
 route pre-merge review through
-`/code-review` (after CI is green where a PR with checks exists; **run on my own authority,
+`/code-review` (launched once the local suites pass, beside any CI; **run on my own authority,
 capped at medium**), ship one finding per PR, and
-fix the class with run-and-reported revert-checks.
+fix the class with the evidence each clause's class calls for.
 
 Scope: this skill holds the doctrines that apply to shipping work regardless of which other mode
 is active — with or without an advisor, with or without a design doc in
@@ -140,25 +140,53 @@ documented — routing decisions elsewhere should cite this section, not restate
   suite too long to run here, named with its measured duration so the reader can overrule the call
   — and say which you left. The seeding incident ran filtered e2e subsets locally; CI then went red
   on three OSes over six assertions a few-second run of the one test file would have caught.
+- **Bringing a branch up to date is not a new change.** Merging the target branch into yours
+  (never a rebase, which needs a force-push) leaves your diff as it was, so it reopens neither
+  review nor the local-suite rule above when it merges cleanly, or its conflicts lie only in files
+  the project declares mechanical: generated docs, changelog ordering, auto-numbered values,
+  regenerated after the merge. CI on the updated head is then the test, read through the full
+  check set like any other head. A conflict resolved by hand in real code is new code: run the
+  local suites of the packages it touches, and one review round over the resolution alone. The
+  risk a clean merge still carries is a semantic conflict — the target changed something your
+  branch relies on without touching the same lines — and CI on the merged head is what sees it.
 - **Bookkeeping is part of the diff.** Before opening a PR, walk the project's own list of
   hand-kept files (its contributing guide or equivalent, the changelog first) and write in the PR
   body which entries the change touched, or that none applied. If the project keeps no such list,
   say so in the PR body. Checked docs fail CI when stale; unchecked ones fail nobody, so a run of
   merged PRs can leave a changelog silently behind.
-- **Where a PR is viable, let CI go green before the review gate.** When the change ships as a PR — a
-  remote forge is in play, not a local-only repo — and the project has checks that run on the PR,
-  open the PR and let the automated checks pass *before* you run the `/code-review` merge gate. A red
-  pipeline surfaces mechanical breakage (build, lint, failing tests) far more cheaply than a reviewer
-  would; reviewing a diff CI would reject spends the expensive gate on findings the cheap one already
-  owns. This **orders** the gates, it does not merge them — green CI is necessary, never sufficient,
-  and never substitutes for the review. Skip the wait when there is no forge or no CI, and don't
-  grind on a stuck or flaky pipeline: if CI can't go green for reasons unrelated to the diff, say so
-  and proceed to review rather than blocking. Design-doc reviews are exempt — they run inside the
-  design loop (see the design-doc bullet below) and gate the doc's content, which CI does not check.
-  Wait for it with `${CLAUDE_SKILL_DIR}/wait-pr-ci <PR>` (shipped beside this skill) run in the background — never a hand-written
-  loop; read its exit status, never a piped summary of it. A wrapper preserves the status of what
-  it wraps: no `| tail`/`| head`/`| grep` on a command whose exit status is the verdict — read the
-  status first, trim afterwards.
+- **Review starts once the local suites pass; CI, where it exists, runs in parallel.** Intent: the
+  merged head is exactly the reviewed head, and every verification the project has passed on that
+  head — without spending wall-clock waiting on a gate that rarely fails first. Once the complete
+  local suites (the first bullet) have passed on the head you push, open the change for review and
+  launch `/code-review` in the same turn. Later rounds resume the reviewer after the fix commit.
+  Make **one push per review round** — the round's fixes together — so each round has one head.
+  **Only the merge needs the evidence, on the final head:**
+  - **With CI**, that is the project's full required check set, green at that sha. Rounds need no CI
+    wait between them, because CI retests every pushed fix.
+  - **Without CI** (a forge with none, or a local-only repo), the complete local suites on the final
+    head are the merge evidence, recorded with `${CLAUDE_SKILL_DIR}/verify-head -- <suites>`. Nothing
+    else retests the fix commits, so **every review round's fix commit needs its own local suite
+    run** before the reviewer resumes.
+  - **Wait for CI before review** only where the local suites could not run what the change risks
+    (another OS, a service this machine lacks, a suite too long to run here): a red pipeline then
+    surfaces mechanical breakage far more cheaply than a reviewer would. Don't grind on a stuck or
+    flaky pipeline: if CI can't go green for reasons unrelated to the diff, say so rather than
+    blocking.
+  - Design-doc reviews are exempt — they run inside the design loop (see the design-doc bullet
+    below) and gate the doc's content, which CI does not check.
+  - Trap seen: a first CI run fails on only a small share of changes whose local suites ran green,
+    so waiting before every review cost about ten minutes per change to avoid a case that produces a
+    fix round anyway.
+  - **Gate, enforced by the `gate.sh` hook:** a merge must pin the head it merges (on GitHub,
+    `--match-head-commit <sha>`), that sha must be the change's head, and the evidence above must
+    pass at it — CI checks, or a `verify-head` stamp where there is no CI. The project's
+    `.claude/gates.json` names its forge commands and required checks; GitHub with CI needs none.
+    Wait for CI with `${CLAUDE_SKILL_DIR}/wait-pr-ci <PR> [deadline]` in the background — never a
+    hand-written loop. It reads the same `.claude/gates.json` forge commands, judges the head it
+    started on, and exits 0 green, 1 red (named), 2 deadline with no verdict, 3 no CI, 4 head moved;
+    `--self-test` checks it. Read its exit status, never a piped summary of it. A wrapper preserves the status of what it wraps: no
+    `| tail`/`| head`/`| grep` on a command whose exit status is the verdict — read the status first,
+    trim afterwards.
 - **One reviewer per change, resumed across rounds.** Invoke `/code-review` **once**; drive later
   rounds by `SendMessage` to that instance. Verified: a completed review agent resumes with its diff,
   its mutation runs and its findings intact. A repeat `Skill` call always starts a new one. **A
@@ -305,7 +333,36 @@ regression test while the class stays broken.
   its domain written by hand: the mechanism is a check against the artifact it mirrors, never a
   reminder to keep it in sync. If the obligation cannot be mechanised, that is a finding about where
   the invariant lives — the bullet above — not a licence to leave the comment.
-- **Revert-check, run and reported — both directions.** No durability or contract clause ships
+- **Evidence matches the clause's class.** Intent: every clause a change makes true is pinned by
+  evidence that would fail if the clause were false — and no more ceremony than that buys. A
+  growing suite and a mutation run per line both cost time on every later change, so spend them
+  where a plausible wrong implementation would pass a naive test. Classify each clause:
+  - **Mutation-prone** — durability or ordering, authorization and fail-closed defaults, wiring to
+    a particular source or target, absence claims ("never", "no X escapes"), coverage claims. These
+    owe the **revert-check** below, run in both directions.
+  - **New observable, asserted against an independent literal** — a new field, message, exit
+    status or output, checked against a value written in the test, not derived from the code. These
+    owe **red-first**: the assertion seen failing before the implementation existed, then green.
+    No mutation run.
+  - **Behaviour-preserving** — refactors, prose, wording, regenerated files. These owe **the name of
+    the existing test that covers the behaviour**, green after the change. No new test and no
+    mutation.
+
+  Put a per-clause table in the PR body — clause, class, test and assertion, evidence (the run's
+  output line, or the covering test's name) — so the reviewer can attack a misclassification; a
+  clause filed one class too low is a finding. When unsure between two classes, take the higher.
+  Three rules keep the suite from growing faster than what it proves:
+  - **A clause is pinned by an assertion, not a test.** Add the assertion to an existing test that
+    already reaches the state before writing a new test with its own fixture.
+  - **A third sibling becomes a table.** When a third test of the same shape appears, fold the
+    three into one table-driven test.
+  - **A subsumed test is deleted in the same PR.** A new test that checks everything an old one did
+    replaces it.
+
+  Trap seen: the revert-check written for every clause, docs and wording included, ran a dozen
+  mutation commands per item and three sessions each hand-wrote their own runner, while the
+  suite's own run time stayed flat — the ceremony, not the suite, was the cost.
+- **Revert-check, run and reported — both directions.** No mutation-prone clause ships
   without a test demonstrated **green with the fix in place and red when the fix — and only the fix
   — is reverted**. Revert means the mutation of the property the test exists to exclude, not removal
   of the feature: a test red when the whole feature is absent and green when it is present has shown
@@ -314,8 +371,17 @@ regression test while the class stays broken.
   **run** and their output reported; never asserted. A
   red-only report — a pinning test committed "red for the predicted reason" — establishes nothing by
   itself: red in both worlds pins as little as green in both. At code time both worlds exist, so
-  neither direction may be left owed at merge. (Design-doc names each invariant's observable and
-  revert at contract depth; this gate owns the demonstration once the code exists.)
+  neither direction may be left owed at merge. (Design-doc names each invariant's observable,
+  class and revert at contract depth; this gate owns the demonstration once the code exists.)
+  - **Gate:** run the mutation with `${CLAUDE_SKILL_DIR}/revert-check <file> <old> <new> -- <test
+    command>` (shipped beside this skill; `--self-test` checks it) — never a hand-rolled mutation
+    runner. It refuses an uncommitted tree, requires `<old>` to match exactly once, runs under a
+    watchdog, always restores and touches the file, and reads a mutant that does not build as
+    NOCOMPILE, never as RED. Report its verdict line and the assertion it prints.
+  - Traps seen: a restore over uncommitted work destroyed it, twice; a restored file with an older
+    timestamp let the build tool run a stale binary; a non-compiling mutant was counted as red; a
+    hand-written runner read the runner's own "test failed" line as a compile error. Each was a
+    session re-inventing the runner.
 - **A revert-check certifies only what its fixture can distinguish.** The rule above is necessary,
   not sufficient, and reads as more than it delivers: "red when reverted" certifies the claim only
   over the domain the fixture exercises. When the claim is that an observable is **computed from, or
@@ -365,3 +431,21 @@ regression test while the class stays broken.
   the same PR.
 - **Never sync docs to defective code.** "Code wins over docs" is dangerous exactly when the code
   is the bug — reconciling a doc to match buggy behavior documents the defect instead of fixing it.
+
+## E. Helpers: reuse, then promote
+
+A helper rewritten in a scratchpad each session comes back with new bugs each time; a helper kept
+as a tool is fixed once. (evolve owns the promotion loop; this is its delivery-time half.)
+
+- **Look before you write.** Before writing a helper script, check the tools shipped beside the
+  skills (`${CLAUDE_SKILL_DIR}/`: `revert-check`, `verify-head`, `wait-pr-ci`, ...) and wherever the
+  project declares its own (its `bin/`, or the tool list its contributing guide or CLAUDE.md names).
+- **A helper written a second time is promoted, not rewritten** — whether the first copy is in this
+  session or an earlier one's scratchpad. Project-neutral: into the owning skill's folder, with a
+  `--self-test`. Project-specific: into the project's tool location, through its normal change
+  process.
+- **A tool that misbehaves is fixed in place, never bypassed** with a one-off. The fix carries a
+  self-test case that reproduces the failure.
+- **Name tools by stable path.** Handoff prompts and run parameters cite a skill or repository
+  path, never a scratchpad path: a scratchpad can be wiped, and the next session cannot reuse or
+  fix what it cannot find.
