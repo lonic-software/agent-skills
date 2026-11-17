@@ -324,7 +324,36 @@ regression test while the class stays broken.
   its domain written by hand: the mechanism is a check against the artifact it mirrors, never a
   reminder to keep it in sync. If the obligation cannot be mechanised, that is a finding about where
   the invariant lives — the bullet above — not a licence to leave the comment.
-- **Revert-check, run and reported — both directions.** No durability or contract clause ships
+- **Evidence matches the clause's class.** Intent: every clause a change makes true is pinned by
+  evidence that would fail if the clause were false — and no more ceremony than that buys. A
+  growing suite and a mutation run per line both cost time on every later change, so spend them
+  where a plausible wrong implementation would pass a naive test. Classify each clause:
+  - **Mutation-prone** — durability or ordering, authorization and fail-closed defaults, wiring to
+    a particular source or target, absence claims ("never", "no X escapes"), coverage claims. These
+    owe the **revert-check** below, run in both directions.
+  - **New observable, asserted against an independent literal** — a new field, message, exit
+    status or output, checked against a value written in the test, not derived from the code. These
+    owe **red-first**: the assertion seen failing before the implementation existed, then green.
+    No mutation run.
+  - **Behaviour-preserving** — refactors, prose, wording, regenerated files. These owe **the name of
+    the existing test that covers the behaviour**, green after the change. No new test and no
+    mutation.
+
+  Put a per-clause table in the PR body — clause, class, test and assertion, evidence (the run's
+  output line, or the covering test's name) — so the reviewer can attack a misclassification; a
+  clause filed one class too low is a finding. When unsure between two classes, take the higher.
+  Three rules keep the suite from growing faster than what it proves:
+  - **A clause is pinned by an assertion, not a test.** Add the assertion to an existing test that
+    already reaches the state before writing a new test with its own fixture.
+  - **A third sibling becomes a table.** When a third test of the same shape appears, fold the
+    three into one table-driven test.
+  - **A subsumed test is deleted in the same PR.** A new test that checks everything an old one did
+    replaces it.
+
+  Trap seen: the revert-check written for every clause, docs and wording included, ran a dozen
+  mutation commands per item and three sessions each hand-wrote their own runner, while the
+  suite's own run time stayed flat — the ceremony, not the suite, was the cost.
+- **Revert-check, run and reported — both directions.** No mutation-prone clause ships
   without a test demonstrated **green with the fix in place and red when the fix — and only the fix
   — is reverted**. Revert means the mutation of the property the test exists to exclude, not removal
   of the feature: a test red when the whole feature is absent and green when it is present has shown
@@ -333,8 +362,8 @@ regression test while the class stays broken.
   **run** and their output reported; never asserted. A
   red-only report — a pinning test committed "red for the predicted reason" — establishes nothing by
   itself: red in both worlds pins as little as green in both. At code time both worlds exist, so
-  neither direction may be left owed at merge. (Design-doc names each invariant's observable and
-  revert at contract depth; this gate owns the demonstration once the code exists.)
+  neither direction may be left owed at merge. (Design-doc names each invariant's observable,
+  class and revert at contract depth; this gate owns the demonstration once the code exists.)
 - **A revert-check certifies only what its fixture can distinguish.** The rule above is necessary,
   not sufficient, and reads as more than it delivers: "red when reverted" certifies the claim only
   over the domain the fixture exercises. When the claim is that an observable is **computed from, or

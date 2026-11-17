@@ -516,12 +516,17 @@ not.
 
 ## Pair every invariant with a falsifying test
 
-No clause ships without a test that goes **red when its code is reverted**. State the mutation
-explicitly in the doc: *revert X → this test fails.* If you cannot name the mutation, the test is
-not pinning the clause.
+Every clause is pinned by evidence that would fail if it were false, at the strength its class
+calls for — delivery §D owns the three classes (mutation-prone, new observable, behaviour-preserving)
+and what each owes. Name each invariant's class in the doc. For a **mutation-prone** clause, state the
+mutation explicitly: *revert X → this test fails.* If you cannot name the mutation, the test is not
+pinning the clause. A new observable names its assertion and the independent literal it is checked
+against; a behaviour-preserving clause names the existing test that covers it. Prefer an assertion in
+an existing test over a new one.
 
 Naming the mutation is not demonstrating it. Demonstration — red under the mutation, green under
-the fix, each by a run — is owed when the code exists; delivery §D gates both directions at merge.
+the fix, each by a run — is owed when the code exists, for a mutation-prone clause; delivery §D gates
+each class's evidence at merge.
 At design time only spiked claims have runs: record those. For the rest, the doc's obligation is
 the observable and the revert, not the ledger.
 
@@ -665,8 +670,8 @@ Check before closing it:
   spike it or verify it; only a claim whose falsity would change mechanism may be
   implementation-owned. An implementation-owned entry is a deferred obligation with a named catcher,
   not a load-bearing claim of the doc. Every invariant gets one line at contract depth — the
-  observable, and the revert that must red it; demonstration in both directions is owed at code time
-  and is delivery §D's merge gate, not this one. Every invariant claiming coverage of a domain
+  observable, its evidence class, and for a mutation-prone clause the revert that must red it;
+  demonstration is owed at code time and is delivery §D's merge gate, not this one. Every invariant claiming coverage of a domain
   additionally names its enforcer or escape probe, or has been narrowed to the cases actually
   checked.
 - Every run observable the doc cites is pinned by an assertion in the cited test, at the strength
