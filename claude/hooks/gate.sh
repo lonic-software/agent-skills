@@ -28,7 +28,8 @@
 #   - a heavy command the fleet config declares must run under `fleet with-lock`.
 #
 # Project config: .claude/gates.json on the default branch (fields documented at load_config below);
-# one that does not parse denies every merge.
+# while it does not parse, a merge is denied: gh/glab, any "pr|mr merge", the merge_cmd still legible
+# in the broken text, and a local merge into the default branch.
 # Fast: no network except on a forge merge. It never denies on its own errors: those are logged to
 # ${GATE_LOG:-$HOME/.claude/hooks/gate.log} and the call is allowed. Never exits 2.
 # Needs jq. Bash 3.2 compatible. `--self-test` feeds it sample hook JSON.
@@ -108,7 +109,7 @@ GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""; GIT_GLOBAL=(); GIT_TARGET_UNKNOWN=""
 unq_opt() { # option
   local vals
   vals=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' \
-    | grep -o -E -- "(^|[;&|(\`[:space:]/])git[[:space:]]+((-[^[:space:];&|\"']*|\"[^\"]*\"|'[^']*')[[:space:]]+)*$1[[:space:]]+(\"[^\"]*\"|'[^']*')" \
+    | grep -o -E -- "(^|[;&|(\`[:space:]/])git[[:space:]]+((-c[[:space:]]+[^[:space:];&|\"']+|-[^[:space:];&|\"']*|\"[^\"]*\"|'[^']*')[[:space:]]+)*$1[[:space:]]+(\"[^\"]*\"|'[^']*')" \
     | sed -E "s/.*[[:space:]]$1[[:space:]]+[\"']//; s/[\"']\$//" | sort -u)
   [ -n "$vals" ] && [ "$(printf '%s\n' "$vals" | wc -l | tr -d ' ')" = 1 ] && printf '%s' "$vals"
 }
@@ -259,14 +260,17 @@ CFG=""   # the config's JSON text, not a path
 # The branch whose config is read: origin/HEAD, else main or master. Deliberately not the config's
 # own default_branch, which a work tree could otherwise point at a branch it controls.
 config_branch() { # cwd
-  local b
-  b=$(cd "$1" 2>/dev/null && git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) && { echo "${b#origin/}"; return; }
-  for b in main master; do
-    (cd "$1" && { git show-ref -q --verify "refs/remotes/origin/$b" || git show-ref -q --verify "refs/heads/$b"; }) 2>/dev/null && { echo "$b"; return; }
-  done
-  # Once per repository: this runs on every command.
-  local m
-  m=$(cd "$1" 2>/dev/null && git rev-parse -q --verify HEAD >/dev/null 2>&1 && git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+  local b="" c m
+  m=$(cd "$1" 2>/dev/null && git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+  b=$(cd "$1" && git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) && b=${b#origin/}
+  if [ -z "$b" ]; then
+    for c in main master; do
+      (cd "$1" && { git show-ref -q --verify "refs/remotes/origin/$c" || git show-ref -q --verify "refs/heads/$c"; }) 2>/dev/null && { b=$c; break; }
+    done
+  fi
+  # Logged once per spell without one (this runs on every command); the marker goes when one exists.
+  if [ -n "$b" ]; then [ ! -e "$m/gate-no-default-branch" ] || rm -f "$m/gate-no-default-branch"; echo "$b"; return; fi
+  (cd "$1" && git rev-parse -q --verify HEAD) >/dev/null 2>&1 || return 0
   [ -e "$m/gate-no-default-branch" ] && return 0
   : 2>/dev/null > "$m/gate-no-default-branch"
   log "no default branch found (no origin/HEAD, main or master) in $1: .claude/gates.json not read, defaults apply. Set it with git remote set-head origin --auto."
@@ -292,6 +296,16 @@ load_config() {
 }
 bad_config_deny() { # what
   [ -z "$CFG_BAD" ] || deny "$1 is refused: .claude/gates.json on $CFG_BAD does not parse, so the rules it sets cannot be read. The user fixes it."
+}
+# With CFG_BAD, the forge and merge_cmd the broken file named are unknown: a segment is a merge when
+# it reads as one (a "pr merge" / "mr merge" subcommand, or the merge_cmd still legible in the text).
+bad_config_merge() { # cwd
+  [ -n "$CFG_BAD" ] || return 1
+  local mc
+  printf '%s' "${WORDS[*]}" | grep -Eq '(^|[[:space:]])(pr|mr)[[:space:]]+merge([[:space:]]|$)' && return 0
+  mc=$(cd "$1" 2>/dev/null && git show "$CFG_BAD:.claude/gates.json" 2>/dev/null | tr '\n' ' ' \
+    | sed -n -E 's/.*"merge_cmd"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p' | sed 's/\\\\/\\/g')
+  [ -n "$mc" ] && printf '%s' "${WORDS[*]}" | grep -Eq -- "$mc" 2>/dev/null
 }
 # has(), not //: jq's // treats false as absent, so a configured "ci": false would fall back to the default.
 cfg() { [ -n "$CFG" ] && printf '%s' "$CFG" | jq -r --arg k "$1" 'if has($k) and .[$k] != null then .[$k] | if type == "array" then .[] else tostring end else empty end' 2>/dev/null; }
@@ -491,7 +505,6 @@ check_local_merge() { # cwd → sets LOCAL_MERGE when gated
   def=$(default_branch "$cwd"); [ -n "$def" ] || { log "no default branch found; local merge not gated"; return 0; }
   [ "$cur" = "$def" ] || return 0
   LOCAL_MERGE=1
-  bad_config_deny "git merge into $def"
   for a in ${GIT_REST[@]+"${GIT_REST[@]}"}; do
     case "$a" in -m|-F|-s|-X) ;; -*) ;; *) target=$a; break ;; esac
   done
@@ -500,6 +513,7 @@ check_local_merge() { # cwd → sets LOCAL_MERGE when gated
   case "$(cd "$cwd" 2>/dev/null && git rev-parse --symbolic-full-name "$target" 2>/dev/null)" in
     refs/remotes/*) return 0 ;;
   esac
+  bad_config_deny "git merge of $target into $def"
   local sha
   sha=$(cd "$cwd" 2>/dev/null && git rev-parse --verify -q "$target^{commit}" 2>/dev/null) || oops "cannot resolve merge target '$target'; allowing"
   deny_protected "$cwd" "git merge of $target into $def" <<EOF
@@ -535,6 +549,7 @@ main() {
       done
       continue
     fi
+    if bad_config_merge "$cwd"; then merge_seen=1; bad_config_deny "the merge"; fi
     if [ -n "$merge_re" ] && printf '%s' "${WORDS[*]}" | grep -Eq -- "$merge_re"; then
       merge_seen=1; check_forge_merge "$cwd"; continue
     fi
@@ -779,6 +794,7 @@ EOF
   allows "identity: an attached redirection is not a refspec" "$I" "git push -u origin HEAD >/dev/null 2>/tmp/x"
   allows "identity: a redirection with no space is not a refspec" "$I" "git push origin HEAD>/dev/null"
   allows "identity: another tool's quoted -C is not git's"  "$I" "make -C \"x\" && git -C \"$I\" push origin HEAD"
+  allows "identity: a -c pair before a quoted -C"           "$tmp" "git -c core.quotePath=false -C \"$I\" push origin HEAD"
   git -C "$I" branch amb && git -C "$I" tag amb
   allows "identity: an ambiguous refname's warning is not an author" "$I" "git push origin amb"
   SG_EMAIL=good@example.invalid setgates "$I" ''
@@ -796,6 +812,10 @@ EOF
   allows "config: no default branch, a second command"    "$FB" "git status"
   [ "$(grep -c "no default branch found (no origin/HEAD, main or master) in $FB" "$GATE_LOG")" = 1 ] \
     && echo "ok   no default branch is logged, once" || { echo "FAIL no default branch is logged, once"; fails=$((fails + 1)); }
+  ( cd "$FB" && git update-ref refs/remotes/origin/main HEAD ) && allows "config: a default branch again" "$FB" "git status"
+  ( cd "$FB" && git update-ref -d refs/remotes/origin/main ) && allows "config: and gone again" "$FB" "git status"
+  [ "$(grep -c "no default branch found (no origin/HEAD, main or master) in $FB" "$GATE_LOG")" = 2 ] \
+    && echo "ok   losing the default branch again is logged again" || { echo "FAIL losing the default branch again is logged again"; fails=$((fails + 1)); }
   # an unparsable config: commits and pushes stay possible (to fix it), merges are denied
   local UB="$tmp/ubrepo"
   ( git init -q -b main "$UB" && cd "$UB" && git remote add origin https://github.com/o/r.git && mkdir .claude \
@@ -803,7 +823,15 @@ EOF
     && git -c user.name=u commit -qm c && git update-ref refs/remotes/origin/main HEAD ) || return 1
   denies "config: an unparsable config denies a forge merge" "does not parse" "$UB" "gh pr merge 12 --match-head-commit $SHA"
   allows "config: an unparsable config still allows a commit" "$UB" "git commit -m x"
+  ( cd "$UB" && git checkout -q -b feature && git -c user.name=u commit -q --allow-empty -m f && git checkout -q main \
+    && git update-ref refs/remotes/origin/feature feature ) || return 1
   ( cd "$UB" && git remote set-url origin https://forge.example.invalid/o/r.git ) || return 1
+  allows "config: an unparsable config still allows syncing from the remote" "$UB" "git merge origin/feature"
+  denies "config: an unparsable config denies a custom forge's pr merge" "does not parse" "$UB" "forgecli pr merge 7"
+  ( cd "$UB" && printf '{"forge":"other","merge_cmd":"^forgecli land",\n' > .claude/gates.json && git -c user.name=u commit -qam c2 \
+    && git update-ref refs/remotes/origin/main HEAD ) || return 1
+  denies "config: an unparsable config denies the merge_cmd still legible in it" "does not parse" "$UB" "forgecli land 7 --sha $SHA"
+  allows "config: an unparsable config allows an ordinary command" "$UB" "forgecli status 7"
   denies "config: an unparsable config is no config (an unrecognised forge gates a local merge)" "does not parse" "$UB" "git merge feature"
   ( cd "$UB" && git remote remove origin ) || return 1
   denies "config: an unparsable config denies a local merge" "does not parse" "$UB" "git merge feature"

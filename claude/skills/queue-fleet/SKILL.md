@@ -182,7 +182,8 @@ Two checked-in files. `fleet init` reads `.claude/fleet.json`; when it is absent
 prints a template (and the gate template, when that file is absent too). Its fields:
 - the worktree root and the build-directory policy;
 - `main_ref`, the ref slots branch from: `origin/main` with a forge, the local `main` without one.
-  It names the default branch: `fleet init` refuses one that is not origin's HEAD;
+  It names the ref the gate reads its config from (the default branch, origin's copy when there
+  is one): `fleet init` refuses another;
 - the heavy commands that need the suite lock, as regexes, each with its bound;
 - the serial resources, each `pool` (with its values) or `counter` (with a command that prints the
   current maximum on `$REF`);
@@ -198,8 +199,9 @@ prints a template (and the gate template, when that file is absent too). Its fie
 `.claude/gates.json` is the merge gate's config, read by `gate.sh` in every session, fleet or not.
 The gate, `wait-pr-ci` and `fleet` read the default branch's committed copy (origin's, else the local
 branch; `fleet` reads its `main_ref`'s), never the work tree's: a change, or an uncommitted edit, cannot loosen the rules that judge it, and an edit is in
-force once it is on the default branch. A committed copy that does not parse denies every merge
-until the user fixes it; commits and pushes still run on the defaults. Every field is optional, and GitHub with CI needs none of them:
+force once it is on the default branch. While the committed copy does not parse, the gate denies a merge
+until the user fixes it (`gh`/`glab`, any `pr merge`/`mr merge`, the `merge_cmd` still legible in
+the broken text, and a local merge into the default branch); commits and pushes still run on the defaults. Every field is optional, and GitHub with CI needs none of them:
 - `forge` — `github`, `gitlab`, `other` or `none`. Default: `github` when origin is on github.com,
   `none` with no remote. Any other remote is unrecognized: its merges are logged, not gated, until
   configured.

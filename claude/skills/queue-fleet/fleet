@@ -213,14 +213,20 @@ cmd_init() {
     jq -e '.version_lines | type == "object" and (.pattern | type == "string") and ((.paths // []) | type == "array")' "$cfg" >/dev/null \
       || refuse "version_lines needs {\"pattern\": ERE, \"paths\": [globs]}"
   fi
-  # The gate and wait-pr-ci read the default branch's gates.json; fleet reads main_ref's. They must
-  # be one branch.
-  local gates want have mb db
-  mb=$(jq -r .main_ref "$cfg"); mb=${mb#refs/heads/}; mb=${mb#refs/remotes/}
-  case "$mb" in */*) git remote 2>/dev/null | grep -qx -- "${mb%%/*}" && mb=${mb#*/} ;; esac
-  if db=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null); then
-    db=${db#origin/}
-    [ "$mb" = "$db" ] || refuse "main_ref names $mb, but the default branch (origin/HEAD) is $db: the merge gate reads the default branch's .claude/gates.json, so main_ref must name that branch"
+  # The gate and wait-pr-ci read the default branch's gates.json (origin/HEAD, else main or master;
+  # origin's copy, else the local branch); fleet reads main_ref's. They must be one ref.
+  local gates want have mr db="" c gref=""
+  mr=$(git rev-parse -q --symbolic-full-name "$(jq -r .main_ref "$cfg")" 2>/dev/null)
+  db=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) && db=${db#origin/}
+  if [ -z "$db" ]; then
+    for c in main master; do
+      { git show-ref -q --verify "refs/remotes/origin/$c" || git show-ref -q --verify "refs/heads/$c"; } 2>/dev/null && { db=$c; break; }
+    done
+  fi
+  if [ -n "$db" ]; then
+    for c in "refs/remotes/origin/$db" "refs/heads/$db"; do git rev-parse -q --verify "$c" >/dev/null && { gref=$c; break; }; done
+    [ -z "$gref" ] || [ "$mr" = "$gref" ] \
+      || refuse "main_ref is ${mr:-$(jq -r .main_ref "$cfg")}, but the merge gate reads .claude/gates.json from $gref (the default branch): main_ref must name that ref"
   fi
   gates=$(main_gates "$top" "$(jq -r .main_ref "$cfg")") || exit $?
   if [ -n "$gates" ]; then
@@ -759,9 +765,13 @@ EOF
   expect "init refuses a command that is not a name" 2 "slash command" "$tmp/main" \
     "$self" init --workers 2 --threshold 60 --queue q --merge-authority x --command "a b"
   ( cd "$tmp/main" && git push -q origin main:dev && git fetch -q origin && git remote set-head origin dev ) >/dev/null 2>&1
-  expect "init refuses a main_ref that is not the default branch" 3 "default branch (origin/HEAD) is dev" "$tmp/main" \
+  expect "init refuses a main_ref that is not the default branch" 3 "reads .claude/gates.json from refs/remotes/origin/dev" "$tmp/main" \
     "$self" init --workers 2 --threshold 60 --queue q --merge-authority x
   ( cd "$tmp/main" && git remote set-head origin main ) >/dev/null 2>&1
+  sed -i.bak 's,"main_ref": "origin/main","main_ref": "main",' "$tmp/main/.claude/fleet.json"
+  expect "init refuses a local main_ref where the gate reads origin's" 3 "reads .claude/gates.json from refs/remotes/origin/main" "$tmp/main" \
+    "$self" init --workers 2 --threshold 60 --queue q --merge-authority x
+  mv "$tmp/main/.claude/fleet.json.bak" "$tmp/main/.claude/fleet.json"
   # gates.json is read from the main ref's commit: commit and push it, then edit the work tree.
   gpush() { ( cd "$tmp/main" && printf '%s\n' "$1" > .claude/gates.json && git add .claude/gates.json && git commit -qm gates && git push -q origin main ); }
   gpush '{"commit_email":"other@example.invalid"}'
