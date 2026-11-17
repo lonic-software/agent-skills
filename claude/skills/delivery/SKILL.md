@@ -377,7 +377,10 @@ regression test while the class stays broken.
     command>` (shipped beside this skill; `--self-test` checks it) — never a hand-rolled mutation
     runner. It refuses an uncommitted tree, requires `<old>` to match exactly once, runs under a
     watchdog, always restores and touches the file, and reads a mutant that does not build as
-    NOCOMPILE, never as RED. Report its verdict line and the assertion it prints.
+    NOCOMPILE, never as RED. Report its verdict line and the assertion it prints. A test runner
+    it does not recognise reads NOCOMPILE every time: name the runner's failure and build-error
+    lines once, in the project's `.claude/gates.json` (`test_failure_re`, `build_error_re`), rather
+    than reading a NOCOMPILE as proof.
   - Traps seen: a restore over uncommitted work destroyed it, twice; a restored file with an older
     timestamp let the build tool run a stale binary; a non-compiling mutant was counted as red; a
     hand-written runner read the runner's own "test failed" line as a compile error. Each was a
