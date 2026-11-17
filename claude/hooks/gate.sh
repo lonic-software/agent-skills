@@ -29,7 +29,8 @@
 #
 # Project config: .claude/gates.json on the default branch (fields documented at load_config below);
 # while it does not parse, a merge is denied: gh/glab, any "pr|mr merge", the merge_cmd still legible
-# in the broken text, and a local merge into the default branch.
+# in the broken text, and, where a local merge is gated (no forge, or an unrecognised one), a local
+# merge into the default branch.
 # Fast: no network except on a forge merge. It never denies on its own errors: those are logged to
 # ${GATE_LOG:-$HOME/.claude/hooks/gate.log} and the call is allowed. Never exits 2.
 # Needs jq. Bash 3.2 compatible. `--self-test` feeds it sample hook JSON.
