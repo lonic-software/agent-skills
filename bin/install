@@ -168,7 +168,7 @@ elif [ "$skill" = "test-filter-hook" ]; then
   echo "    { \"type\": \"command\", \"command\": \"bash $dst_hooks/filter-test-output.sh\" }"
   echo '  ] } ] }'
 elif [ "$skill" = "powerup-fleet" ] || [ "$skill" = "queue-fleet" ]; then
-  echo "From the main checkout, run /$skill start <N> stop at <N>%; it prints one command per slot."
+  echo "From the main checkout, run /$skill start <N> stop at <N>%; it starts one background worker session per slot (claude agents lists them)."
 elif [ "$skill" = "gate-hook" ]; then
   :
 elif [ "$skill" = "queue-run" ] || [ "$skill" = "powerup-auto" ]; then

@@ -12,6 +12,9 @@
 #              [--windows TEXT] [--lookahead K] [--worktree-root DIR] [--command NAME]
 #              (NAME: the slash command each slot's worker runs and every handoff starts with;
 #              default queue-fleet, powerup-fleet for the powerup workflow)
+#   fleet launch [slot...]             start a background worker session (claude --bg) in each named
+#                                      slot, default every slot with no live owner; the session is
+#                                      registered as the slot's owner before it starts working
 #   fleet whoami                       register this process as the slot's owner; print the slot
 #   fleet claim <item> [--area A] --usage PCT    claim a queue item (or ask:<item>)
 #   fleet release <item>
@@ -27,6 +30,7 @@
 #
 # Exit codes: 0 ok · 2 usage · 3 refused (the message says why) · 10 waiting (not your turn yet)
 #             · 11 the turn's head is held by a dead owner (read remote state, then take-dead)
+# $FLEET_CLAUDE names the claude binary launch and status use (default: claude).
 # Needs git and jq. Bash 3.2 compatible; macOS has no timeout/flock, so the watchdog is perl's alarm
 # and every lock is an atomic mkdir.
 set -u
@@ -198,8 +202,58 @@ cmd_init() {
     jq -n --arg s "slot-$i" --arg p "$path" '{slot: $s, path: $p, pid: null, start: null}' > "$S/slots/slot-$i.json"
   done
   echo "fleet: $workers slot(s) at $root, state at $S"
-  echo "Open one terminal per slot and run, in each:"
+  echo "Start the workers as background sessions with: fleet launch"
+  echo "or open one terminal per slot and run, in each:"
   for i in $(seq 1 "$workers"); do echo "  cd $root/slot-$i && claude      # then: /$command"; done
+}
+
+# --- launch ---
+CLAUDE_BIN=${FLEET_CLAUDE:-claude}
+session_of() { # pid → that process's background session as JSON, or nothing
+  "$CLAUDE_BIN" agents --json 2>/dev/null | jq -c --arg p "$1" '[.[]? | select((.pid // "" | tostring) == $p)][0] // empty' 2>/dev/null
+}
+cmd_launch() {
+  need_state
+  local cmd slots="" f s path out id pid start i launched=0
+  cmd=$(jq -r .command "$S/run.json")
+  if [ $# -gt 0 ]; then
+    for s in "$@"; do [ -f "$S/slots/$s.json" ] || refuse "no slot $s (fleet status lists them)"; done
+    slots="$*"
+  else
+    for f in "$S"/slots/*.json; do [ -f "$f" ] && slots="$slots $(jq -r .slot "$f")"; done
+  fi
+  command -v "$CLAUDE_BIN" >/dev/null 2>&1 || die "no $CLAUDE_BIN on PATH"
+  check_halt
+  for s in $slots; do
+    f="$S/slots/$s.json"; path=$(jq -r .path "$f")
+    # The slot lock is held from the owner check to the registration, so two launches never start
+    # two sessions in one slot.
+    lock_state
+    if slot_owner_live "$s"; then
+      unlock_state; note "$s: owner $(jq -r .pid "$f") is live; not launched"; continue
+    fi
+    [ -d "$path" ] || { unlock_state; refuse "$s: its worktree $path is gone"; }
+    out=$(cd "$path" && "$CLAUDE_BIN" --bg -n "fleet-$s" "/$cmd" 2>&1) \
+      || { unlock_state; refuse "$s: $CLAUDE_BIN --bg failed: $(printf '%s' "$out" | tail -1)"; }
+    id=$(printf '%s\n' "$out" | sed -n 's/.*claude attach \([0-9a-zA-Z_-]*\).*/\1/p' | head -1)
+    [ -n "$id" ] || { unlock_state; refuse "$s: could not read the session id from: $(printf '%s' "$out" | tail -1); check $CLAUDE_BIN agents for a session in $path and stop it before launching again"; }
+    pid=""
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      pid=$("$CLAUDE_BIN" agents --json 2>/dev/null | jq -r --arg id "$id" '[.[]? | select(.id == $id) | .pid // empty][0] // empty' 2>/dev/null)
+      [ -n "$pid" ] && break; sleep 1
+    done
+    start=""; [ -n "$pid" ] && start=$(proc_start "$pid")
+    if [ -z "$start" ]; then
+      unlock_state
+      refuse "$s: session $id started but its process is not visible; stop it ($CLAUDE_BIN stop $id) before launching again"
+    fi
+    jset "$f" '.pid = $p | .start = $st | .session = $id | .adopted_at = $t' \
+      --arg p "$pid" --arg st "$start" --arg id "$id" --argjson t "$(now)"
+    unlock_state
+    echo "$s: launched /$cmd as session $id (process $pid); watch: $CLAUDE_BIN attach $id"
+    launched=$((launched + 1))
+  done
+  echo "launched $launched session(s). $CLAUDE_BIN agents lists them; a worker waiting on you shows as blocked in fleet status."
 }
 
 # --- whoami ---
@@ -489,7 +543,15 @@ cmd_status() {
   local f s
   for f in "$S"/slots/*.json; do
     s=$(jq -r .slot "$f")
-    printf '  %-8s %s  owner %s (%s)\n' "$s" "$(jq -r .path "$f")" "$(jq -r '.pid // "-"' "$f")" "$(slot_owner_live "$s" && echo live || echo gone)"
+    local pid sess wait=""
+    pid=$(jq -r '.pid // "-"' "$f")
+    if slot_owner_live "$s"; then
+      sess=$(session_of "$pid")
+      [ -n "$sess" ] && wait=$(printf '%s' "$sess" | jq -r --arg c "$CLAUDE_BIN" 'if .state == "blocked" then " · WAITING FOR YOU (\(.waitingFor // "input")): \($c) attach \(.id)" else " · session \(.id) \(.status // .state // "")" end' 2>/dev/null)
+      printf '  %-8s %s  owner %s (live)%s\n' "$s" "$(jq -r .path "$f")" "$pid" "$wait"
+    else
+      printf '  %-8s %s  owner %s (gone)\n' "$s" "$(jq -r .path "$f")" "$pid"
+    fi
   done
   echo "claims:"; for f in "$S"/claims/*.json; do [ -f "$f" ] && jq -r '"  \(.item) → \(.slot)" + (if .area != "" then " [\(.area)]" else "" end)' "$f"; done
   echo "merge queue:"; sed 's/^/  #/' "$S/turn/queue"
@@ -621,7 +683,49 @@ EOF
   mkdir -p "$L/.git/verified"; printf 'suite\nt\n' > "$L/.git/verified/$(git -C "$LW" rev-parse HEAD)"
   expect "no forge: a stamped head fast-forwards main" 0 "landed" "$LW" "$self" land
   [ "$(git -C "$L" rev-parse main)" = "$(git -C "$LW" rev-parse HEAD)" ] && ok "no forge: main is at the landed head" || bad "no forge: main is at the landed head"
+  # launch, against a fake claude: --bg starts a sleep and records it as a session.
+  local FB="$tmp/fakebin"; mkdir -p "$FB"
+  cat > "$FB/claude" <<'FAKE'
+#!/usr/bin/env bash
+d=$FAKE_CLAUDE_DIR
+case "$1" in
+  --bg)
+    [ -z "${FAKE_FAIL:-}" ] || { echo "boom"; exit 1; }
+    sleep 600 >/dev/null 2>&1 & p=$!; id="s$p"
+    printf '{"id":"%s","pid":%s,"cwd":"%s","state":"working","status":"busy"}\n' "$id" "$p" "$PWD" >> "$d/agents"
+    printf '%s|%s\n' "$PWD" "$*" >> "$d/calls"
+    [ -n "${FAKE_NOID:-}" ] && { echo "started"; exit 0; }
+    echo "started $id"; echo "  claude attach $id    open in this terminal" ;;
+  agents) if [ -f "$d/agents" ]; then jq -s . "$d/agents"; else echo '[]'; fi ;;
+esac
+FAKE
+  chmod +x "$FB/claude"
+  local FD="$tmp/fakestate"; mkdir -p "$FD"
+  fc() { env FLEET_CLAUDE="$FB/claude" FAKE_CLAUDE_DIR="$FD" "$@"; }
+  expect "launch: an unknown slot is refused" 3 "no slot slot-9" "$L" fc "$self" launch slot-9
+  expect "launch: a slot with a live owner is not launched" 0 "owner $P4 is live; not launched" "$L" fc "$self" launch
+  [ ! -f "$FD/calls" ] && ok "launch: no session was started for it" || bad "launch: no session was started for it" "$(cat "$FD/calls")"
   kill "$P4" 2>/dev/null; wait "$P4" 2>/dev/null
+  expect "launch: a halted fleet refuses" 3 "halted" "$L" sh -c "'$self' halt ci down >/dev/null && env FLEET_CLAUDE='$FB/claude' FAKE_CLAUDE_DIR='$FD' '$self' launch; st=\$?; '$self' unhalt >/dev/null; exit \$st"
+  expect "launch: an unreadable session id is refused" 3 "could not read the session id" "$L" fc env FAKE_NOID=1 "$self" launch
+  for FP in $(jq -r .pid "$FD/agents"); do kill "$FP" 2>/dev/null; done
+  : > "$FD/agents"; : > "$FD/calls"
+  expect "launch: a failed claude --bg is refused" 3 "claude --bg failed: boom" "$L" fc env FAKE_FAIL=1 "$self" launch
+  expect "launch: a slot whose owner is gone gets a session" 0 "slot-1: launched /queue-fleet as session" "$L" fc "$self" launch
+  [ "$(cat "$FD/calls")" = "$LW|--bg -n fleet-slot-1 /queue-fleet" ] && ok "launch: the session starts in the slot with the fleet's command" \
+    || bad "launch: the session starts in the slot with the fleet's command" "$(cat "$FD/calls")"
+  local FP; FP=$(jq -r .pid "$FD/agents")
+  [ "$(jq -r .pid "$L/.git/fleet/slots/slot-1.json")" = "$FP" ] && ok "launch: the session is registered as the slot's owner" \
+    || bad "launch: the session is registered as the slot's owner" "$(cat "$L/.git/fleet/slots/slot-1.json")"
+  expect "launch: a second launch starts no second session" 0 "is live; not launched" "$L" fc "$self" launch
+  [ "$(wc -l < "$FD/calls" | tr -d ' ')" = 1 ] && ok "launch: still one session" || bad "launch: still one session" "$(cat "$FD/calls")"
+  PIDV=$FP
+  expect "launch: the launched session's whoami keeps the slot" 0 "slot-1" "$LW" "$self" whoami
+  case "$out" in *adopted*|*registered*) bad "launch: whoami needed no adoption" "$out" ;; *) ok "launch: whoami needed no adoption" ;; esac
+  expect "status names the running session" 0 "session s$FP busy" "$L" fc "$self" status
+  sed -i.bak 's/"state":"working"/"state":"blocked","waitingFor":"input needed"/' "$FD/agents"
+  expect "status flags a worker waiting on the user" 0 "WAITING FOR YOU (input needed): $FB/claude attach s$FP" "$L" fc "$self" status
+  for FP in $(jq -r .pid "$FD/agents"); do kill "$FP" 2>/dev/null; done
   rm -rf "$tmp"
   [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }
   echo "self-test: $fails failed"; return 1
@@ -630,6 +734,7 @@ EOF
 sub=${1:-}; shift || true
 case "$sub" in
   init) cmd_init "$@" ;;
+  launch) cmd_launch "$@" ;;
   whoami) cmd_whoami ;;
   claim) cmd_claim "$@" ;;
   release) cmd_release "$@" ;;
@@ -644,6 +749,6 @@ case "$sub" in
   status) cmd_status ;;
   end) cmd_end ;;
   --self-test) self_test; exit $? ;;
-  ""|-h|--help) sed -n '2,29p' "$0"; exit 2 ;;
+  ""|-h|--help) sed -n '2,33p' "$0"; exit 2 ;;
   *) die "unknown subcommand '$sub' (fleet --help)" ;;
 esac

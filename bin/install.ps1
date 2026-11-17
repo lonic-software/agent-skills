@@ -170,7 +170,7 @@ if ($Skill -eq 'powerup') {
     Write-Host "    { `"type`": `"command`", `"command`": `"$hookCmd`" }"
     Write-Host '  ] } ] }'
 } elseif ($Skill -eq 'powerup-fleet' -or $Skill -eq 'queue-fleet') {
-    Write-Host "From the main checkout, run /$Skill start <N> stop at <N>%; it prints one command per slot."
+    Write-Host "From the main checkout, run /$Skill start <N> stop at <N>%; it starts one background worker session per slot (claude agents lists them)."
 } elseif ($Skill -eq 'gate-hook') {
 } elseif ($Skill -eq 'queue-run' -or $Skill -eq 'powerup-auto') {
     Write-Host "Start a session and run /$Skill stop at <N>%."

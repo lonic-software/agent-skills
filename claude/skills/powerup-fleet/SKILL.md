@@ -1,5 +1,5 @@
 ---
-description: Powerup + queue fleet — full-rigor powerup mode for N concurrent queue workers, one per worktree slot, coordinated by the fleet script. `/powerup-fleet start N <queue-run args>` sets the fleet up once; `/powerup-fleet` in each slot's session runs a worker. User-invoked only.
+description: Powerup + queue fleet — full-rigor powerup mode for N concurrent queue workers, one per worktree slot, coordinated by the fleet script. `/powerup-fleet start N <queue-run args>` sets the fleet up and starts one background worker session per slot; `/powerup-fleet` is what each of those sessions runs. User-invoked only.
 disable-model-invocation: true
 ---
 

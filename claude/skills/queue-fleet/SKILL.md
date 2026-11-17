@@ -1,5 +1,5 @@
 ---
-description: Queue fleet — queue-run with N concurrent workers in one repository, each in its own worktree slot, coordinated by the `fleet` script (claims, locks, a FIFO merge turn, a shared budget). `/queue-fleet start N <queue-run args>` sets the fleet up once; `/queue-fleet` in each slot's session runs a worker. Also the protocol /powerup-fleet runs on. User-invoked only.
+description: Queue fleet — queue-run with N concurrent workers in one repository, each in its own worktree slot, coordinated by the `fleet` script (claims, locks, a FIFO merge turn, a shared budget). `/queue-fleet start N <queue-run args>` sets the fleet up and starts one background worker session per slot; `/queue-fleet` is what each of those sessions runs. Also the protocol /powerup-fleet runs on. User-invoked only.
 disable-model-invocation: true
 ---
 
@@ -26,12 +26,18 @@ and `fleet status` prints it.
      user the template it printed, propose a filled-in config from the repository, and stop until
      they accept it and it is committed.
   3. Init creates the slot worktrees, detached at the main ref, under the config's in-repo worktree
-     root, and prints one `cd <slot> && claude` line per slot, each naming the command. Relay those
-     lines to the user, then stop.
-- **`/<command>` (no args), or a handoff prompt that starts with it: a worker, in a slot.** When
-  invoked directly, record the run for compaction recovery:
-  `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark set queue-fleet` (where powerup is installed; skip
-  it otherwise). Open with one line naming the slot, then run `fleet whoami` before anything else,
+     root.
+  4. Run `${CLAUDE_SKILL_DIR}/fleet launch`. It starts one background session per slot
+     (`claude --bg`, named `fleet-<slot>`, in the slot, running `/<command>`) and registers each as
+     its slot's owner before it starts, so a second launch never puts two workers in one slot. Relay
+     its lines to the user: `claude agents` lists the workers, `claude attach <id>` opens one, and
+     `fleet status` marks a worker waiting on them. Then stop. `fleet launch` again restarts the
+     worker of any slot whose session has ended; a slot can also be worked by hand, with
+     `cd <slot> && claude` and then `/<command>`.
+- **`/<command>` (no args), or a handoff prompt that starts with it: a worker, in a slot**, usually
+  a background session `fleet launch` started. When invoked directly, record the run for
+  compaction recovery: `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark set queue-fleet` (where powerup
+  is installed; skip it otherwise). Open with one line naming the slot, then run `fleet whoami` before anything else,
   then the item loop. If `fleet status` names a different command than the one this session was
   started with, stop and tell the user: the fleet was set up for the other workflow.
 
@@ -129,7 +135,11 @@ session (SendMessage, naming the slot) and notify the user.
   slot's change.
 - **§1d, asking the user:** claim the question first (`fleet claim ask:<item>`), so one question
   reaches the user once. A question the user declines goes into the exclusions with
-  `fleet exclude <item>`.
+  `fleet exclude <item>`. **Leave the merge turn before asking** (`fleet turn leave --requeue`): a
+  session waiting on the user is still a live owner, so a held turn would stop every slot's merge
+  until they answer. A background worker's question is seen only in `fleet status`, `claude agents`
+  or its attached session, so notify the user (naming the slot) whenever you ask, inside a window
+  or not.
 - **§3, usage:** the 5-hour window is no longer ignored. Pace on it with `fleet budget pace`.
 - **§4, handoff:** the prompt starts with the fleet's command (`fleet status` prints it), and names
   the slot and the claimed item in flight. The run parameters are in `run.json`, so it does not need to repeat them.
