@@ -754,6 +754,7 @@ EOF
   ( cd "$I" && git -c user.name=g commit -q --allow-empty -m good ) || return 1
   allows "identity: a push whose new commits all match"     "$I" "git push -u origin HEAD"
   allows "identity: redirections are not refspecs"          "$I" "git push -u origin HEAD 2>&1 > /dev/null"
+  allows "identity: an attached redirection is not a refspec" "$I" "git push -u origin HEAD >/dev/null 2>/tmp/x"
   git -C "$I" branch amb && git -C "$I" tag amb
   allows "identity: an ambiguous refname's warning is not an author" "$I" "git push origin amb"
   SG_EMAIL=good@example.invalid setgates "$I" ''
