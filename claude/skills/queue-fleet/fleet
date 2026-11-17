@@ -559,8 +559,11 @@ collisions_check() { # tree → returns, or refuses
   case "$full" in
     refs/remotes/*/*)
       rest=${full#refs/remotes/}; remote=${rest%%/*}; branch=${rest#*/}
-      rtip=$(cd "$tree" && git ls-remote "$remote" "refs/heads/$branch" 2>/dev/null | cut -f1)
-      [ -n "$rtip" ] || refuse "cannot read $remote's $branch (git ls-remote $remote refs/heads/$branch); retry once the remote answers"
+      # Bounded and non-interactive: the gate runs this inside a hook. A remote that cannot be read
+      # is an error (exit 2), not a refusal: the merge itself needs that remote anyway.
+      rtip=$(cd "$tree" && GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes" \
+        perl -e 'alarm 30; exec @ARGV' git ls-remote "$remote" "refs/heads/$branch" 2>/dev/null | cut -f1)
+      [ -n "$rtip" ] || die "cannot read $remote's $branch (git ls-remote $remote refs/heads/$branch); retry once the remote answers"
       [ "$rtip" = "$tip" ] || refuse "$ref is at $tip, but $remote's $branch is at $rtip: fetch, merge it in, re-verify"
       ;;
   esac
@@ -611,7 +614,7 @@ land_protected() { # tree main-ref old head
 $globs
 EOF
   done <<EOF
-$(cd "$1" && git diff --name-only "$3" "$4")
+$(cd "$1" && git diff --no-renames --name-only "$3" "$4")
 EOF
   [ -z "$hit" ] || refuse "the change touches ${hit#, }, a protected path: the user lands this one"
 }
@@ -813,6 +816,9 @@ EOF
   (cd "$LW" && echo '{}' > .claude/gates.json && git add .claude/gates.json && git commit -qm gates)
   printf 'suite\nt\n' > "$L/.git/verified/$(git -C "$LW" rev-parse HEAD)"
   expect "no forge: land refuses a change to a protected path" 3 ".claude/gates.json, a protected path" "$LW" "$self" land
+  (cd "$LW" && git reset -q --hard HEAD~1 && git mv .claude/fleet.json moved.json && git commit -qm mv)
+  printf 'suite\nt\n' > "$L/.git/verified/$(git -C "$LW" rev-parse HEAD)"
+  expect "no forge: land refuses renaming a protected path away" 3 ".claude/fleet.json, a protected path" "$LW" "$self" land
   (cd "$LW" && git reset -q --hard HEAD~1)
   # collisions: a version line both sides of a merge added, against a real remote
   local CO="$tmp/corigin.git" CM="$tmp/cmain"
@@ -854,6 +860,11 @@ EOF
   expect "collisions: a main ref behind the remote is refused" 3 "but origin's main is at" "$CW" "$self" collisions
   git -C "$CW" fetch -q origin
   expect "collisions: HEAD lacking the main ref's tip is refused" 3 "does not contain origin/main's tip" "$CW" "$self" collisions
+  git -C "$CW" merge -q --no-edit origin/main >/dev/null
+  git -C "$CM" remote set-url origin "$tmp/no-such-origin.git"
+  expect "collisions: a remote that cannot be read is an error, not a refusal" 2 "cannot read origin's main" "$CW" "$self" collisions
+  git -C "$CM" remote set-url origin "$CO"
+  expect "collisions: back in step once the remote answers" 0 "no collisions" "$CW" "$self" collisions
   kill "$P5" 2>/dev/null; wait "$P5" 2>/dev/null
   # launch, against a fake claude: --bg starts a sleep and records it as a session.
   local FB="$tmp/fakebin"; mkdir -p "$FB"

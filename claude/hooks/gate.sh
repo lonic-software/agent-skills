@@ -25,7 +25,7 @@
 #     to be this slot's HEAD, and `fleet collisions` to pass on it (no counter both sides bumped);
 #   - a heavy command the fleet config declares must run under `fleet with-lock`.
 #
-# Project config: .claude/gates.json in the work tree (fields documented at load_config below).
+# Project config: .claude/gates.json on the default branch (fields documented at load_config below).
 # Fast: no network except on a forge merge. It never denies on its own errors: those are logged to
 # ${GATE_LOG:-$HOME/.claude/hooks/gate.log} and the call is allowed. Never exits 2.
 # Needs jq. Bash 3.2 compatible. `--self-test` feeds it sample hook JSON.
@@ -63,7 +63,7 @@ unq() { # key value
 
 # Split a segment into words; strip leading VAR=value assignments (kept in ENV_HOME when HOME=,
 # ENV_AUTHOR when GIT_AUTHOR_EMAIL=) and wrappers (command, env, exec, sudo-less).
-WORDS=(); ENV_HOME=""; ENV_AUTHOR=""
+WORDS=(); ENV_HOME=""; ENV_AUTHOR=""; SHELL_AUTHOR=""
 parse_segment() {
   local seg=$1 w
   set -f; WORDS=($seg); set +f
@@ -81,21 +81,44 @@ parse_segment() {
 }
 base() { local w=${1##*/}; printf '%s' "$w"; }
 
-# For a git segment: GIT_SUB = subcommand, GIT_REST = its arguments, GIT_EMAIL = -c user.email.
-GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""
+# For a git segment: GIT_SUB = subcommand, GIT_REST = its arguments, GIT_EMAIL = -c user.email,
+# GIT_GLOBAL = the options that pick the repository (-C, --git-dir, --work-tree), replayed on every
+# git the checks run so they read the repository the command targets.
+GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""; GIT_GLOBAL=()
 parse_git() {
-  local i=1 n=${#WORDS[@]} w
-  GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""
+  local i=1 n=${#WORDS[@]} w v
+  GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""; GIT_GLOBAL=()
   while [ $i -lt $n ]; do
     w=${WORDS[$i]}
     case "$w" in
       -C|-c|--git-dir|--work-tree|--namespace)
-        if [ "$w" = "-c" ]; then case "${WORDS[$((i + 1))]:-}" in user.email=*) GIT_EMAIL=$(unq 'user\.email' "${WORDS[$((i + 1))]#user.email=}") ;; esac; fi
+        v=${WORDS[$((i + 1))]:-}
+        if [ "$w" = "-c" ]; then
+          case "$v" in
+            user.email=*) GIT_EMAIL=$(unq 'user\.email' "${v#user.email=}") ;;
+            # -c "user.email=x": the whole pair was quoted
+            Q) v=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' | sed -n -E "s/.*-c[[:space:]]+[\"']user\.email=([^\"']*)[\"'].*/\\1/p" | head -1)
+               [ -z "$v" ] || GIT_EMAIL=$v ;;
+          esac
+        elif [ "$w" != "--namespace" ]; then GIT_GLOBAL+=("$w" "$v"); fi
         i=$((i + 2)) ;;
+      --git-dir=*|--work-tree=*) GIT_GLOBAL+=("$w"); i=$((i + 1)) ;;
       -*) i=$((i + 1)) ;;
       *) GIT_SUB=$w; GIT_REST=("${WORDS[@]:$((i + 1))}"); return 0 ;;
     esac
   done
+}
+
+# git in the repository the parsed command targets.
+tgit() { # cwd args...
+  local d=$1; shift
+  (cd "$d" 2>/dev/null && git ${GIT_GLOBAL[@]+"${GIT_GLOBAL[@]}"} "$@")
+}
+# The target repository's commit_email: its own default-branch config, not the session's.
+target_want() { # cwd
+  local top
+  top=$(tgit "$1" rev-parse --show-toplevel 2>/dev/null) || top=$1
+  CFG=$(config_file "$top") cfg commit_email
 }
 
 check_git() {
@@ -112,28 +135,31 @@ check_git() {
           +*) deny "git push with a +refspec ($a) is a force push and is refused: ask the user first." ;;
         esac
       done
-      local want; want=$(cfg commit_email)
+      local want; want=$(target_want "$cwd")
       [ -z "$want" ] || check_push_authors "$cwd" "$want" ;;
     rebase)
       case "${GIT_REST[0]:-}" in --abort|--quit) return 0 ;; esac
       deny "git rebase is refused: ask the user first. To bring a branch up to date, merge main into it." ;;
     commit)
-      local email=$GIT_EMAIL want
+      # git's precedence: --author, then GIT_AUTHOR_EMAIL, then user.email (-c, then config).
+      local email="" want
+      for a in ${GIT_REST[@]+"${GIT_REST[@]}"}; do
+        case "$a" in --author=*|--author) email=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' | sed -n -E 's/.*--author[= ]+[^<;&|]*<([^>]*)>.*/\1/p' | head -1) ;; esac
+      done
       [ -n "$email" ] || email=$ENV_AUTHOR
-      if [ -z "$email" ]; then
-        for a in ${GIT_REST[@]+"${GIT_REST[@]}"}; do
-          case "$a" in --author=*|--author) email=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' | sed -n -E 's/.*--author[= ]+[^<;&|]*<([^>]*)>.*/\1/p' | head -1) ;; esac
-        done
-      fi
+      [ -n "$email" ] || email=$SHELL_AUTHOR
+      [ -n "$email" ] || email=$GIT_EMAIL
       if [ -z "$email" ]; then
         if [ -n "$ENV_HOME" ]; then
-          email=$(cd "$cwd" 2>/dev/null && HOME=$ENV_HOME git config user.email 2>/dev/null)
+          email=$(HOME=$ENV_HOME tgit "$cwd" config user.email 2>/dev/null)
         else
-          email=$(cd "$cwd" 2>/dev/null && git config user.email 2>/dev/null)
+          email=$(tgit "$cwd" config user.email 2>/dev/null)
         fi
       fi
+      # A shell expansion is not known here; the push check judges the commit it made.
+      case "$email" in *'$'*|*'`'*) log "commit author email is an expansion ($email); left to the push check"; return 0 ;; esac
       [ -n "$email" ] || deny "git commit is refused: no user.email is set${ENV_HOME:+ under HOME=$ENV_HOME} — the commit would carry an unlinked author. Set HOME per command only for the tool that needs it, or pass -c user.email=<address>."
-      want=$(cfg commit_email)
+      want=$(target_want "$cwd")
       [ -z "$want" ] || [ "$email" = "$want" ] \
         || deny "git commit is refused: its author email would be $email, not the project's commit_email $want (.claude/gates.json). Set it in the repository's own config (git config user.email $want), or drop the override." ;;
   esac
@@ -143,26 +169,35 @@ check_git() {
 # git push: every commit it would publish (reachable from what it pushes, on no remote-tracking ref
 # yet) must be authored by the project's commit_email.
 check_push_authors() { # cwd want
-  local cwd=$1 want=$2 i=0 n=${#GIT_REST[@]} a remote="" srcs=() src bad
+  local cwd=$1 want=$2 i=0 n=${#GIT_REST[@]} a remote="" srcs=() src bad specs=0 out
   while [ $i -lt $n ]; do
     a=${GIT_REST[$i]}
     case "$a" in
       --repo|-o|--push-option|--receive-pack|--exec) i=$((i + 2)); continue ;;
-      --all|--branches|--mirror) srcs+=(--branches) ;;
+      -d|--delete) return 0 ;;   # a delete publishes no commit
+      --all|--branches|--mirror) srcs+=(--branches); specs=1 ;;
+      --tags) srcs+=(--tags); specs=1 ;;
       -*) ;;
       *) if [ -z "$remote" ]; then remote=$a
-         else src=${a#+}; src=${src%%:*}; [ -n "$src" ] && srcs+=("$src"); fi ;;
+         elif [ "$a" = tag ] && [ $((i + 1)) -lt $n ]; then specs=1; i=$((i + 1)); srcs+=("refs/tags/${GIT_REST[$i]}")
+         else specs=1; src=${a#+}; src=${src%%:*}; [ -n "$src" ] && srcs+=("$src"); fi ;;
     esac
     i=$((i + 1))
   done
-  [ ${#srcs[@]} -gt 0 ] || srcs=(HEAD)
-  bad=$(cd "$cwd" 2>/dev/null && git log --format='%h %ae' "${srcs[@]}" --not --remotes -- 2>/dev/null | awk -v w="$want" '$2 != w' | head -5)
+  # No refspec at all pushes the current branch; refspecs that are all deletes (:dst) publish nothing.
+  if [ ${#srcs[@]} -eq 0 ]; then [ "$specs" = 1 ] && return 0; srcs=(HEAD); fi
+  # The push check is the authoritative one: a source it cannot read is a refusal, not a pass.
+  out=$(tgit "$cwd" log --format='%h %ae' "${srcs[@]}" --not --remotes -- 2>&1) \
+    || deny "git push is refused: cannot list the commits it would publish (git log ${srcs[*]} --not --remotes failed: $(printf '%s' "$out" | head -1)). Name the refspec unquoted, or ask the user."
+  bad=$(printf '%s\n' "$out" | awk -v w="$want" 'NF && $2 != w' | head -5)
   [ -z "$bad" ] || deny "git push is refused: it would publish commits not authored by the project's commit_email $want (.claude/gates.json): $(printf '%s' "$bad" | tr '\n' ';' | sed 's/;$//; s/;/; /g'). Set git config user.email $want, then re-author them (git commit --amend --reset-author for the last one; ask the user before rewriting more)."
   return 0
 }
 
 # --- the project's forge and verification config --------------------------------------------------
-# .claude/gates.json in the work tree (all fields optional):
+# .claude/gates.json, read from the default branch's committed copy (origin/<branch>, else the
+# local branch), never from the work tree: a change, or an uncommitted edit, cannot rewrite the rules
+# that judge it. An edit is in force once it is on the default branch. All fields optional:
 #   forge          github | gitlab | other | none   (default: github when origin is on github.com,
 #                  none when there is no remote, else unknown → the forge gate is skipped, logged)
 #   default_branch the branch merges land on (default: origin/HEAD, else main or master)
@@ -175,46 +210,50 @@ check_push_authors() { # cwd want
 #   required_checks names that must be listed and pass, on top of the rule that every listed check
 #                  passes or is skipping: a forge lists only the checks that have registered, so a
 #                  required check that has not started yet would otherwise go unnoticed
-#   protected_paths globs (bash case patterns) a session never merges; read from the default
-#                  branch's copy of this file, on top of .claude/gates.json and .claude/fleet.json
+#   protected_paths globs (bash case patterns) a session never merges, on top of
+#                  .claude/gates.json and .claude/fleet.json
 #   commit_email   the author email every commit and push must carry
 #   verify_cmd     the complete local suite command; a verified stamp must have been made by it
-CFG=""
-load_config() { # cwd
-  local top
-  top=$(cd "$1" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || return 0
-  [ -f "$top/.claude/gates.json" ] || return 0
-  if jq -e 'type == "object"' "$top/.claude/gates.json" >/dev/null 2>&1; then CFG="$top/.claude/gates.json"
-  else log "unparsable $top/.claude/gates.json; using defaults"; fi
+CFG=""   # the config's JSON text, not a path
+# The branch whose config is read: origin/HEAD, else main or master. Deliberately not the config's
+# own default_branch, which a work tree could otherwise point at a branch it controls.
+config_branch() { # cwd
+  local b
+  b=$(cd "$1" 2>/dev/null && git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) && { echo "${b#origin/}"; return; }
+  for b in main master; do (cd "$1" && git show-ref -q --verify "refs/heads/$b") 2>/dev/null && { echo "$b"; return; }; done
 }
+# Prints the default branch's .claude/gates.json (a JSON object), or nothing.
+config_file() { # cwd
+  local b ref j
+  b=$(config_branch "$1"); [ -n "$b" ] || return 0
+  for ref in "refs/remotes/origin/$b" "refs/heads/$b"; do
+    (cd "$1" 2>/dev/null && git rev-parse -q --verify "$ref" >/dev/null 2>&1) || continue
+    j=$(cd "$1" 2>/dev/null && git show "$ref:.claude/gates.json" 2>/dev/null) || return 0
+    if printf '%s' "$j" | jq -e 'type == "object"' >/dev/null 2>&1; then printf '%s\n' "$j"
+    else log "unparsable .claude/gates.json on $ref; using defaults"; fi
+    return 0
+  done
+}
+load_config() { CFG=$(config_file "$1"); }
 # has(), not //: jq's // treats false as absent, so a configured "ci": false would fall back to the default.
-cfg() { [ -n "$CFG" ] && jq -r --arg k "$1" 'if has($k) and .[$k] != null then .[$k] | if type == "array" then .[] else tostring end else empty end' "$CFG" 2>/dev/null; }
+cfg() { [ -n "$CFG" ] && printf '%s' "$CFG" | jq -r --arg k "$1" 'if has($k) and .[$k] != null then .[$k] | if type == "array" then .[] else tostring end else empty end' 2>/dev/null; }
 # required_checks as a JSON array of strings ([] when unset).
 required_json() {
   local j=""
-  [ -n "$CFG" ] && j=$(jq -c '.required_checks // [] | if type == "array" then map(tostring) else [tostring] end' "$CFG" 2>/dev/null)
+  [ -n "$CFG" ] && j=$(printf '%s' "$CFG" | jq -c '.required_checks // [] | if type == "array" then map(tostring) else [tostring] end' 2>/dev/null)
   printf '%s\n' "${j:-[]}"
 }
 log() { { printf '%s gate.sh: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "$LOG"; } 2>/dev/null; }
 
-# The default branch's copy of the config, never the work tree's: a change can rewrite its own.
-# Prints the protected globs, the two hardcoded ones first.
-protected_globs() { # cwd
-  local def ref
+# The protected globs, the two built-in ones first (the config itself comes from the default branch).
+protected_globs() {
   printf '%s\n' .claude/gates.json .claude/fleet.json
-  def=$(default_branch "$1"); [ -n "$def" ] || { log "no default branch; only the built-in protected paths apply"; return 0; }
-  for ref in "refs/remotes/origin/$def" "refs/heads/$def"; do
-    if (cd "$1" 2>/dev/null && git rev-parse -q --verify "$ref" >/dev/null 2>&1); then
-      (cd "$1" 2>/dev/null && git show "$ref:.claude/gates.json" 2>/dev/null) \
-        | jq -r '.protected_paths // [] | if type == "array" then .[] else . end | tostring' 2>/dev/null
-      return 0
-    fi
-  done
+  cfg protected_paths
 }
 # Deny when one of the changed paths (stdin, one per line) matches a protected glob.
 deny_protected() { # cwd what
   local globs f g hit=""
-  globs=$(protected_globs "$1")
+  globs=$(protected_globs)
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     while IFS= read -r g; do
@@ -272,7 +311,7 @@ forge_default() { # key
     github:sha_flag)   echo '--match-head-commit' ;;
     github:head_cmd)   echo 'gh pr view "$PR" $REPO_FLAG --json headRefOid -q .headRefOid' ;;
     github:checks_cmd) echo 'gh pr checks "$PR" $REPO_FLAG --json name,bucket' ;;
-    github:files_cmd)  echo 'gh pr diff "$PR" $REPO_FLAG --name-only' ;;
+    github:files_cmd)  echo 'gh api --paginate "repos/${REPO:-"{owner}/{repo}"}/pulls/$PR/files" --jq ".[] | .filename, (.previous_filename // empty)"' ;;
     gitlab:merge_cmd)  echo '^glab[[:space:]]+mr[[:space:]]+merge([[:space:]]|$)' ;;
     gitlab:sha_flag)   echo '--sha' ;;
     gitlab:head_cmd)   printf '%s\n' "$GL_HEAD_CMD" ;;
@@ -338,8 +377,10 @@ check_forge_merge() { # cwd
   files_cmd=$(setting files_cmd)
   if [ -z "$files_cmd" ]; then
     log "forge $FORGE: no files_cmd configured; protected paths not checked for $pr"
-  elif files=$(cd "$cwd" 2>/dev/null && PR=$pr REPO_FLAG=${repo:+"-R $repo"} GL_PROJECT=$(printf '%s' "$repo" | sed 's,/,%2F,g') sh -c "$files_cmd" 2>/dev/null); then
-    printf '%s\n' "$files" | deny_protected "$cwd" "the merge of change $pr"
+  elif files=$(cd "$cwd" 2>/dev/null && PR=$pr REPO_FLAG=${repo:+"-R $repo"} GL_PROJECT=$(printf '%s' "$repo" | sed 's,/,%2F,g') REPO=$repo sh -c "$files_cmd" 2>/dev/null); then
+    deny_protected "$cwd" "the merge of change $pr" <<EOF
+$files
+EOF
   else
     log "files_cmd for $pr failed; protected paths not checked"
   fi
@@ -395,7 +436,9 @@ check_local_merge() { # cwd → sets LOCAL_MERGE when gated
   esac
   local sha
   sha=$(cd "$cwd" 2>/dev/null && git rev-parse --verify -q "$target^{commit}" 2>/dev/null) || oops "cannot resolve merge target '$target'; allowing"
-  (cd "$cwd" 2>/dev/null && git diff --name-only "$def...$sha" 2>/dev/null) | deny_protected "$cwd" "git merge of $target into $def"
+  deny_protected "$cwd" "git merge of $target into $def" <<EOF
+$(cd "$cwd" 2>/dev/null && git diff --no-renames --name-only "$def...$sha" 2>/dev/null)
+EOF
   need_stamp "$cwd" "$sha" "git merge of $target into $def"
 }
 
@@ -419,6 +462,13 @@ main() {
   while IFS= read -r seg; do
     parse_segment "$seg"
     [ ${#WORDS[@]} -gt 0 ] || continue
+    # export GIT_AUTHOR_EMAIL=x; git commit — the variable reaches later segments' commits.
+    if [ "${WORDS[0]}" = export ]; then
+      local w; for w in "${WORDS[@]:1}"; do
+        case "$w" in GIT_AUTHOR_EMAIL=*) SHELL_AUTHOR=$(unq GIT_AUTHOR_EMAIL "${w#GIT_AUTHOR_EMAIL=}") ;; esac
+      done
+      continue
+    fi
     if [ -n "$merge_re" ] && printf '%s' "${WORDS[*]}" | grep -Eq -- "$merge_re"; then
       merge_seen=1; check_forge_merge "$cwd"; continue
     fi
@@ -471,7 +521,7 @@ self_test() {
   self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/gate-self.XXXXXX"); tmp=$(cd "$tmp" && pwd -P)
   export GATE_LOG="$tmp/gate.log"
-  (cd "$tmp" && git init -q repo && git init -q fleetrepo && git init -q noemail && git init -q -b main local && git init -q glrepo && git init -q glcom) || return 1
+  (cd "$tmp" && for r in repo fleetrepo noemail local glrepo glcom; do git init -q -b main "$r" || exit 1; done) || return 1
   local r
   for r in repo fleetrepo local glrepo glcom; do git -C "$tmp/$r" config user.email t@example.invalid; git -C "$tmp/$r" config user.name t; done
   git -C "$tmp/repo" remote add origin https://github.com/o/r.git
@@ -499,15 +549,30 @@ EOF
   # Stand-ins on PATH. gh: GH_HEAD is the PR head, GH_CHECKS the checks JSON, GH_FAIL=1 a network
   # failure. forgecli: a non-GitHub forge's CLI the glrepo config points at.
   printf '#!/bin/sh\ncase "$1" in head) echo "$GH_HEAD" ;; checks) echo "$GH_CHECKS" ;; esac\n' > "$tmp/bin/forgecli"; chmod +x "$tmp/bin/forgecli"
-  mkdir -p "$tmp/glrepo/.claude"
-  printf '%s\n' '{"forge":"gitlab","merge_cmd":"^forgecli merge","sha_flag":"--sha","head_cmd":"forgecli head $PR","checks_cmd":"forgecli checks $PR","ci":true}' > "$tmp/glrepo/.claude/gates.json"
+  # The config is read from the default branch's commit: setgates commits it on main (and moves
+  # origin/main with it when that ref exists); an empty json removes it. SG_EMAIL is its author.
+  setgates() { # dir json
+    ( cd "$1" && [ "$(git symbolic-ref -q --short HEAD)" = main ] || { echo "setgates: $1 is not on main"; exit 1; }
+      mkdir -p .claude
+      if [ -n "$2" ]; then printf '%s\n' "$2" > .claude/gates.json && git add .claude/gates.json
+      else git rm -q --ignore-unmatch .claude/gates.json && rm -f .claude/gates.json; fi
+      git -c user.email="${SG_EMAIL:-t@example.invalid}" -c user.name=t commit -q --allow-empty -m gates || exit 1
+      ! git rev-parse -q --verify refs/remotes/origin/main >/dev/null || git update-ref refs/remotes/origin/main HEAD
+    ) || { echo "FAIL setgates $1"; fails=$((fails + 1)); }
+  }
+  setgates "$tmp/glrepo" '{"forge":"gitlab","merge_cmd":"^forgecli merge","sha_flag":"--sha","head_cmd":"forgecli head $PR","checks_cmd":"forgecli checks $PR","ci":true}'
   cat > "$tmp/bin/gh" <<'EOF'
 #!/bin/sh
 [ "${GH_FAIL:-0}" = 1 ] && exit 1
 case "$1 $2" in
   "pr view")   echo "$GH_HEAD" ;;
   "pr checks") printf '%s\n' "$GH_CHECKS"; echo "$GH_CHECKS" | grep -q '"pass"' || exit 8 ;;
-  "pr diff")   [ "${GH_FILES_FAIL:-0}" = 1 ] && exit 1; printf '%s\n' "${GH_FILES:-}" | tr ',' '\n' ;;
+  "api --paginate")
+     # pulls/N/files: GH_FILES_JSON, else GH_FILES (comma-separated) as plain filenames; --jq applied
+     [ "${GH_FILES_FAIL:-0}" = 1 ] && exit 1
+     q=""; prev=""; for a in "$@"; do [ "$prev" = --jq ] && q=$a; prev=$a; done
+     j=${GH_FILES_JSON:-$(printf '%s' "${GH_FILES:-}" | jq -R 'split(",") | map(select(length > 0) | {filename: .})')}
+     printf '%s' "$j" | jq -r "${q:-.}" ;;
 esac
 EOF
   chmod +x "$tmp/bin/gh"
@@ -538,7 +603,8 @@ EOF
     jq -n --arg c "$c" --arg d "$d" '{tool_name: "Bash", tool_input: {command: $c}, cwd: $d}' \
       | env PATH="$tmp/bin:$PATH" FLEET_BIN="$tmp/fakefleet" HOME="$tmp/home" GH_HEAD=$SHA GH_CHECKS="$GREEN" "$@" bash "$self"
   }
-  denies() { local name=$1 want=$2; shift 2; out=$(run "$@"); if printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1 && printf '%s' "$out" | grep -q -- "$want"; then echo "ok   $name"; else echo "FAIL $name: ${out:-<allowed>}"; fails=$((fails + 1)); fi; }
+  # A deny is exactly one JSON document: two concatenated ones are not a valid hook answer.
+  denies() { local name=$1 want=$2; shift 2; out=$(run "$@"); if [ "$(printf '%s' "$out" | jq -s length 2>/dev/null)" = 1 ] && printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1 && printf '%s' "$out" | grep -q -- "$want"; then echo "ok   $name"; else echo "FAIL $name: ${out:-<allowed>}"; fails=$((fails + 1)); fi; }
   allows() { local name=$1 st; shift; out=$(run "$@" 2>&1); st=$?; [ "$st" -eq 0 ] && [ -z "$out" ] && echo "ok   $name" || { echo "FAIL $name (exit $st): $out"; fails=$((fails + 1)); }; }
   R="$tmp/repo"; F="$tmp/fleetrepo"
   # stash
@@ -571,41 +637,43 @@ EOF
   denies "merge: head moved"                    "not $SHA" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_HEAD=$OTHER
   denies "merge: a check pending"               "ci: pending" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS="$PENDING"
   denies "merge: no checks at all"              "no checks" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS="[]"
-  mkdir -p "$R/.claude"; printf '{"required_checks":["ci","cla"]}\n' > "$R/.claude/gates.json"
+  setgates "$R" '{"required_checks":["ci","cla"]}'
   denies "merge: a required check missing"      "cla: missing" "$R" "gh pr merge 12 --match-head-commit $SHA"
-  printf '{"required_checks":["ci"]}\n' > "$R/.claude/gates.json"
+  printf '{}\n' > "$R/.claude/gates.json"
+  denies "config: an uncommitted edit to gates.json is not in force" "cla: missing" "$R" "gh pr merge 12 --match-head-commit $SHA"
+  setgates "$R" '{"required_checks":["ci"]}'
   denies "merge: an unrequired check failing still counts" "flaky: fail" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS='[{"name":"ci","bucket":"pass"},{"name":"flaky","bucket":"fail"}]'
   denies "merge: an unrequired check pending still counts" "lint: pending" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS='[{"name":"ci","bucket":"pass"},{"name":"lint","bucket":"pending"}]'
   allows "merge: required passes, the rest pass or skip" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS='[{"name":"ci","bucket":"pass"},{"name":"lint","bucket":"skipping"},{"name":"x","bucket":"pass"}]'
   denies "merge: a required check listed twice, one failing" "ci: fail" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS='[{"name":"ci","bucket":"pass"},{"name":"ci","bucket":"fail"}]'
   denies "merge: a required check skipped" "ci: skipping" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS='[{"name":"ci","bucket":"skipping"},{"name":"x","bucket":"pass"}]'
   denies "merge: a required check missing, the rest green" "ci: missing" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS='[{"name":"x","bucket":"pass"}]'
-  printf '{"forge":"github","ci":false}\n' > "$R/.claude/gates.json"
+  setgates "$R" '{"forge":"github","ci":false}'
   denies "github with \"ci\": false: a merge wants a stamp, not checks" "verify-head" "$R" "gh pr merge 12 --match-head-commit $SHA"
   mkdir -p "$R/.git/verified"; printf 'x\nt\n' > "$R/.git/verified/$SHA"
   allows "github with \"ci\": false: a stamped head merges" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS="$PENDING"
   rm -rf "$R/.git/verified"
-  rm -rf "$R/.claude"
+  setgates "$R" ''
   allows "merge: a gh failure is logged and allowed" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FAIL=1
   grep -q "head_cmd for 12 failed" "$GATE_LOG" && echo "ok   the gh failure was logged" || { echo "FAIL the gh failure was logged"; fails=$((fails + 1)); }
   # protected paths: the two configs always, plus the default branch's own protected_paths
   denies "protected: a change to .claude/gates.json"  "protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES="src/a.rs,.claude/gates.json"
   denies "protected: a change to .claude/fleet.json"  "protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".claude/fleet.json"
   allows "protected: an ordinary workflow change"     "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".github/workflows/ci.yml,src/a.rs"
-  ( cd "$R" && mkdir -p .claude && printf '{"protected_paths":["LICENSE*",".github/workflows/cla.yml"]}\n' > .claude/gates.json \
-    && git add .claude/gates.json && git commit -qm base && git update-ref refs/remotes/origin/main HEAD \
-    && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main ) || return 1
+  setgates "$R" '{"protected_paths":["LICENSE*",".github/workflows/cla.yml"]}'
+  ( cd "$R" && git update-ref refs/remotes/origin/main HEAD && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main ) || return 1
   denies "protected: a glob from the default branch's protected_paths" "LICENSE-MIT, a protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES="LICENSE-MIT"
   allows "protected: the default branch's list is not a prefix match" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".github/workflows/cla.yml.bak"
   printf '{}\n' > "$R/.claude/gates.json"
   denies "protected: the work tree dropping protected_paths does not lift it" "cla.yml, a protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".github/workflows/cla.yml"
-  rm -rf "$R/.claude"
+  denies "protected: a rename's old path counts" ".claude/gates.json, a protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES_JSON='[{"filename":"elsewhere.json","previous_filename":".claude/gates.json"}]'
+  git -C "$R" checkout -q -- .claude/gates.json
   allows "protected: a files_cmd failure is logged and allowed" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES_FAIL=1
   grep -q "files_cmd for 12 failed" "$GATE_LOG" && echo "ok   the files_cmd failure was logged" || { echo "FAIL the files_cmd failure was logged"; fails=$((fails + 1)); }
   # commit identity: commit_email, at commit (best-effort) and at push (over the pushed commits)
   local I="$tmp/idrepo"
-  git init -q "$I" && git -C "$I" remote add origin https://github.com/o/r.git && mkdir -p "$I/.claude" "$tmp/home2" || return 1
-  printf '{"commit_email":"good@example.invalid"}\n' > "$I/.claude/gates.json"
+  git init -q -b main "$I" && git -C "$I" remote add origin https://github.com/o/r.git && mkdir -p "$tmp/home2" || return 1
+  SG_EMAIL=good@example.invalid setgates "$I" '{"commit_email":"good@example.invalid"}'
   printf '[user]\n\temail = wrong@example.invalid\n\tname = w\n' > "$tmp/home2/.gitconfig"
   denies "identity: a wrong global email, no local config"  "not the project's commit_email" "$I" "git commit -m x" HOME="$tmp/home2"
   denies "identity: -c user.email=<wrong>"                  "would be wrong@x.invalid" "$I" "git -c user.email=wrong@x.invalid commit -m x" HOME="$tmp/home2"
@@ -613,15 +681,29 @@ EOF
   denies "identity: GIT_AUTHOR_EMAIL=<wrong>"               "would be wrong@x.invalid" "$I" "GIT_AUTHOR_EMAIL=wrong@x.invalid git commit -m x" HOME="$tmp/home2"
   denies "identity: --author with the wrong email"          "would be wrong@x.invalid" "$I" "git commit --author=\"W <wrong@x.invalid>\" -m x" HOME="$tmp/home2"
   allows "identity: -c user.email=<right>"                  "$I" "git -c user.email=good@example.invalid commit -m x" HOME="$tmp/home2"
+  denies "identity: --author beats -c user.email"           "would be bad@x.invalid" "$I" "git -c user.email=good@example.invalid commit --author=\"W <bad@x.invalid>\" -m x" HOME="$tmp/home2"
+  denies "identity: GIT_AUTHOR_EMAIL beats -c user.email"   "would be bad@x.invalid" "$I" "GIT_AUTHOR_EMAIL=bad@x.invalid git -c user.email=good@example.invalid commit -m x" HOME="$tmp/home2"
+  allows "identity: a right --author over a wrong user.email" "$I" "git -c user.email=bad@x.invalid commit --author=\"G <good@example.invalid>\" -m x" HOME="$tmp/home2"
+  denies "identity: a wholly quoted -c \"user.email=<wrong>\"" "would be bad@x.invalid" "$I" "git -c \"user.email=bad@x.invalid\" commit -m x" HOME="$tmp/home2"
+  denies "identity: export GIT_AUTHOR_EMAIL=<wrong>; git commit" "would be bad@x.invalid" "$I" "export GIT_AUTHOR_EMAIL=bad@x.invalid; git -c user.email=good@example.invalid commit -m x" HOME="$tmp/home2"
+  allows "identity: an expansion is left to the push check" "$I" "GIT_AUTHOR_EMAIL=\$E git commit -m x" HOME="$tmp/home2"
+  denies "identity: git -C targets the other repository's config" "not the project's commit_email good@example.invalid" "$R" "git -C $I -c user.email=bad@x.invalid commit -m x"
   git -C "$I" config user.email good@example.invalid
   allows "identity: the repository's own config matches"    "$I" "git commit -m x" HOME="$tmp/home2"
   ( cd "$I" && git -c user.email=wrong@x.invalid -c user.name=w commit -q --allow-empty -m bad ) || return 1
   denies "identity: a push carrying a wrong author"         "not authored by the project's commit_email" "$I" "git push -u origin HEAD"
   denies "identity: a push naming the branch"               "wrong@x.invalid" "$I" "git push origin $(git -C "$I" symbolic-ref --short HEAD)"
+  denies "identity: a quoted refspec cannot be read, so it is refused" "cannot list the commits" "$I" "git push origin \"main\""
+  git -C "$I" tag v1
+  denies "identity: git push origin tag <name> checks the tag" "wrong@x.invalid" "$I" "git push origin tag v1"
+  denies "identity: git -C pushes the other repository's commits" "wrong@x.invalid" "$R" "git -C $I push origin HEAD"
+  allows "identity: a delete refspec publishes nothing"     "$I" "git push origin :old"
+  allows "identity: --delete publishes nothing"             "$I" "git push --delete origin old"
   git -C "$I" update-ref refs/remotes/origin/x HEAD
   ( cd "$I" && git -c user.name=g commit -q --allow-empty -m good ) || return 1
   allows "identity: a push whose new commits all match"     "$I" "git push -u origin HEAD"
-  rm "$I/.claude/gates.json"
+  SG_EMAIL=good@example.invalid setgates "$I" ''
+  git -C "$I" update-ref refs/remotes/origin/x HEAD
   ( cd "$I" && git -c user.email=wrong@x.invalid -c user.name=w commit -q --allow-empty -m bad2 ) || return 1
   allows "identity: no commit_email, no author check"       "$I" "git push origin HEAD"
   # a configured non-GitHub forge
@@ -646,16 +728,16 @@ EOF
   allows "gitlab: a URL names the merge request"    "$L" "glab mr merge https://gitlab.com/o/r/-/merge_requests/12 --sha=$SHA" GL_SHA=$SHA
   allows "gitlab: --squash-message's value is not the iid" "$L" "glab mr merge --squash-message 99 12 --sha $SHA" GL_SHA=$SHA
   denies "gitlab: a protected path in the diffs"    "protected path" "$L" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA GL_FILES='[{"old_path":".claude/fleet.json","new_path":".claude/fleet.json"}]'
-  printf '{"forge":"gitlab"}\n' > "$G/.claude/gates.json"
+  setgates "$G" '{"forge":"gitlab"}'
   allows "self-hosted: \"forge\": \"gitlab\" alone uses the preset" "$G" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA
   denies "self-hosted: the preset's checks gate it" "pipeline: pending" "$G" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA GL_PIPE=running
   # a forge with no CI: the stamp is the evidence
-  printf '%s\n' '{"forge":"gitlab","merge_cmd":"^forgecli merge","sha_flag":"--sha","head_cmd":"forgecli head $PR","ci":false}' > "$G/.claude/gates.json"
+  setgates "$G" '{"forge":"gitlab","merge_cmd":"^forgecli merge","sha_flag":"--sha","head_cmd":"forgecli head $PR","ci":false}'
   denies "no CI: a merge without a stamp"          "verify-head" "$G" "forgecli merge 7 --sha $SHA"
   mkdir -p "$G/.git/verified"; printf 'make test\n2026-01-01T00:00:00Z\n' > "$G/.git/verified/$SHA"
   allows "no CI: a stamped head merges"            "$G" "forgecli merge 7 --sha $SHA"
   # an unconfigured unknown forge: logged, not denied
-  rm -rf "$G/.claude"
+  setgates "$G" ''
   allows "unknown forge, no config: its merges are not gated" "$G" "forgecli merge 7"
   # no remote at all: a local merge into the default branch needs a stamp
   L="$tmp/local"
@@ -666,7 +748,12 @@ EOF
   ( cd "$L" && git checkout -q -b prot main && mkdir -p .claude && echo '{}' > .claude/gates.json && git add . && git commit -qm p && git checkout -q main ) || return 1
   mkdir -p "$L/.git/verified"; printf 'x\nt\n' > "$L/.git/verified/$(git -C "$L" rev-parse prot)"
   denies "no remote: a stamped merge touching a protected path" "protected path" "$L" "git merge prot"
-  printf '%s\n' '{"verify_cmd":"make check"}' > "$L/.git/../.gates-tmp"; mkdir -p "$L/.claude"; mv "$L/.gates-tmp" "$L/.claude/gates.json"
+  ( cd "$L" && git checkout -q -b prot2 main && mkdir -p .claude && echo '{}' > .claude/fleet.json && git add . && git commit -qm p && git checkout -q main ) || return 1
+  denies "no remote: an unstamped protected merge denies once" "protected path" "$L" "git merge prot2"
+  setgates "$L" '{"verify_cmd":"make check"}'
+  ( cd "$L" && git checkout -q -b ren main && git mv .claude/gates.json elsewhere.json && git commit -qm ren && git checkout -q main ) || return 1
+  printf 'x\nt\n' > "$L/.git/verified/$(git -C "$L" rev-parse ren)"
+  denies "no remote: renaming a protected path away counts" ".claude/gates.json, a protected path" "$L" "git merge ren"
   denies "no remote: a stamp from another command" "make check" "$L" "git merge feat"
   rm -rf "$L/.claude"
   allows "no remote: git merge --abort"            "$L" "git merge --abort"

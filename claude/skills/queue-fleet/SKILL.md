@@ -195,7 +195,9 @@ prints a template (and the gate template, when that file is absent too). Its fie
 `fleet end` and a new `fleet init`.
 
 `.claude/gates.json` is the merge gate's config, read by `gate.sh` in every session, fleet or not.
-Every field is optional, and GitHub with CI needs none of them:
+The gate reads the default branch's committed copy (origin's, else the local branch), never the work
+tree's: a change, or an uncommitted edit, cannot loosen the rules that judge it, and an edit is in
+force once it is on the default branch. Every field is optional, and GitHub with CI needs none of them:
 - `forge` — `github`, `gitlab`, `other` or `none`. Default: `github` when origin is on github.com,
   `none` with no remote. Any other remote is unrecognized: its merges are logged, not gated, until
   configured.
@@ -209,11 +211,12 @@ Every field is optional, and GitHub with CI needs none of them:
   pending. `fleet init` warns when GitHub with CI names none.
 - `files_cmd` — shell printing change `$PR`'s changed paths. Built in for GitHub and GitLab.
 - `protected_paths` — globs no session merges: the user merges those changes.
-  `.claude/gates.json` and `.claude/fleet.json` are always protected. The list is read from the
-  default branch's copy, never from the change's own.
+  `.claude/gates.json` and `.claude/fleet.json` are always protected, renames included.
 - `commit_email` — the author email every commit and push must carry. The gate refuses a commit
-  set up otherwise and a push carrying another author, and `fleet init` refuses a repository whose
+  set up otherwise (in git's order: `--author`, `GIT_AUTHOR_EMAIL`, `user.email`, in the repository
+  `git -C` names) and a push carrying another author or naming commits it cannot list, and `fleet init` refuses a repository whose
   configured email differs.
 - `verify_cmd` — the complete local suite command. With no CI, its `verify-head` stamp on the
   merged head is the merge evidence.
-- `default_branch` — default: origin's HEAD, else `main` or `master`.
+- `default_branch` — the branch a local merge is judged against. Default: origin's HEAD, else
+  `main` or `master`; the config itself is always read from that default, never from this field.
