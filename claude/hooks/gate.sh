@@ -27,7 +27,8 @@
 #     to be this slot's HEAD, and `fleet collisions` to pass on it (no counter both sides bumped);
 #   - a heavy command the fleet config declares must run under `fleet with-lock`.
 #
-# Project config: .claude/gates.json on the default branch (fields documented at load_config below).
+# Project config: .claude/gates.json on the default branch (fields documented at load_config below);
+# one that does not parse denies every merge.
 # Fast: no network except on a forge merge. It never denies on its own errors: those are logged to
 # ${GATE_LOG:-$HOME/.claude/hooks/gate.log} and the call is allowed. Never exits 2.
 # Needs jq. Bash 3.2 compatible. `--self-test` feeds it sample hook JSON.
