@@ -26,9 +26,13 @@ Open with powerup's announcement, then queue-run's parameter confirmation, in th
 - **Two kinds of boundary:**
   - An **item boundary** (an item finished or merged) always ends the session: hand off or stop
     according to the usage check. Do not weigh it, because the usage checkpoint lives there.
-  - A **phase boundary inside an item** (a design closed, a slice merged with more slices to go)
-    follows powerup's break-even weighing. When it does hand off, check usage first, because the stop
-    rule applies at every handoff.
+  - A **closed design** always hands off, as an item boundary does — do not weigh it. Intent: the
+    design loop leaves the session's context full of passes, verdicts and superseded wording that
+    implementation never reads again, and an unattended run has nobody to notice the slowdown. The
+    handoff prompt names the memo first. Check usage before it, because the stop rule applies at
+    every handoff.
+  - Any **other phase boundary inside an item** (a slice merged with more slices to go) follows
+    powerup's break-even weighing. When it does hand off, check usage first, for the same reason.
 - **Rounds versus the threshold.** Powerup's convergence rule is not cut to save budget. If finishing
   the current review loop would likely cross the threshold, don't start the round. Leave the item
   resumable at the round boundary, with the open findings written down, and stop. A half-converged

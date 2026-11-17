@@ -15,7 +15,10 @@ tetel whenever it is installed — that is not a choice to offer (design-doc's r
 Read `${CLAUDE_SKILL_DIR}/../consult/SKILL.md`, `${CLAUDE_SKILL_DIR}/../design-doc/SKILL.md`,
 `${CLAUDE_SKILL_DIR}/../delivery/SKILL.md`, and `${CLAUDE_SKILL_DIR}/../evolve/SKILL.md` now, in full. They carry
 `disable-model-invocation: true`, so this is the only way to activate them together — reading them
-here is what puts them in force; nothing below substitutes for reading them.
+here is what puts them in force; nothing below substitutes for reading them. design-doc's
+`SKILL.md` is its always-read core; the two files beside it (`method.md`, and `loop-tetel.md` on the
+tetel route) are read in full when a design starts, as its "Read when a design starts" section says —
+not now, and never skipped once a design is under way.
 
 Every conditional inside them — "if `/consult` is active," "if an advisor mode is active" — resolves
 to **true**. What follows is the composition detail none of them states on its own.
@@ -52,8 +55,8 @@ mechanism and one pass is never enough — but a round count is not the rule and
 
 **The stopping rule is: no blocker findings remain.** A blocker is **for a design** a finding that
 changes *what gets built*; **for code** a finding that affects the *semantics* of the code. Everything
-else is recorded and fixed but buys no further round. `design-doc`'s "When the loop stops" owns the
-design side in full — do not restate it here. A reviewer always returns *something*; the count is
+else is recorded and fixed but buys no further round. `design-doc`'s "When the loop stops" (in its
+`loop-tetel.md`) owns the design side in full — do not restate it here. A reviewer always returns *something*; the count is
 noise and the class is the signal.
 
 The waste was never the rounds. It was **conflating "fresh agent" with "independent round."**
