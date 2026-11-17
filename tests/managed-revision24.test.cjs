@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {replay,fixture,observedScopes}=require('./fixtures/managed-config-replay.cjs');
+const {replay: nativeReplay,fixture,observedScopes}=require('./fixtures/managed-config-replay.cjs');
 const {configRules: nativeConfigRules,assertRules}=require('../codex/runtime/managed-inventory-rules.cjs');
 const {configDigest: nativeConfigDigest}=require('../codex/runtime/managed-inventory.cjs');
 const {BUILTIN_CONTEXT_KEYS,emptyInstructionSources}=require('../codex/runtime/managed-instruction-config.cjs');
@@ -28,6 +28,10 @@ test('S24 newly resolved realtime text-loader names remain empty-only',()=>{
   for(const key of ['experimental_realtime_ws_backend_prompt','experimental_realtime_start_instructions']){const r=replay();assert.equal(r.config[key],null);r.config[key]='EXAMPLE forbidden text';assert.equal(configRules(r).find(c=>c.ruleId==='CFG_INSTRUCTIONS').passed,false);}
 });
 
-const trustProject=require('node:path').resolve('EXAMPLE');
+// Pure configuration checks use a synthetic Windows path on every platform; no file is opened.
+const trustProject='C:\\EXAMPLE';
 const configRules=response=>nativeConfigRules(response,trustProject);
 const configDigest=response=>nativeConfigDigest(response,trustProject);
+
+// Preserve the observed key/type shape; only the synthetic trust value is Windows-shaped.
+function replay(){const response=nativeReplay();response.config.projects={[trustProject.toLowerCase()]:{trust_level:'trusted'}};return response;}

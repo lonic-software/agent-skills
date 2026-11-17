@@ -19,7 +19,7 @@ test('disabled hooks still require complete known metadata and config origins mu
   for (const field of ['key', 'currentHash', 'trustStatus', 'command', 'displayOrder']) { const value = {...hook}; delete value[field]; assert.throws(() => normalizeHooks(response(value), cwd, 'cwd'), /INVENTORY_UNCERTAIN/); }
   assert.throws(() => configDigest({...config(), origins: {model: {name: {type: 'unknown'}, version: '1'}}}), /INVENTORY_UNCERTAIN/);
 });
-test('cwd and loaded-thread inventories use native APIs and pin explicit root source membership', async () => {
+test('cwd and loaded-thread inventories use native APIs and pin explicit root source membership', {skip: process.platform !== 'win32' && 'Windows-only managed inventory requires real Windows project paths (CFG_PROJECT_TRUSTED)'}, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-inventory-')); const project = path.join(root, 'project'), profile = path.join(root, 'profile'); fs.mkdirSync(project); fs.mkdirSync(profile);
   try {
     fs.writeFileSync(path.join(project, 'AGENTS.md'), 'EXAMPLE');
@@ -34,5 +34,6 @@ test('cwd and loaded-thread inventories use native APIs and pin explicit root so
   } finally { fs.rmSync(root, {recursive: true, force: true}); }
 });
 
-const trustProject=require('node:path').resolve('EXAMPLE');
+// Pure configuration checks use a synthetic Windows path on every platform; no file is opened.
+const trustProject='C:\\EXAMPLE';
 const configDigest=response=>nativeConfigDigest(response,trustProject);

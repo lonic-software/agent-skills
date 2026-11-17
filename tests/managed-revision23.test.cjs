@@ -28,7 +28,7 @@ test('S23 effective and layer shell policy content are hashed, independent of ke
   const c=synthetic(),initial=configDigest(c),reordered=structuredClone(c);reordered.config.shell_environment_policy=Object.fromEntries(Object.entries(c.config.shell_environment_policy).reverse());assert.equal(configDigest(reordered),initial);
   for(const target of ['effective','layer']){const next=structuredClone(c);(target==='effective'?next.config:next.layers[0].config).shell_environment_policy.set.EXAMPLE_FLAG='changed';assert.notEqual(configDigest(next),initial);}
 });
-test('S23 shell policy drift refuses inventory revalidation with CONFIG_PIN',async()=>{
+test('S23 shell policy drift refuses inventory revalidation with CONFIG_PIN',{skip: process.platform !== 'win32' && 'Windows-only managed inventory requires real Windows project paths (CFG_PROJECT_TRUSTED)'}, async()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'lonic-s23-'));try{
     const project=path.join(root,'project'),profile=path.join(root,'profile');fs.mkdirSync(project);fs.mkdirSync(profile);
     let response=synthetic();response.config.projects={[project.toLowerCase()]:{trust_level:"trusted"}};const reader={async call(m){return m==='config/read'?response:{data:[{cwd:project,errors:[],warnings:[],hooks:[],skills:[]}]};}};
@@ -37,6 +37,7 @@ test('S23 shell policy drift refuses inventory revalidation with CONFIG_PIN',asy
   }finally{assert.equal(path.dirname(fs.realpathSync(root)),fs.realpathSync(os.tmpdir()));fs.rmSync(root,{recursive:true});}
 });
 
-const trustProject=require('node:path').resolve('EXAMPLE');
+// Pure configuration checks use a synthetic Windows path on every platform; no file is opened.
+const trustProject='C:\\EXAMPLE';
 const configRules=response=>nativeConfigRules(response,trustProject);
 const configDigest=response=>nativeConfigDigest(response,trustProject);

@@ -64,5 +64,6 @@ test('S21 original rule survives a failed cleanup; journal remains unresolved',(
   await closed;assert.deepEqual(f.journal.unresolved(),['reader']);
 }));
 
-const trustProject=require('node:path').resolve('EXAMPLE');
+// Pure configuration checks use a synthetic Windows path on every platform; no file is opened.
+const trustProject='C:\\EXAMPLE';
 const configRules=response=>nativeConfigRules(response,trustProject);
