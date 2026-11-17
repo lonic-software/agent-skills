@@ -53,7 +53,7 @@ unquote() { printf '%s' "$1" | tr '\n' ';' | sed -e "s/'[^']*'/Q/g" -e 's/"[^"]*
 # Print each simple command on its own line.
 segments() { printf '%s' "$1" | sed -e 's/&&/;/g' -e 's/||/;/g' -e 's/[|&()]/;/g' | tr ';' '\n'; }
 
-# A value the unquoting turned into Q, recovered from the raw command: the first KEY=value there,
+# A value the unquoting turned into Q, recovered from the raw command: the KEY=value there,
 # quotes stripped. Best-effort: with two different quoted values for one key, the last wins.
 RAW_CMD=""
 unq() { # key value
