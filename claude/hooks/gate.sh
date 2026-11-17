@@ -133,7 +133,8 @@ load_config() { # cwd
   if jq -e 'type == "object"' "$top/.claude/gates.json" >/dev/null 2>&1; then CFG="$top/.claude/gates.json"
   else log "unparsable $top/.claude/gates.json; using defaults"; fi
 }
-cfg() { [ -n "$CFG" ] && jq -r --arg k "$1" '.[$k] // empty | if type == "array" then .[] else tostring end' "$CFG" 2>/dev/null; }
+# has(), not //: jq's // treats false as absent, so a configured "ci": false would fall back to the default.
+cfg() { [ -n "$CFG" ] && jq -r --arg k "$1" 'if has($k) and .[$k] != null then .[$k] | if type == "array" then .[] else tostring end else empty end' "$CFG" 2>/dev/null; }
 log() { { printf '%s gate.sh: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "$LOG"; } 2>/dev/null; }
 
 FORGE=""
@@ -393,6 +394,11 @@ EOF
   denies "merge: a required check missing"      "cla: missing" "$R" "gh pr merge 12 --match-head-commit $SHA"
   printf '{"required_checks":["ci"]}\n' > "$R/.claude/gates.json"
   allows "merge: only the required checks count" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS='[{"name":"ci","bucket":"pass"},{"name":"flaky","bucket":"fail"}]'
+  printf '{"forge":"github","ci":false}\n' > "$R/.claude/gates.json"
+  denies "github with \"ci\": false: a merge wants a stamp, not checks" "verify-head" "$R" "gh pr merge 12 --match-head-commit $SHA"
+  mkdir -p "$R/.git/verified"; printf 'x\nt\n' > "$R/.git/verified/$SHA"
+  allows "github with \"ci\": false: a stamped head merges" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_CHECKS="$PENDING"
+  rm -rf "$R/.git/verified"
   rm -rf "$R/.claude"
   allows "merge: a gh failure is logged and allowed" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FAIL=1
   grep -q "head_cmd for 12 failed" "$GATE_LOG" && echo "ok   the gh failure was logged" || { echo "FAIL the gh failure was logged"; fails=$((fails + 1)); }
