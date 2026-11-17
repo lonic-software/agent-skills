@@ -22,7 +22,7 @@ async function nativeSession(descriptor,options){
  }});
  try{
   await client.call('initialize',{clientInfo:{name:'lonic-queue-controller',version:'2'},capabilities:{experimentalApi:true}});client.notify('initialized');
-  const entryFile=plainPath(options.entrySkillFile||path.join(descriptor.project,'.agents','skills',descriptor.entrySkill,'SKILL.md'));
+  const entryFile=plainPath(options.entrySkillFile||require('./resolve-installation.cjs').skill(descriptor.project,descriptor.entrySkill));
   if(!fs.statSync(entryFile).isFile())throw Error('Queue entry skill is missing: '+entryFile);
   if(options.entrySkillFile)await client.call('skills/extraRoots/set',{extraRoots:[path.dirname(path.dirname(entryFile))]});
   const listed=await client.call('skills/list',{cwds:[descriptor.project],forceReload:true});if(!listed.data.flatMap(row=>row.skills||[]).some(skill=>path.resolve(skill.path)===entryFile&&skill.enabled))throw Error('The project entry skill is not available and enabled');

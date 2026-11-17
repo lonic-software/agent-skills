@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 'use strict';
-// Project-local preview installer. Requires Node.js 18+; no package download.
+// Global-default CLI with explicit project scope; preview installer. Requires Node.js 18+; no package download.
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
 const digest = data => crypto.createHash('sha256').update(data).digest('hex');
 
 function noLinks(target) {
@@ -35,10 +36,18 @@ function listFiles(directory) {
   }
   return result;
 }
-function plan(repo, project, selection) {
-  repo = path.resolve(repo); project = path.resolve(project);
-  noLinks(project);
-  if (!fs.statSync(project).isDirectory()) throw new Error('Project must be an existing directory');
+function plan(repo, project, selection, options = {}) {
+  const scope = options.scope || 'project';
+  if (!['global','project'].includes(scope)) throw new Error('Choose --scope global or project');
+  if (options.onDuplicate !== undefined && options.onDuplicate !== 'keep-both') throw new Error('Choose --on-duplicate keep-both or remove one installation');
+  if (scope === 'project' && !project) throw new Error('Project scope requires --project');
+  const contextProject = path.resolve(project || process.cwd());
+  const codexHome = path.resolve(options.codexHome || process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
+  repo = path.resolve(repo); project = scope === 'global' ? codexHome : contextProject;
+  noLinks(project); noLinks(contextProject); noLinks(codexHome);
+  if (!fs.statSync(contextProject).isDirectory()) throw new Error('Project must be an existing directory');
+  if (fs.existsSync(project) && !fs.statSync(project).isDirectory()) throw new Error('Target must be a directory');
+  if (scope === 'global' && selection === 'test-filter-hook') throw new Error('Native hook activation is project-only; choose --scope project');
   const source = path.join(repo, 'codex');
   const manifest = JSON.parse(fs.readFileSync(path.join(source, 'manifest.json'), 'utf8'));
   if (manifest.schema !== 1) throw new Error('Unsupported Codex manifest schema');
@@ -50,14 +59,18 @@ function plan(repo, project, selection) {
   for (const name of chosen.skills.map(safeName)) {
     const skillRoot = within(source, path.join('skills', name));
     if (!fs.statSync(path.join(skillRoot, 'SKILL.md')).isFile()) throw new Error(`Missing SKILL.md: ${name}`);
-    for (const file of listFiles(skillRoot)) files.push({ source: file, relative: path.join('.agents', 'skills', name, path.relative(skillRoot, file)) });
+    for (const file of listFiles(skillRoot)) files.push({ source: file, relative: path.join(...(scope === 'global' ? ['skills'] : ['.agents','skills']), name, path.relative(skillRoot, file)) });
   }
-  for (const name of chosen.agents.map(safeName)) files.push({ source: within(source, path.join('agents', name + '.toml')), relative: path.join('.codex', 'agents', name + '.toml') });
+  for (const name of chosen.agents.map(safeName)) files.push({ source: within(source, path.join('agents', name + '.toml')), relative: path.join(...(scope === 'global' ? ['agents'] : ['.codex','agents']), name + '.toml') });
   if (chosen.runtime !== undefined && chosen.runtime !== true) throw new Error('Invalid runtime selection');
   if (chosen.runtime) {
     const runtimeRoot = within(source, 'runtime');
-    for (const file of listFiles(runtimeRoot)) files.push({source: file, relative: path.join('.codex', 'lonic', 'runtime', path.relative(runtimeRoot, file))});
+    for (const file of listFiles(runtimeRoot)) files.push({source: file, relative: path.join(...(scope === 'global' ? ['lonic','runtime'] : ['.codex','lonic','runtime']), path.relative(runtimeRoot, file))});
   }
+  if (chosen.runtime && fs.existsSync(path.join(source,'runtime-config.example.json'))) files.push({source:path.join(source,'runtime-config.example.json'), relative:path.join(...(scope==='global'?['lonic']:['.codex','lonic']),'runtime-config.example.json')});
+  const collisionTargets = chosen.skills.map(name => path.join(scope==='global'?contextProject:codexHome,...(scope==='global'?['.agents','skills']:['skills']),name,'SKILL.md'));
+  for (const target of collisionTargets) noLinks(target);
+  const duplicates = collisionTargets.filter(target => fs.existsSync(target));
   const seen = new Set();
   for (const file of files) {
     noLinks(file.source);
@@ -73,9 +86,10 @@ function plan(repo, project, selection) {
       file.status = fs.readFileSync(file.target).equals(file.bytes) ? 'MATCH' : 'CONFLICT';
     } else file.status = 'CREATE';
   }
-  return { project, selection, packageStatus: manifest.status, files };
+  return { project, scope, contextProject, codexHome, selection, packageStatus: manifest.status, files, duplicates, collisionTargets, onDuplicate:options.onDuplicate };
 }
 function apply(planned) {
+  if ((planned.collisionTargets||[]).some(p=>{noLinks(p);return fs.existsSync(p);}) && planned.onDuplicate!=='keep-both') throw new Error('Cross-scope skill collision: choose one scope, remove the other installation, or explicitly --on-duplicate keep-both; no files changed');
   if (planned.files.some(file => file.status === 'CONFLICT')) throw new Error('Existing content differs; no files were changed');
   // Recheck the entire plan before writing, then create each new file exclusively.
   for (const file of planned.files) {
@@ -114,21 +128,21 @@ function main(argv) {
     if (arg === '--apply' || arg === '--check') {
       if (mode !== 'preview') throw new Error('Choose at most one of --apply and --check');
       mode = arg.slice(2);
-    } else if (arg === '--project' || arg === '--skill') {
+    } else if (['--project','--skill','--scope','--codex-home','--on-duplicate'].includes(arg)) {
       if (options[arg] || !argv[i+1] || argv[i+1].startsWith('--')) throw new Error(`Missing or duplicate argument: ${arg}`);
       options[arg] = argv[++i];
     } else throw new Error(`Unknown argument: ${arg}`);
   }
-  if (!options['--project'] || !options['--skill']) throw new Error('Usage: node bin/install-codex.cjs --project PATH --skill SELECTION [--apply|--check]');
-  const planned = plan(path.resolve(__dirname, '..'), options['--project'], options['--skill']);
-  console.log(JSON.stringify({ mode, project: planned.project, selection: planned.selection, packageStatus: planned.packageStatus, files: planned.files.map(({relative,status,sha256}) => ({path: relative, status, sha256})) }, null, 2));
-  if (mode === 'apply') console.log(`Created ${apply(planned)} files. Review the project and start a new Codex session. Full workflow parity is not claimed.`);
+  if (!options['--skill']) throw new Error('Usage: node bin/install-codex.cjs --skill SELECTION [--scope global|project] [--project PATH] [--codex-home PATH] [--on-duplicate keep-both] [--apply|--check]');
+  const planned = plan(path.resolve(__dirname, '..'), options['--project'], options['--skill'], {scope:options['--scope']||'global',codexHome:options['--codex-home'],onDuplicate:options['--on-duplicate']});
+  console.log(JSON.stringify({ mode, scope:planned.scope, root:planned.project, project: planned.contextProject, duplicates:planned.duplicates, duplicateDecision:planned.onDuplicate||'required-if-listed', selection: planned.selection, packageStatus: planned.packageStatus, files: planned.files.map(({relative,status,sha256}) => ({path: relative, status, sha256})) }, null, 2));
+  if (mode === 'apply') console.log(`Created ${apply(planned)} files. Review the selected installation and start a new Codex session. Full workflow parity is not claimed.`);
   if (mode === 'check' && planned.files.some(file => file.status !== 'MATCH')) return 2;
-  if (mode === 'preview' && planned.files.some(file => file.status === 'CONFLICT')) return 2;
+  if (mode === 'preview' && (planned.files.some(file => file.status === 'CONFLICT') || (planned.duplicates.length && planned.onDuplicate!=='keep-both'))) return 2;
   return 0;
 }
 if (require.main === module) {
   try { process.exitCode = main(process.argv.slice(2)); }
   catch (error) { console.error(error.message); process.exitCode = 1; }
 }
-module.exports = { plan, apply, main };
+module.exports = { plan, apply, main, noLinks };

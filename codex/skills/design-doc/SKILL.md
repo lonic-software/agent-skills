@@ -16,7 +16,8 @@ class analysis, and the evidence needed for closure.
 ## Select the evidence route
 
 Use tetel when its tools are available, including deferred MCP tools. Read an
-existing `.codex/lonic/design.json` project preference if present. A recorded
+existing `.codex/lonic/design.json` project preference if present, otherwise
+CODEX_HOME/lonic/design.json if present (CODEX_HOME defaults to the OS home/.codex). A recorded
 `route: tetel` means missing or failing tetel stops the work; do not quietly
 switch to prose. Save such a preference only when the user requests it.
 

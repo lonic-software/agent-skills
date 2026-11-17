@@ -1,13 +1,41 @@
 # Codex runtime candidate
 
-This directory is copied to `.codex/lonic/runtime` by the project installer.
-Copying it does not activate hooks, create a new login/profile, or change global
-settings. Node.js 18+ is required. The separate evidence and queue CLIs start
+This directory is copied to CODEX_HOME/lonic/runtime by the global-default installer,
+or PROJECT/.codex/lonic/runtime with --scope project.
+Copying it does not activate hooks, create a new login/profile, or edit Codex config.toml. Node.js 18+ is required. The separate evidence and queue CLIs start
 native Codex processes using the existing login and the configured model.
 
 ## Configuration
 
-Create `.codex/lonic/runtime-config.json` only with setup authorization:
+Create CODEX_HOME/lonic/runtime-config.json or the project override
+.codex/lonic/runtime-config.json only with setup authorization. The installer
+ships runtime-config.example.json, never overwrites the operator configuration.
+Without --config, queue and evidence merge global then project top-level fields;
+arrays/objects replace, invalid project JSON refuses. Explicit --config remains
+standalone. Runtime and ordinary entry-skill lookup prefer the project then
+CODEX_HOME; resolve-installation.cjs PROJECT queue|evidence prints selected paths.
+Managed retains its explicit configuration/admission contract.
+
+In the commands below, replace RUNTIME with that selected absolute runtime path;
+quote the script path if it contains spaces. A global installation does not need
+another copy in each project. The user-level tetel config.toml snippet and the
+Windows 0.167.0 discovery limits are in ../README.md in the source distribution
+(codex/README.md); config.toml registration remains a separate manual step.
+
+User-level tetel registration, manually merged into CODEX_HOME/config.toml:
+
+```toml
+[mcp_servers.tetel]
+command = "tetel"
+args = ["mcp"]
+```
+
+Use an absolute native executable path when it is not on PATH (Windows example:
+command = 'C:\tools\tetel.exe'). In the isolated Windows Codex 0.167.0 zero-turn
+probe this user registration exposed 14 tools without project trust. Tool calls
+by a model were not tested. The installer never edits this configuration.
+
+Example:
 
 ```json
 {
@@ -179,7 +207,7 @@ active commands or every process-tree failure mode.
 Example syntax only; substitute approved paths and budget:
 
 ```text
-node .codex/lonic/runtime/queue.cjs --config .codex/lonic/runtime-config.json --project ABSOLUTE_PROJECT --queue ASSIGNED_TASK_FILE --item-id TASK_ID --entry powerup --authority-file AUTHORITY_FILE --threshold USER_PERCENT --max-steps 2 --interactive
+node RUNTIME/queue.cjs --project ABSOLUTE_PROJECT --queue ASSIGNED_TASK_FILE --item-id TASK_ID --entry powerup --authority-file AUTHORITY_FILE --threshold USER_PERCENT --max-steps 2 --interactive
 ```
 
 The same launch supports queue-run and powerup-auto. Automatic continuation is

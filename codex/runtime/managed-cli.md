@@ -262,3 +262,17 @@ name/row is promised or synthesized: the supported account response does not
 supply a verified workspace label. Exact lowercase yes is still required; only
 the fingerprint is stored. An injected audit observer supplements notifications.jsonl
 instead of replacing it; local notification records remain method-only.
+
+## Global installation and skill admission
+
+User-scope lonic skills alone do not trigger refusal: SKILL_COVERAGE accepts the
+complete single-cwd list, SKILL_METADATA accepts scope user with complete metadata,
+and SKILL_PIN requires the same discovered paths on subsequent reads. The host
+pins and disables every listed skill before authors/meters; enabled or newly
+appearing loaded skills still refuse. Offline tests cover global presence, path
+drift, missing/unknown metadata and coverage failures without weakening any rule.
+This is not native managed validation of a globally installed setup or global
+role dispatch. Other profile/configuration restrictions still apply. A project
+copy does not hide user skills or cure inventory drift; there is no blanket
+project-install exception or silent fallback. The existing native B1 observations
+used the earlier installation shape; macOS is untested.

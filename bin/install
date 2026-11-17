@@ -3,7 +3,7 @@
 #
 #   install <tool> <skill>
 #
-# tool  : claude, or codex for the project-local development preview
+# tool  : claude, or codex for the global-default installation preview
 # skill : powerup | consult | design-doc | delivery | evolve
 #         | queue-run | queue-fleet | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
 #         Codex also accepts core-preview | full-preview.
@@ -30,7 +30,7 @@ die() { echo "install: $*" >&2; exit 1; }
 [ -n "$tool" ]  || die "no tool given (expected: claude | codex)"
 [ -n "$skill" ] || die "no skill given (expected: powerup | consult | design-doc | delivery | evolve | queue-run | queue-fleet | powerup-auto | powerup-fleet | test-filter-hook | gate-hook)"
 
-# Codex previews by default. --apply is explicit; no user-wide writes.
+# Codex defaults to global scope but previews only; --scope project selects a project.
 if [ "$tool" = codex ]; then
   command -v node >/dev/null 2>&1 || die "Codex preview requires Node.js 18 or later; no installation was attempted"
   shift 2

@@ -5,8 +5,8 @@ function noLinks(target){const full=path.resolve(target),root=path.parse(full).r
 function within(root,file){const rel=path.relative(root,file);return !rel||(!path.isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..'+path.sep))}
 function createJob({configFile,mode,repo,memo}){
  if(!['grounder','attacker'].includes(mode))throw Error('Choose grounder or attacker');
- if(!configFile||!repo||!memo)throw Error('Config, source repository and rendered memo are required');
- noLinks(configFile);const config=JSON.parse(fs.readFileSync(configFile,'utf8'));
+ if(!repo||!memo)throw Error('Source repository and rendered memo are required');
+ let config;if(configFile){noLinks(configFile);config=JSON.parse(fs.readFileSync(configFile,'utf8'));}else config=require('./resolve-installation.cjs').config(repo);
  const known=new Set(['schema','codex','tetel','model','allowedCommands','runRoot','timeoutMs']);
  if(Object.keys(config).some(k=>!known.has(k))||config.schema!==1)throw Error('Unsupported evidence configuration');
  for(const field of ['codex','tetel','model'])if(typeof config[field]!=='string'||!config[field].trim())throw Error('Missing configuration: '+field);
@@ -27,7 +27,7 @@ function createJob({configFile,mode,repo,memo}){
  fs.writeFileSync(job.jobPath,JSON.stringify(job,null,2)+'\n',{flag:'wx',mode:0o600});
  return {job,timeoutMs};
 }
-async function main(argv){const options={};for(let i=0;i<argv.length;i++){const arg=argv[i];if(!['--config','--mode','--repo','--memo'].includes(arg)||options[arg]||!argv[i+1]||argv[i+1].startsWith('--'))throw Error('Usage: node evidence.cjs --config FILE --mode grounder|attacker|attack-pair --repo SOURCE_ROOT --memo MEMO');options[arg]=argv[++i]}
+async function main(argv){const options={};for(let i=0;i<argv.length;i++){const arg=argv[i];if(!['--config','--mode','--repo','--memo'].includes(arg)||options[arg]||!argv[i+1]||argv[i+1].startsWith('--'))throw Error('Usage: node evidence.cjs [--config FILE] --mode grounder|attacker|attack-pair --repo SOURCE_ROOT --memo MEMO');options[arg]=argv[++i]}
  if(options['--mode']==='attack-pair'){const result=await require('./attack-pair.cjs').runAttackPair({configFile:options['--config'],repo:options['--repo'],memo:options['--memo']});console.log(JSON.stringify(result));return result.pairComplete?0:2}
  const {job,timeoutMs}=createJob({configFile:options['--config'],mode:options['--mode'],repo:options['--repo'],memo:options['--memo']});console.log(JSON.stringify({job:job.jobPath,result:job.result,existingLogin:true}));
  try{const result=await require('./run-isolated-grounder.cjs').runEvidence(job,{timeoutMs});console.log(JSON.stringify(result));return result.completion.groundingComplete||result.completion.attackComplete?0:2}

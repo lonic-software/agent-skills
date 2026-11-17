@@ -1,12 +1,25 @@
 # Controller powerup sessions
 
-Use `.codex/lonic/runtime/queue.cjs` with `--entry powerup`. The historical CLI
+## Installation lookup (Codex 0.167.0 port)
+
+Resolve RUNTIME to the project's .codex/lonic/runtime first, otherwise
+CODEX_HOME/lonic/runtime (CODEX_HOME defaults to the OS home/.codex).
+Use the selected absolute path, quoted as a separate shell argument.
+The read-only helper at either installation, resolve-installation.cjs, accepts
+PROJECT and queue or evidence and prints the selected runtime/config paths.
+Without --config, global lonic/runtime-config.json is read first and project
+.codex/lonic/runtime-config.json overrides its top-level fields. Arrays/objects
+replace; invalid project configuration refuses. Explicit --config is standalone.
+Do not infer an account, model, budget or authority from installation scope.
+
+
+Use `RUNTIME/queue.cjs` with `--entry powerup`. The historical CLI
 name does not make bare powerup a queue runner. Set `--queue` to the assigned
 task file and `--item-id` to a stable task ID. The host rejects a handoff that
 changes this ID. Use continue at a durable phase boundary and done only when
 this assigned item is complete. Never select another item.
 
-The installed `.codex/lonic/runtime/README.md` owns configuration and operator
+The installed `RUNTIME/README.md` owns configuration and operator
 options. Resolve the user's task authority, an explicit current-run weekly
 usage threshold or relative allowance, and run bounds before launch. Do not
 infer a budget from a prior run. The existing native login is reused.
@@ -28,4 +41,4 @@ checkpoint alone does not authorize a new process or prove completion.
 
 ## B1 explicit managed branch
 
-The `--managed` CLI has a separate [host contract](../../../runtime/managed-cli.md), requires `--queue-kind file` and an explicit timeout, and never inherits native approval/hook allowances from the ordinary workflow. It uses sampled account checks, bounded observed cleanup, an external intent registry, and exact-byte result receipts. A clean bounded stop is `incomplete`, not a lost handoff. This branch is experimental; B1 remains unfinished, proceeding by operator decision. Native observations cover enrollment/admission, N1 handoff and continuation, N2 cancellation plus ordinary reconcile, and N3a forced closure/survivor refusal with Node substitutes and a probe-equivalent observer. N3b produced no file change; its tool list was model-reported. Command execution is not authorized, supported or observed. See the host contract for sampled-account, cleanup, manual-recovery and profile/version limits.
+The `--managed` CLI has a separate host contract at RUNTIME/managed-cli.md, requires `--queue-kind file` and an explicit timeout, and never inherits native approval/hook allowances from the ordinary workflow. It uses sampled account checks, bounded observed cleanup, an external intent registry, and exact-byte result receipts. A clean bounded stop is `incomplete`, not a lost handoff. This branch is experimental; B1 remains unfinished, proceeding by operator decision. Native observations cover enrollment/admission, N1 handoff and continuation, N2 cancellation plus ordinary reconcile, and N3a forced closure/survivor refusal with Node substitutes and a probe-equivalent observer. N3b produced no file change; its tool list was model-reported. Command execution is not authorized, supported or observed. See the host contract for sampled-account, cleanup, manual-recovery and profile/version limits.

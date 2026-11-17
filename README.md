@@ -4,12 +4,12 @@ Composable workflow skills for high-rigor engineering — planning, delegation, 
 
 ## Codex support candidate
 
-A project-local Codex candidate is available under `codex/` with all
+A global-default Codex candidate (with explicit project scope) is available under `codex/` with all
 seven workflow skills, four advisor roles, two reviewer roles, separate tetel
 evidence workers, a queue controller, and optional test-output scripts.
 See the [Codex setup guide](codex/README.md) for Windows and Ubuntu commands.
 The installer previews changes by default and requires an explicit apply flag.
-It does not activate hooks or modify global configuration.
+It does not activate hooks or edit Codex config.toml. See codex/README.md for scopes and manual runtime/MCP configuration.
 
 Bounded native author-driven design, evidence, fresh-session implementation and
 review examples passed on Windows and Ubuntu. Managed powerup supports automatic phase

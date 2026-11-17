@@ -1,8 +1,20 @@
 # Codex evidence dispatch
 
+## Installation lookup (Codex 0.167.0 port)
+
+Resolve RUNTIME to the project's .codex/lonic/runtime first, otherwise
+CODEX_HOME/lonic/runtime (CODEX_HOME defaults to the OS home/.codex).
+Use the selected absolute path, quoted as a separate shell argument.
+The read-only helper at either installation, resolve-installation.cjs, accepts
+PROJECT and queue or evidence and prints the selected runtime/config paths.
+Without --config, global lonic/runtime-config.json is read first and project
+.codex/lonic/runtime-config.json overrides its top-level fields. Arrays/objects
+replace; invalid project configuration refuses. Explicit --config is standalone.
+Do not infer an account, model, budget or authority from installation scope.
+
+
 Read this when the tetel design route is selected. The installed runner is
-`.codex/lonic/runtime/evidence.cjs`. Its project configuration is
-`.codex/lonic/runtime-config.json`. Missing files are a setup requirement, not
+`RUNTIME/evidence.cjs`. Configuration is resolved as described above. Missing files are a setup requirement, not
 permission to install them. Keep the main session's authoring tetel connection.
 
 The configuration names the existing Codex and tetel executables, the approved
@@ -15,9 +27,9 @@ Store the rendered memo outside the source Git worktree. Invoke from the project
 root, replacing the labelled example paths with the actual absolute paths:
 
 ```text
-node .codex/lonic/runtime/evidence.cjs --config .codex/lonic/runtime-config.json --mode attack-pair --repo ABSOLUTE_SOURCE_ROOT --memo ABSOLUTE_MEMO_PATH
-node .codex/lonic/runtime/evidence.cjs --config .codex/lonic/runtime-config.json --mode grounder --repo ABSOLUTE_SOURCE_ROOT --memo ABSOLUTE_MEMO_PATH
-node .codex/lonic/runtime/evidence.cjs --config .codex/lonic/runtime-config.json --mode attacker --repo ABSOLUTE_SOURCE_ROOT --memo ABSOLUTE_MEMO_PATH
+node RUNTIME/evidence.cjs --mode attack-pair --repo ABSOLUTE_SOURCE_ROOT --memo ABSOLUTE_MEMO_PATH
+node RUNTIME/evidence.cjs --mode grounder --repo ABSOLUTE_SOURCE_ROOT --memo ABSOLUTE_MEMO_PATH
+node RUNTIME/evidence.cjs --mode attacker --repo ABSOLUTE_SOURCE_ROOT --memo ABSOLUTE_MEMO_PATH
 ```
 
 Quote paths containing spaces according to the active shell. These are separate

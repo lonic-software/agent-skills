@@ -23,7 +23,9 @@ Do not consult as a rubber stamp or delegate routine implementation.
 
 ## Model preference and tiers
 
-Read `.codex/lonic/advisor.json` relative to the project root if it exists.
+Read `.codex/lonic/advisor.json` relative to the project root if it exists;
+otherwise read CODEX_HOME/lonic/advisor.json if present (CODEX_HOME defaults to
+the OS home/.codex). Do not write either preference without user authorization.
 Fields are `model` (an exact Codex model ID) and `default_effort` (low, medium,
 high, or xhigh). Before the first consultation, resolve a missing preference
 from the user's current instructions or ask once. Recommend medium effort;

@@ -18,7 +18,7 @@ the first revision. This deliberately adds one initial attack compared with the
 Claude workflow and can increase first-round model usage. It is not a cost-saving claim.
 
 See [runtime contracts and limits](runtime/README.md). The source includes real
-Windows/Ubuntu evidence-worker probes and native queue transport checks. Managed bare powerup supports automatic phase handoff. An attached terminal can
+Windows/Ubuntu evidence-worker probes and native queue transport checks. Controller-driven bare powerup supports automatic phase handoff. An attached terminal can
 answer questions and native approvals within optional availability windows.
 Ordinary Codex chats still need the controller for automatic phase changes.
 Native hook activation and complete small author-driven workflows were checked
@@ -27,60 +27,110 @@ in both demos. These bounded examples do not prove every workflow or input.
 Native advisor/reviewer roles in this preview have read-only instructions;
 they do not create separate OS permission boundaries.
 
-## Project-local setup
+## Installation scope (global by default)
 
-Requires an existing Codex installation and Node.js 18 or later. This setup
-does not download dependencies. Tetel is configured separately in the project's
-`.codex/config.toml`. The installer does not edit that file, `AGENTS.md`, user
-configuration, credentials, or hooks. Use a standalone project outside any
-unrelated repository and start a new Codex session there.
+Requires Node.js 18+ and an existing Codex installation. Preview never installs;
+only --apply writes. The default scope is global: CODEX_HOME, or the OS user
+home/.codex when CODEX_HOME is unset. --codex-home can select another profile.
+One global installation serves subsequent projects without reinstalling there.
 
-Preview from this repository on Linux or Git Bash:
+From this repository, preview and then apply the complete bundle:
 
-```sh
-bash bin/install codex core-preview --project /absolute/path/to/project
+```text
+node bin/install-codex.cjs --skill powerup-auto
+node bin/install-codex.cjs --skill powerup-auto --apply
 ```
 
-Preview from PowerShell:
+For project-only installation, choose the scope explicitly:
 
-```powershell
-& .\bin\install.ps1 codex core-preview -Project 'C:\path\to\project'
+```text
+node bin/install-codex.cjs --scope project --project /absolute/project --skill powerup-auto
+node bin/install-codex.cjs --scope project --project /absolute/project --skill powerup-auto --apply
 ```
 
-The preview lists destination paths, current status, and source SHA-256 hashes.
-After reviewing it and obtaining any required installation approval, repeat
-with `--apply` (bash) or `-Apply` (PowerShell). Without that flag nothing is
-installed. Use `full-preview` in place of `core-preview` for the complete candidate.
-`evolve` includes its consult dependency. The original core-preview creates 12 files:
-three SKILL.md files, three invocation-policy files, and six agent TOMLs.
+The Bash wrapper is bash bin/install codex powerup-auto [the same flags].
+PowerShell: & .\bin\install.ps1 codex powerup-auto defaults to global; add
+-Scope project -Project 'C:\path\to\project' to select project scope, and -Apply
+only after preview. -CodexHome and -OnDuplicate keep-both are also supported.
+No dependency download, config.toml, AGENTS.md, login, hook registration or trust
+write is performed. Runtime scripts are inert until invoked.
 
-Skills go under `<project>/.agents/skills`. Agent definitions go under
-`<project>/.codex/agents`. Existing identical files are retained. Different
-content is a conflict: the installer refuses the whole operation. It never
-deletes an installed skill directory. Symlink/junction targets are rejected.
-If copying fails, rollback removes only new files with the expected bytes;
-changed files are retained and reported. This is not a transaction against
-hostile concurrent filesystem changes; avoid concurrent setup/edit operations.
+| Content | Global | Project |
+| --- | --- | --- |
+| Skills | CODEX_HOME/skills/<name> | PROJECT/.agents/skills/<name> |
+| Native role TOMLs | CODEX_HOME/agents | PROJECT/.codex/agents |
+| Runtime | CODEX_HOME/lonic/runtime | PROJECT/.codex/lonic/runtime |
+| Operator configuration | CODEX_HOME/lonic/runtime-config.json | PROJECT/.codex/lonic/runtime-config.json |
 
-Project configuration and custom agents require the normal Codex project trust
-review. No trust bypass is used. User-wide instructions, skills, and plugins may
-still be inherited; project-local setup is not a filesystem security boundary.
+The runtime selection ships runtime-config.example.json beside runtime. Copy it
+to runtime-config.json only as an explicit operator setup step, set approved
+model/executable values, and never put credentials in it. Install/update/removal
+leave the actual operator runtime-config.json alone.
 
-Compare installed files with the chosen source selection:
+Identical target files are retained. Differing bytes refuse normal installation;
+use the reviewed updater instead. Links/junctions refuse. The preview reports
+same-name skills in the opposite scope for the selected project context (cwd by
+default). Decide to remove one installation or explicitly --on-duplicate keep-both
+to acknowledge coexistence; otherwise apply refuses. The other copy is never
+overwritten. A global installer cannot enumerate every project on the machine.
+Future project installations check their own context. Removing a selected bundle
+can affect another selection sharing its files: review the full plan; shared
+ownership/atomic updates remain B13 deferred work.
 
-```sh
-bash bin/check-sync codex --project /absolute/path/to/project --skill core-preview
+Installation copying is not a security boundary. Project trust remains a separate
+Codex decision; the managed mode still requires exact-project trust. The ordinary
+global skill listing observation below does not relax that managed requirement.
+
+Check either scope with the same installer command plus --check (PowerShell
+-Check), or bash bin/check-sync codex --skill powerup-auto [--scope project
+--project PROJECT]. Exit 2 means drift or an unresolved preview collision; exit
+1 is a usage/filesystem error. Check does not overwrite or decide coexistence.
+
+### Native discovery evidence and limits
+
+Windows Codex 0.167.0 zero-turn observations with a disposable HOME/CODEX_HOME:
+user skills under CODEX_HOME/skills were listed without project trust; same-name
+project and user skills were both enabled and returned (repo first). This is not
+proof of a model-side winner. The separate HOME/.agents/skills fixture was not
+listed; the installer does not use that location. CODEX_HOME/agents TOMLs were
+discovered and parsed (a malformed role produced a named parse diagnostic), but
+actual global role dispatch was not tested. config/read did not enumerate the
+valid role. No login or model call was made for these observations.
+
+A user-level tetel MCP registration loaded 14 tools without project trust in
+that same Codex 0.167.0 test. Register it manually in CODEX_HOME/config.toml
+(normally ~/.codex/config.toml), merging with existing settings:
+
+```toml
+[mcp_servers.tetel]
+command = "tetel"
+args = ["mcp"]
 ```
 
-PowerShell uses the same check:
+On Windows, command may instead be an absolute native executable path, for example
+command = 'C:\tools\tetel.exe'. The installer does not add this registration.
+Configuration discovery is not proof of a model invoking a tool. These are
+versioned Windows observations; macOS has not been tested.
 
-```powershell
-& .\bin\install.ps1 codex core-preview -Project 'C:\path\to\project' -Check
-```
+### Runtime lookup
 
-Exit 0 means the selected files match; 2 means missing/different files; 1 means
-a usage, configuration, or filesystem error. This is source/install checking,
-not a claim that Claude and Codex behavior is equivalent.
+Select PROJECT/.codex/lonic/runtime first, then CODEX_HOME/lonic/runtime. The
+read-only helper resolve-installation.cjs in either installation accepts PROJECT
+and queue or evidence and prints selected paths. Invoke the returned absolute
+runtime path, quoting each argument separately. Queue entry-skill lookup also
+prefers PROJECT/.agents/skills over CODEX_HOME/skills, and supplies that explicit
+path to Codex. No project copy is needed for an ordinary globally installed run.
+
+Without --config, queue (--project) and evidence (--repo) combine global
+runtime-config.json with project overrides. Top-level values replace, including
+arrays and objects; invalid present project JSON refuses instead of falling back.
+Explicit --config keeps its prior standalone meaning. Managed launch keeps its
+explicit configuration and admission requirements.
+
+Native test-filter-hook activation remains project-only; that selection refuses
+global scope. A full global runtime contains inert hook files but does not enable
+them. Follow the existing project hook/trust procedure; global activation was
+not established here. Managed mode forbids any enabled native hook.
 
 ## Try the modes
 
@@ -129,10 +179,10 @@ behavior require separate tests; parsing alone does not establish them.
 The module adds codex-install, codex-check-sync, codex-update-plan and codex-update.
 Existing Claude commands keep their behavior. Node.js and Codex/tetel must already
 be installed. Pult uses Bash on Windows (Git for Windows). These commands do not
-install pult or dependencies. Select a project path explicitly. codex-install
+install pult or dependencies. Select global or project scope; project scope requires an explicit path. codex-install
 previews by default; its apply flag needs installation authorization.
 
-Prepare changed package files with bin/manage-codex.cjs preview --project PROJECT
+Prepare changed package files with bin/manage-codex.cjs preview [--scope project --project PROJECT]
 --skill powerup-auto --plan PLAN_JSON. The plan retains old/new bytes and prints
 the exact SHA-256 and file list. Review before running apply --plan PLAN_JSON
 --approved-sha256 HASH. rollback with the same plan/hash restores old bytes and
@@ -150,4 +200,11 @@ These commands do not change credentials or grant native hook trust.
 
 ## Explicit B1 managed option (step 5)
 
-The new `--managed` option is opt-in and is not the older generic "managed bare powerup" wording above. It is experimental: narrow native observations cover enrollment, admission, handoff, cancellation, Node-substitute forced closure and ordinary reconcile; file work is unverified and command execution is not authorized, supported or observed. Ordinary calls are unchanged. Read [managed CLI, enrollment and limits](runtime/managed-cli.md) before selecting it: `--queue-kind file` and an explicit author timeout are mandatory; native hooks (including lonic's filter) are forbidden. Clean bounded work can return `incomplete` with preserved context. No native probe starts automatically.
+The `--managed` option selects the experimental B1 mode explicitly. It is experimental: narrow native observations cover enrollment, admission, handoff, cancellation, Node-substitute forced closure and ordinary reconcile; file work is unverified and command execution is not authorized, supported or observed. Ordinary calls are unchanged. Read [managed CLI, enrollment and limits](runtime/managed-cli.md) before selecting it: `--queue-kind file` and an explicit author timeout are mandatory; native hooks (including lonic's filter) are forbidden. Clean bounded work can return `incomplete` with preserved context. No native probe starts automatically.
+
+For a global update, preview with node bin/manage-codex.cjs preview --skill
+powerup-auto --plan PLAN_JSON; project updates add --scope project --project
+PROJECT. For removal use remove instead of preview: it still only writes a plan,
+and refuses edited target files. Apply and rollback use the saved scope/root and
+exact --approved-sha256. Actual runtime-config.json and config.toml are outside
+the plan's permitted targets. Preserve plans/receipts outside installed files.
