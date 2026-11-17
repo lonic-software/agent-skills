@@ -64,7 +64,7 @@ Two of the agents in this repo (`lonic-design-attacker`, `lonic-grounder`) exist
 | **evolve** | Lets a recurring pattern harden into a durable rule, so the skills sharpen with use instead of drifting | Portable idea; the advisor-gate + memory system are Claude Code |
 | **queue-run** | Works through a project's queue unattended, one item per fresh session, until weekly usage reaches a threshold you set for the run (`/queue-run stop at 60%`) | Claude Code; hands off via the `phase-handoff` mod |
 | **powerup-auto** | `/powerup` + `/queue-run` in one: the queue, worked at full rigor | As above |
-| **queue-fleet** | `/queue-run` with N workers at once, one per worktree slot, coordinated by one script (`/queue-fleet start 2 stop at 60%`, then `/queue-fleet` in each slot) | Claude Code; git worktrees; see [Queue fleet](#queue-fleet) |
+| **queue-fleet** | `/queue-run` with N workers at once, one per worktree slot, coordinated by one script (`/queue-fleet start 2 stop at 60%` starts a background worker per slot) | Claude Code; git worktrees; see [Queue fleet](#queue-fleet) |
 | **powerup-fleet** | `/powerup-auto` as a fleet: the same slots, each worked at full rigor | As above |
 
 `orchestrate` and its `lonic-exec-*` executors were retired in favour of the main session authoring the work itself; see *You are the author* in `powerup`.
@@ -167,7 +167,7 @@ After an auto-compaction, Claude Code re-attaches only skills invoked through th
 
 ## Queue fleet
 
-`/queue-fleet start <N> …` (install `queue-fleet`) runs N queue-run workers in one repository, one per worktree slot; `/powerup-fleet start <N> …` (install `powerup-fleet`) runs the same fleet with the powerup workflow in each slot, as `/powerup-auto` does for one session. `skills/queue-fleet/fleet` holds every shared decision — claims, locks, a FIFO merge turn, budget reservations — under the repository's common git dir; the project's `.claude/fleet.json` declares its heavy commands, serial resources and areas. A repo without a forge lands with `fleet land`. `fleet --self-test` checks it.
+`/queue-fleet start <N> …` (install `queue-fleet`) runs N queue-run workers in one repository, one per worktree slot; `/powerup-fleet start <N> …` (install `powerup-fleet`) runs the same fleet with the powerup workflow in each slot, as `/powerup-auto` does for one session. `fleet launch` starts each slot's worker as a background session (`claude --bg`); `claude agents` lists them, `claude attach <id>` opens one, and `fleet status` marks a worker waiting on you. `skills/queue-fleet/fleet` holds every shared decision — claims, locks, a FIFO merge turn, budget reservations — under the repository's common git dir; the project's `.claude/fleet.json` declares its heavy commands, serial resources and areas. A repo without a forge lands with `fleet land`. `fleet --self-test` checks it.
 
 ## Keeping a checkout and an install in step
 
