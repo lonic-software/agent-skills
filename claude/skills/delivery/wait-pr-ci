@@ -25,7 +25,8 @@
 # its whole process group, and the deadline holds through the sleeps: a stalled forge CLI cannot
 # hang the wait.
 #
-# Forge: .claude/gates.json in the work tree, the fields gate.sh reads: forge, ci, head_cmd (prints
+# Forge: .claude/gates.json on the default branch (origin/HEAD, else main or master; origin's copy,
+# else the local branch), read as gate.sh reads it, never the work tree's. The fields gate.sh reads: forge, ci, head_cmd (prints
 # the head sha; $PR is the change number), checks_cmd (prints [{"name","bucket"}] with bucket
 # pass|fail|pending|skipping|cancel), required_checks. origin on github.com needs no config (gh, every check gh pr
 # checks lists, Actions and external statuses alike); nor does gitlab.com, or "forge": "gitlab"
@@ -52,20 +53,29 @@ bounded() {
     exit($? & 127 ? 128 + ($? & 127) : $? >> 8)' "$@"
 }
 
-CFG=""
+CFG=""   # the config's JSON text
 load_config() {
-  local top
-  top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
-  [ -f "$top/.claude/gates.json" ] || return 0
-  jq -e 'type == "object"' "$top/.claude/gates.json" >/dev/null 2>&1 || die "unparsable $top/.claude/gates.json"
-  CFG="$top/.claude/gates.json"
+  local b="" ref
+  b=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) && b=${b#origin/}
+  if [ -z "$b" ]; then
+    for ref in main master; do
+      { git show-ref -q --verify "refs/remotes/origin/$ref" || git show-ref -q --verify "refs/heads/$ref"; } 2>/dev/null && { b=$ref; break; }
+    done
+  fi
+  [ -n "$b" ] || return 0
+  for ref in "refs/remotes/origin/$b" "refs/heads/$b"; do
+    git rev-parse -q --verify "$ref" >/dev/null 2>&1 || continue
+    CFG=$(git show "$ref:.claude/gates.json" 2>/dev/null) || { CFG=""; return 0; }
+    printf '%s' "$CFG" | jq -e 'type == "object"' >/dev/null 2>&1 || die "unparsable .claude/gates.json on $ref"
+    return 0
+  done
 }
 # has(), not //: a configured false must read as false, not as absent.
-cfg() { [ -n "$CFG" ] && jq -r --arg k "$1" 'if has($k) then .[$k] | tostring else empty end' "$CFG" 2>/dev/null; }
+cfg() { [ -n "$CFG" ] && printf '%s' "$CFG" | jq -r --arg k "$1" 'if has($k) then .[$k] | tostring else empty end' 2>/dev/null; }
 # required_checks as a JSON array of strings ([] when unset).
 required_json() {
   local j=""
-  [ -n "$CFG" ] && j=$(jq -c '.required_checks // [] | if type == "array" then map(tostring) else [tostring] end' "$CFG" 2>/dev/null)
+  [ -n "$CFG" ] && j=$(printf '%s' "$CFG" | jq -c '.required_checks // [] | if type == "array" then map(tostring) else [tostring] end' 2>/dev/null)
   printf '%s\n' "${j:-[]}"
 }
 # The GitLab preset (origin on gitlab.com, or "forge": "gitlab" for a self-hosted instance), run
@@ -243,7 +253,7 @@ esac
 EOF
   chmod +x "$tmp/bin/glab"
   local r
-  for r in gh none gl unk noci glc req; do git init -q "$tmp/$r" || return 1; done
+  for r in gh none gl unk noci glc req; do git init -q -b main "$tmp/$r" || return 1; done
   git -C "$tmp/gh" remote add origin https://github.com/o/r.git
   git -C "$tmp/noci" remote add origin git@github.com:o/r.git
   git -C "$tmp/gl" remote add origin https://gitlab.example.com/o/r.git
@@ -254,6 +264,11 @@ EOF
   mkdir -p "$tmp/gl/.claude" "$tmp/noci/.claude"
   printf '%s\n' '{"forge":"gitlab","head_cmd":"forgecli head $PR","checks_cmd":"forgecli checks $PR"}' > "$tmp/gl/.claude/gates.json"
   printf '%s\n' '{"forge":"github","ci":false}' > "$tmp/noci/.claude/gates.json"
+  # The config is read from the default branch's commit.
+  for r in req gl noci; do
+    ( cd "$tmp/$r" && git add .claude/gates.json && git -c user.email=t@example.invalid -c user.name=t commit -qm gates ) || return 1
+  done
+  printf '{}\n' > "$tmp/req/.claude/gates.json"   # an uncommitted edit, not in force
 
   local H0=0123456789abcdef0123456789abcdef01234567 H1=fedcba9876543210fedcba9876543210fedcba98
   local ONE='[{"name":"cla","bucket":"pass"}]' i MANY_PENDING MANY_PASS

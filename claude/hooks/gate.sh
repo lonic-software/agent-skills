@@ -68,6 +68,17 @@ parse_segment() {
   local seg=$1 w
   set -f; WORDS=($seg); set +f
   ENV_HOME=""; ENV_AUTHOR=""
+  # Redirections are the shell's, not the command's: drop them (and a bare operator's target).
+  local kept=() skip=""
+  for w in ${WORDS[@]+"${WORDS[@]}"}; do
+    if [ -n "$skip" ]; then skip=""; continue; fi
+    case "$w" in
+      '>'|'>>'|'<'|'<<'|'<<<'|'>|'|'&>'|'&>>'|[0-9]'>'|[0-9]'>>'|[0-9]'<') skip=1 ;;
+      '>'*|'<'*|'&>'*|[0-9]'>'*|[0-9]'<'*) ;;
+      *) kept+=("$w") ;;
+    esac
+  done
+  WORDS=(${kept[@]+"${kept[@]}"})
   while [ ${#WORDS[@]} -gt 0 ]; do
     w=${WORDS[0]}
     case "$w" in
@@ -84,10 +95,19 @@ base() { local w=${1##*/}; printf '%s' "$w"; }
 # For a git segment: GIT_SUB = subcommand, GIT_REST = its arguments, GIT_EMAIL = -c user.email,
 # GIT_GLOBAL = the options that pick the repository (-C, --git-dir, --work-tree), replayed on every
 # git the checks run so they read the repository the command targets.
-GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""; GIT_GLOBAL=()
+# GIT_TARGET_UNKNOWN=1 when one of those names a path this hook cannot read (a quoted value it
+# cannot recover unambiguously, or an expansion).
+GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""; GIT_GLOBAL=(); GIT_TARGET_UNKNOWN=""
+# The value of a quoted repository option, from RAW_CMD; empty unless exactly one value is found.
+unq_opt() { # option
+  local vals
+  vals=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' | grep -o -E -- "(^|[[:space:]])$1[[:space:]]+(\"[^\"]*\"|'[^']*')" \
+    | sed -E "s/^[[:space:]]*$1[[:space:]]+[\"']//; s/[\"']\$//" | sort -u)
+  [ -n "$vals" ] && [ "$(printf '%s\n' "$vals" | wc -l | tr -d ' ')" = 1 ] && printf '%s' "$vals"
+}
 parse_git() {
   local i=1 n=${#WORDS[@]} w v
-  GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""; GIT_GLOBAL=()
+  GIT_SUB=""; GIT_REST=(); GIT_EMAIL=""; GIT_GLOBAL=(); GIT_TARGET_UNKNOWN=""
   while [ $i -lt $n ]; do
     w=${WORDS[$i]}
     case "$w" in
@@ -100,9 +120,14 @@ parse_git() {
             Q) v=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' | sed -n -E "s/.*-c[[:space:]]+[\"']user\.email=([^\"']*)[\"'].*/\\1/p" | head -1)
                [ -z "$v" ] || GIT_EMAIL=$v ;;
           esac
-        elif [ "$w" != "--namespace" ]; then GIT_GLOBAL+=("$w" "$v"); fi
+        elif [ "$w" != "--namespace" ]; then
+          [ "$v" != Q ] || v=$(unq_opt "$w")
+          case "$v" in ""|*'$'*|*'`'*) GIT_TARGET_UNKNOWN=1 ;; *) GIT_GLOBAL+=("$w" "$v") ;; esac
+        fi
         i=$((i + 2)) ;;
-      --git-dir=*|--work-tree=*) GIT_GLOBAL+=("$w"); i=$((i + 1)) ;;
+      --git-dir=*|--work-tree=*)
+        case "$w" in *=Q|*'$'*|*'`'*) GIT_TARGET_UNKNOWN=1 ;; *) GIT_GLOBAL+=("$w") ;; esac
+        i=$((i + 1)) ;;
       -*) i=$((i + 1)) ;;
       *) GIT_SUB=$w; GIT_REST=("${WORDS[@]:$((i + 1))}"); return 0 ;;
     esac
@@ -136,6 +161,8 @@ check_git() {
         esac
       done
       local want; want=$(target_want "$cwd")
+      [ -z "$want" ] || [ -z "$GIT_TARGET_UNKNOWN" ] \
+        || deny "git push is refused: this repository sets commit_email, and the repository this push names (git -C/--git-dir) cannot be read from the command. Name the path literally, or cd there first."
       [ -z "$want" ] || check_push_authors "$cwd" "$want" ;;
     rebase)
       case "${GIT_REST[0]:-}" in --abort|--quit) return 0 ;; esac
@@ -143,6 +170,8 @@ check_git() {
     commit)
       # git's precedence: --author, then GIT_AUTHOR_EMAIL, then user.email (-c, then config).
       local email="" want
+      # A repository this hook cannot read is left to the push check, which judges the commit.
+      [ -z "$GIT_TARGET_UNKNOWN" ] || { log "git commit names a repository this hook cannot read; left to the push check"; return 0; }
       for a in ${GIT_REST[@]+"${GIT_REST[@]}"}; do
         case "$a" in --author=*|--author) email=$(printf '%s' "$RAW_CMD" | tr '\n' ' ' | sed -n -E 's/.*--author[= ]+[^<;&|]*<([^>]*)>.*/\1/p' | head -1) ;; esac
       done
@@ -187,8 +216,12 @@ check_push_authors() { # cwd want
   # No refspec at all pushes the current branch; refspecs that are all deletes (:dst) publish nothing.
   if [ ${#srcs[@]} -eq 0 ]; then [ "$specs" = 1 ] && return 0; srcs=(HEAD); fi
   # The push check is the authoritative one: a source it cannot read is a refusal, not a pass.
-  out=$(tgit "$cwd" log --format='%h %ae' "${srcs[@]}" --not --remotes -- 2>&1) \
-    || deny "git push is refused: cannot list the commits it would publish (git log ${srcs[*]} --not --remotes failed: $(printf '%s' "$out" | head -1)). Name the refspec unquoted, or ask the user."
+  local errf; errf=$(mktemp "${TMPDIR:-/tmp}/gate-err.XXXXXX") || oops "mktemp failed"
+  if ! out=$(tgit "$cwd" log --format='%h %ae' "${srcs[@]}" --not --remotes -- 2>"$errf"); then
+    a=$(head -1 "$errf"); rm -f "$errf"
+    deny "git push is refused: cannot list the commits it would publish (git log ${srcs[*]} --not --remotes failed: $a). Name the refspec unquoted, or ask the user."
+  fi
+  rm -f "$errf"
   bad=$(printf '%s\n' "$out" | awk -v w="$want" 'NF && $2 != w' | head -5)
   [ -z "$bad" ] || deny "git push is refused: it would publish commits not authored by the project's commit_email $want (.claude/gates.json): $(printf '%s' "$bad" | tr '\n' ';' | sed 's/;$//; s/;/; /g'). Set git config user.email $want, then re-author them (git commit --amend --reset-author for the last one; ask the user before rewriting more)."
   return 0
@@ -206,7 +239,8 @@ check_push_authors() { # cwd want
 #   sha_flag       the merge command's flag binding the merged head (github default: --match-head-commit)
 #   head_cmd       shell, prints the change's head sha; $PR is the change number
 #   checks_cmd     shell, prints JSON [{"name","bucket"}] with bucket pass|fail|pending|skipping|cancel
-#   files_cmd      shell, prints the change's changed paths, one per line (github and gitlab built in)
+#   files_cmd      shell, prints the change's changed paths, one per line (github and gitlab built
+#                  in); exit 3 = too many to list, which denies
 #   required_checks names that must be listed and pass, on top of the rule that every listed check
 #                  passes or is skipping: a forge lists only the checks that have registered, so a
 #                  required check that has not started yet would otherwise go unnoticed
@@ -220,7 +254,11 @@ CFG=""   # the config's JSON text, not a path
 config_branch() { # cwd
   local b
   b=$(cd "$1" 2>/dev/null && git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) && { echo "${b#origin/}"; return; }
-  for b in main master; do (cd "$1" && git show-ref -q --verify "refs/heads/$b") 2>/dev/null && { echo "$b"; return; }; done
+  for b in main master; do
+    (cd "$1" && { git show-ref -q --verify "refs/remotes/origin/$b" || git show-ref -q --verify "refs/heads/$b"; }) 2>/dev/null && { echo "$b"; return; }
+  done
+  (cd "$1" 2>/dev/null && git rev-parse -q --verify HEAD >/dev/null 2>&1) \
+    && log "no default branch found (no origin/HEAD, main or master) in $1: .claude/gates.json not read, defaults apply. Set it with git remote set-head origin --auto."
 }
 # Prints the default branch's .claude/gates.json (a JSON object), or nothing.
 config_file() { # cwd
@@ -275,7 +313,8 @@ EOF
 # or none yet, is pending or no checks, never green. A job failed with allow_failure is "skipping",
 # as GitLab itself passes the pipeline over it; a pipeline waiting on a manual job is pending.
 GL_HEAD_CMD='glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR" | jq -er .sha'
-GL_FILES_CMD='glab api --paginate "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR/diffs?per_page=100" | jq -r ".[] | .old_path, .new_path"'
+# changes_count reads "N+" once the merge request is past the instance's diff limit: exit 3.
+GL_FILES_CMD='n=$(glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR" | jq -r .changes_count) || exit 1; case "$n" in *+*) exit 3 ;; esac; glab api --paginate "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR/diffs?per_page=100" | jq -r ".[] | .old_path, .new_path"'
 GL_CHECKS_CMD=
 IFS= read -r -d '' GL_CHECKS_CMD <<'EOF' || true
 mr=$(glab api "projects/${GL_PROJECT:-:fullpath}/merge_requests/$PR") || exit 1
@@ -311,7 +350,8 @@ forge_default() { # key
     github:sha_flag)   echo '--match-head-commit' ;;
     github:head_cmd)   echo 'gh pr view "$PR" $REPO_FLAG --json headRefOid -q .headRefOid' ;;
     github:checks_cmd) echo 'gh pr checks "$PR" $REPO_FLAG --json name,bucket' ;;
-    github:files_cmd)  echo 'gh api --paginate "repos/${REPO:-"{owner}/{repo}"}/pulls/$PR/files" --jq ".[] | .filename, (.previous_filename // empty)"' ;;
+    # The files API lists at most 3000 files: past that, exit 3 (too many to check).
+    github:files_cmd)  echo 'n=$(gh pr view "$PR" $REPO_FLAG --json changedFiles -q .changedFiles) || exit 1; [ "$n" -lt 3000 ] || exit 3; gh api --paginate "repos/${REPO:-"{owner}/{repo}"}/pulls/$PR/files" --jq ".[] | .filename, (.previous_filename // empty)"' ;;
     gitlab:merge_cmd)  echo '^glab[[:space:]]+mr[[:space:]]+merge([[:space:]]|$)' ;;
     gitlab:sha_flag)   echo '--sha' ;;
     gitlab:head_cmd)   printf '%s\n' "$GL_HEAD_CMD" ;;
@@ -377,12 +417,17 @@ check_forge_merge() { # cwd
   files_cmd=$(setting files_cmd)
   if [ -z "$files_cmd" ]; then
     log "forge $FORGE: no files_cmd configured; protected paths not checked for $pr"
-  elif files=$(cd "$cwd" 2>/dev/null && PR=$pr REPO_FLAG=${repo:+"-R $repo"} GL_PROJECT=$(printf '%s' "$repo" | sed 's,/,%2F,g') REPO=$repo sh -c "$files_cmd" 2>/dev/null); then
-    deny_protected "$cwd" "the merge of change $pr" <<EOF
+  else
+    local fst=0
+    files=$(cd "$cwd" 2>/dev/null && PR=$pr REPO_FLAG=${repo:+"-R $repo"} GL_PROJECT=$(printf '%s' "$repo" | sed 's,/,%2F,g') REPO=$repo sh -c "$files_cmd" 2>/dev/null) || fst=$?
+    case "$fst" in
+      0) deny_protected "$cwd" "the merge of change $pr" <<EOF
 $files
 EOF
-  else
-    log "files_cmd for $pr failed; protected paths not checked"
+         ;;
+      3) deny "the merge of change $pr is refused: it changes more files than the forge lists, so its protected paths cannot be checked. The user merges this one." ;;
+      *) log "files_cmd for $pr failed; protected paths not checked" ;;
+    esac
   fi
   local ci; ci=$(setting ci); [ -n "$ci" ] || { [ -n "$(cfg checks_cmd)" ] && ci=true || ci=false; }
   if [ "$ci" != "true" ]; then
@@ -414,8 +459,7 @@ EOF
 
 default_branch() { # cwd
   local b; b=$(cfg default_branch); [ -n "$b" ] && { echo "$b"; return; }
-  b=$(cd "$1" 2>/dev/null && git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) && { echo "${b#origin/}"; return; }
-  for b in main master; do (cd "$1" && git show-ref -q --verify "refs/heads/$b") 2>/dev/null && { echo "$b"; return; }; done
+  config_branch "$1"
 }
 
 # A local merge into the default branch (no forge): the merged head must carry a verified stamp.
@@ -565,7 +609,7 @@ EOF
 #!/bin/sh
 [ "${GH_FAIL:-0}" = 1 ] && exit 1
 case "$1 $2" in
-  "pr view")   echo "$GH_HEAD" ;;
+  "pr view")   case "$*" in *changedFiles*) echo "${GH_NFILES:-1}" ;; *) echo "$GH_HEAD" ;; esac ;;
   "pr checks") printf '%s\n' "$GH_CHECKS"; echo "$GH_CHECKS" | grep -q '"pass"' || exit 8 ;;
   "api --paginate")
      # pulls/N/files: GH_FILES_JSON, else GH_FILES (comma-separated) as plain filenames; --jq applied
@@ -590,8 +634,8 @@ case "$2" in
      sha=$GL_SHA
      { [ "$p" = "${GL_EXPECT:-:fullpath}" ] && [ "$iid" = "${GL_IID:-12}" ]; } || sha=ffffffffffffffffffffffffffffffffffffffff
      if [ "${GL_PIPE:-success}" = none ]; then jq -n --arg s "$sha" '{sha: $s, head_pipeline: null}'
-     else jq -n --arg s "$sha" --arg ps "${GL_PIPE_SHA:-$sha}" --arg st "${GL_PIPE:-success}" \
-       '{sha: $s, head_pipeline: {id: 5, sha: $ps, status: $st}}'; fi ;;
+     else jq -n --arg s "$sha" --arg ps "${GL_PIPE_SHA:-$sha}" --arg st "${GL_PIPE:-success}" --arg cc "${GL_CHANGES:-1}" \
+       '{sha: $s, changes_count: $cc, head_pipeline: {id: 5, sha: $ps, status: $st}}'; fi ;;
 esac
 EOF
   chmod +x "$tmp/bin/glab"
@@ -667,6 +711,7 @@ EOF
   allows "protected: the default branch's list is not a prefix match" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".github/workflows/cla.yml.bak"
   printf '{}\n' > "$R/.claude/gates.json"
   denies "protected: the work tree dropping protected_paths does not lift it" "cla.yml, a protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES=".github/workflows/cla.yml"
+  denies "protected: more files than the forge lists"  "more files than the forge lists" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_NFILES=3000
   denies "protected: a rename's old path counts" ".claude/gates.json, a protected path" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES_JSON='[{"filename":"elsewhere.json","previous_filename":".claude/gates.json"}]'
   git -C "$R" checkout -q -- .claude/gates.json
   allows "protected: a files_cmd failure is logged and allowed" "$R" "gh pr merge 12 --match-head-commit $SHA" GH_FILES_FAIL=1
@@ -691,6 +736,8 @@ EOF
   denies "identity: git -C targets the other repository's config" "not the project's commit_email good@example.invalid" "$R" "git -C $I -c user.email=bad@x.invalid commit -m x"
   git -C "$I" config user.email good@example.invalid
   allows "identity: the repository's own config matches"    "$I" "git commit -m x" HOME="$tmp/home2"
+  allows "identity: a quoted git -C path is read"           "$tmp" "git -C \"$I\" commit -m x 2>&1"
+  allows "identity: a git -C target named by an expansion is left to the push" "$I" "git -C \"\$D\" commit -m x"
   ( cd "$I" && git -c user.email=wrong@x.invalid -c user.name=w commit -q --allow-empty -m bad ) || return 1
   denies "identity: a push carrying a wrong author"         "not authored by the project's commit_email" "$I" "git push -u origin HEAD"
   denies "identity: a push naming the branch"               "wrong@x.invalid" "$I" "git push origin $(git -C "$I" symbolic-ref --short HEAD)"
@@ -698,15 +745,30 @@ EOF
   git -C "$I" tag v1
   denies "identity: git push origin tag <name> checks the tag" "wrong@x.invalid" "$I" "git push origin tag v1"
   denies "identity: git -C pushes the other repository's commits" "wrong@x.invalid" "$R" "git -C $I push origin HEAD"
+  denies "identity: a quoted git -C path is read for the push" "wrong@x.invalid" "$tmp" "git -C \"$I\" push origin HEAD"
+  denies "identity: an unreadable git -C target is refused where commit_email is set" "cannot be read from the command" "$I" "git -C \"\$D\" push origin HEAD"
+  allows "identity: an unreadable git -C target passes where none is set" "$tmp" "git -C \"\$D\" push origin HEAD"
   allows "identity: a delete refspec publishes nothing"     "$I" "git push origin :old"
   allows "identity: --delete publishes nothing"             "$I" "git push --delete origin old"
   git -C "$I" update-ref refs/remotes/origin/x HEAD
   ( cd "$I" && git -c user.name=g commit -q --allow-empty -m good ) || return 1
   allows "identity: a push whose new commits all match"     "$I" "git push -u origin HEAD"
+  allows "identity: redirections are not refspecs"          "$I" "git push -u origin HEAD 2>&1 > /dev/null"
+  git -C "$I" branch amb && git -C "$I" tag amb
+  allows "identity: an ambiguous refname's warning is not an author" "$I" "git push origin amb"
   SG_EMAIL=good@example.invalid setgates "$I" ''
   git -C "$I" update-ref refs/remotes/origin/x HEAD
   ( cd "$I" && git -c user.email=wrong@x.invalid -c user.name=w commit -q --allow-empty -m bad2 ) || return 1
   allows "identity: no commit_email, no author check"       "$I" "git push origin HEAD"
+  # the config branch: origin/main with no origin/HEAD and no local main
+  local FB="$tmp/fbrepo"
+  ( git init -q -b work "$FB" && cd "$FB" && git remote add origin https://github.com/o/r.git && mkdir .claude \
+    && printf '{"commit_email":"good@example.invalid"}\n' > .claude/gates.json && git add . \
+    && git -c user.email=good@example.invalid -c user.name=g commit -qm c && git update-ref refs/remotes/origin/main HEAD ) || return 1
+  denies "config: origin/main is read with no origin/HEAD or local main" "not the project's commit_email" "$FB" "git -c user.email=bad@x.invalid commit -m x"
+  ( cd "$FB" && git update-ref -d refs/remotes/origin/main ) || return 1
+  allows "config: no default branch at all: defaults apply" "$FB" "git -c user.email=bad@x.invalid commit -m x"
+  grep -q "no default branch found" "$GATE_LOG" && echo "ok   no default branch is logged" || { echo "FAIL no default branch is logged"; fails=$((fails + 1)); }
   # a configured non-GitHub forge
   G="$tmp/glrepo"
   allows "other forge: sha pinned, checks green"   "$G" "forgecli merge 7 --sha $SHA"
@@ -728,6 +790,7 @@ EOF
   denies "gitlab: -R reaches the named project"     "not $SHA" "$L" "glab mr merge 12 -R oth/er --sha $SHA" GL_SHA=$SHA GL_EXPECT=grp%2Fproj
   allows "gitlab: a URL names the merge request"    "$L" "glab mr merge https://gitlab.com/o/r/-/merge_requests/12 --sha=$SHA" GL_SHA=$SHA
   allows "gitlab: --squash-message's value is not the iid" "$L" "glab mr merge --squash-message 99 12 --sha $SHA" GL_SHA=$SHA
+  denies "gitlab: past the instance's diff limit"   "more files than the forge lists" "$L" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA GL_CHANGES=1000+
   denies "gitlab: a protected path in the diffs"    "protected path" "$L" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA GL_FILES='[{"old_path":".claude/fleet.json","new_path":".claude/fleet.json"}]'
   setgates "$G" '{"forge":"gitlab"}'
   allows "self-hosted: \"forge\": \"gitlab\" alone uses the preset" "$G" "glab mr merge 12 --sha $SHA" GL_SHA=$SHA

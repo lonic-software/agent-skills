@@ -152,13 +152,22 @@ cfg_template() {
 EOF
 }
 
+# The main ref's committed .claude/gates.json (a JSON object), never the work tree's, as gate.sh
+# reads it; empty when absent. Refuses one that does not parse.
+main_gates() { # tree ref
+  local j
+  j=$(cd "$1" && git show "$2:.claude/gates.json" 2>/dev/null) || return 0
+  printf '%s' "$j" | jq -e 'type == "object"' >/dev/null 2>&1 || refuse "$2:.claude/gates.json is not a JSON object"
+  printf '%s\n' "$j"
+}
+
 # A GitHub repository with CI and no required_checks: the gate counts only the checks listed so far,
 # and nothing on the forge stops a merge from its web UI while CI is pending.
-gates_warn() { # top
-  local g="$1/.claude/gates.json" forge="" ci="" req=0 url
-  if [ -f "$g" ]; then
-    forge=$(jq -r '.forge // empty' "$g"); ci=$(jq -r 'if has("ci") then .ci | tostring else empty end' "$g")
-    req=$(jq -r '.required_checks // [] | length' "$g")
+gates_warn() { # top gates-json
+  local g=$2 forge="" ci="" req=0 url
+  if [ -n "$g" ]; then
+    forge=$(printf '%s' "$g" | jq -r '.forge // empty'); ci=$(printf '%s' "$g" | jq -r 'if has("ci") then .ci | tostring else empty end')
+    req=$(printf '%s' "$g" | jq -r '.required_checks // [] | length')
   fi
   if [ -z "$forge" ]; then
     url=$(git -C "$1" remote get-url origin 2>/dev/null); case "$url" in *github.com[:/]*) forge=github ;; esac
@@ -204,16 +213,16 @@ cmd_init() {
     jq -e '.version_lines | type == "object" and (.pattern | type == "string") and ((.paths // []) | type == "array")' "$cfg" >/dev/null \
       || refuse "version_lines needs {\"pattern\": ERE, \"paths\": [globs]}"
   fi
-  local gates="$top/.claude/gates.json" want have
-  if [ -f "$gates" ]; then
-    jq -e 'type == "object"' "$gates" >/dev/null 2>&1 || refuse "$gates is not a JSON object"
-    want=$(jq -r '.commit_email // empty' "$gates")
+  local gates want have
+  gates=$(main_gates "$top" "$(jq -r .main_ref "$cfg")") || exit $?
+  if [ -n "$gates" ]; then
+    want=$(printf '%s' "$gates" | jq -r '.commit_email // empty')
     if [ -n "$want" ]; then
       have=$(git config user.email 2>/dev/null)
       [ "$have" = "$want" ] || refuse "the commit email here is '${have:-unset}', not the project's commit_email $want; set it in the repository's own config (git config user.email $want), which every slot shares"
     fi
   fi
-  gates_warn "$top"
+  gates_warn "$top" "$gates"
   jq -e '[.serial_resources[] | .kind] | all(. == "pool" or . == "counter")' "$cfg" >/dev/null \
     || refuse "every serial resource needs kind \"pool\" or \"counter\""
   S=$(state_dir)
@@ -555,20 +564,34 @@ collisions_check() { # tree → returns, or refuses
   ref=$(jq -r .main_ref "$S/config.json")
   head=$(cd "$tree" && git rev-parse -q --verify HEAD) || refuse "no HEAD in $tree"
   tip=$(cd "$tree" && git rev-parse -q --verify "$ref^{commit}") || refuse "main_ref '$ref' does not resolve"
+  (cd "$tree" && git merge-base --is-ancestor "$tip" "$head") \
+    || refuse "HEAD does not contain $ref's tip $tip: fetch, merge it in (never rebase), re-verify"
+  version_lines_check "$tree" "$tip" "$head"
+  # Last, the one network step: a remote that cannot be read skips only this freshness check.
   full=$(cd "$tree" && git rev-parse --symbolic-full-name "$ref" 2>/dev/null)
   case "$full" in
     refs/remotes/*/*)
       rest=${full#refs/remotes/}; remote=${rest%%/*}; branch=${rest#*/}
       # Bounded and non-interactive: the gate runs this inside a hook. A remote that cannot be read
       # is an error (exit 2), not a refusal: the merge itself needs that remote anyway.
-      rtip=$(cd "$tree" && GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes" \
-        perl -e 'alarm 30; exec @ARGV' git ls-remote "$remote" "refs/heads/$branch" 2>/dev/null | cut -f1)
+      rtip=$(cd "$tree" && GIT_TERMINAL_PROMPT=0 batch_ssh perl -e 'alarm 30; exec @ARGV' \
+        git ls-remote "$remote" "refs/heads/$branch" 2>/dev/null | cut -f1)
       [ -n "$rtip" ] || die "cannot read $remote's $branch (git ls-remote $remote refs/heads/$branch); retry once the remote answers"
       [ "$rtip" = "$tip" ] || refuse "$ref is at $tip, but $remote's $branch is at $rtip: fetch, merge it in, re-verify"
       ;;
   esac
-  (cd "$tree" && git merge-base --is-ancestor "$tip" "$head") \
-    || refuse "HEAD does not contain $ref's tip $tip: fetch, merge it in (never rebase), re-verify"
+}
+# Runs a command with ssh made non-interactive, keeping the repository's own ssh command (env, then
+# core.sshCommand). A GIT_SSH program takes no options, so it is left as it is.
+batch_ssh() {
+  local c=${GIT_SSH_COMMAND:-$(git config core.sshCommand 2>/dev/null)}
+  if [ -n "$c" ]; then GIT_SSH_COMMAND="$c -o BatchMode=yes" "$@"
+  elif [ -n "${GIT_SSH:-}" ]; then "$@"
+  else GIT_SSH_COMMAND="ssh -o BatchMode=yes" "$@"; fi
+}
+# A merge of main that kept a version line both sides added from the merge base: refuses.
+version_lines_check() { # tree tip head
+  local tree=$1 tip=$2 head=$3
   jq -e '.version_lines.pattern // empty' "$S/config.json" >/dev/null 2>&1 || return 0
   local specs=() p m b t1 t2 hits="" f l
   VPAT=$(jq -r .version_lines.pattern "$S/config.json"); export VPAT
@@ -642,7 +665,8 @@ cmd_land() {
   collisions_check "$SLOT_PATH"
   g=$(cd "$SLOT_PATH" && git rev-parse --path-format=absolute --git-common-dir); stamp="$g/verified/$head"
   [ -f "$stamp" ] || refuse "HEAD $head has no verified stamp; run delivery/verify-head -- <the complete local suites> under fleet with-lock first"
-  want=$(jq -r '.verify_cmd // empty' "$SLOT_PATH/.claude/gates.json" 2>/dev/null)
+  g=$(main_gates "$SLOT_PATH" "$full") || exit $?
+  want=$(printf '%s' "$g" | jq -r '.verify_cmd // empty' 2>/dev/null)
   [ -z "$want" ] || [ "$(head -1 "$stamp")" = "$want" ] || refuse "the stamp for $head was made by '$(head -1 "$stamp")', not the configured verify_cmd '$want'"
   local new=$head
   if [ -n "$squash" ]; then
@@ -726,11 +750,14 @@ self_test() {
 EOF
   expect "init refuses a command that is not a name" 2 "slash command" "$tmp/main" \
     "$self" init --workers 2 --threshold 60 --queue q --merge-authority x --command "a b"
-  printf '%s\n' '{"commit_email":"other@example.invalid"}' > "$tmp/main/.claude/gates.json"
+  # gates.json is read from the main ref's commit: commit and push it, then edit the work tree.
+  gpush() { ( cd "$tmp/main" && printf '%s\n' "$1" > .claude/gates.json && git add .claude/gates.json && git commit -qm gates && git push -q origin main ); }
+  gpush '{"commit_email":"other@example.invalid"}'
+  printf '{}\n' > "$tmp/main/.claude/gates.json"
   expect "init refuses a commit email other than the project's" 3 "not the project's commit_email other@example.invalid" "$tmp/main" \
     "$self" init --workers 2 --threshold 60 --queue q --merge-authority x
   [ ! -d "$tmp/main/.git/fleet" ] && ok "a refused init leaves no state" || bad "a refused init leaves no state"
-  printf '%s\n' '{"forge":"github","commit_email":"t@example.invalid"}' > "$tmp/main/.claude/gates.json"
+  gpush '{"forge":"github","commit_email":"t@example.invalid"}'
   expect "init creates the slots, naming the worker command" 0 "then: /powerup-fleet" "$tmp/main" \
     "$self" init --workers 2 --threshold 60 --queue q --merge-authority "merge on green" --command /powerup-fleet
   printf '%s' "$out" | grep -q "names no required_checks" && ok "init warns: GitHub with CI and no required_checks" \
@@ -820,6 +847,14 @@ EOF
   printf 'suite\nt\n' > "$L/.git/verified/$(git -C "$LW" rev-parse HEAD)"
   expect "no forge: land refuses renaming a protected path away" 3 ".claude/fleet.json, a protected path" "$LW" "$self" land
   (cd "$LW" && git reset -q --hard HEAD~1)
+  # verify_cmd comes from main's commit: a work-tree edit git does not see changes nothing
+  (cd "$L" && git checkout -q main && printf '{"verify_cmd":"suite"}\n' > .claude/gates.json && git add .claude/gates.json \
+    && git commit -qm vc && git checkout -q --detach) || bad "verify_cmd setup"
+  (cd "$LW" && git merge -q --ff-only main && echo 3 > f && git commit -qam three \
+    && git update-index --skip-worktree .claude/gates.json && printf '{"verify_cmd":"other"}\n' > .claude/gates.json)
+  printf 'other\nt\n' > "$L/.git/verified/$(git -C "$LW" rev-parse HEAD)"
+  expect "no forge: land reads verify_cmd from main, not the work tree" 3 "not the configured verify_cmd 'suite'" "$LW" "$self" land
+  (cd "$LW" && git update-index --no-skip-worktree .claude/gates.json && git checkout -q -- .claude/gates.json)
   # collisions: a version line both sides of a merge added, against a real remote
   local CO="$tmp/corigin.git" CM="$tmp/cmain"
   git init -q --bare "$CO"; git clone -q "$CO" "$CM" 2>/dev/null
@@ -860,11 +895,22 @@ EOF
   expect "collisions: a main ref behind the remote is refused" 3 "but origin's main is at" "$CW" "$self" collisions
   git -C "$CW" fetch -q origin
   expect "collisions: HEAD lacking the main ref's tip is refused" 3 "does not contain origin/main's tip" "$CW" "$self" collisions
+  git -C "$CM" remote set-url origin "$tmp/no-such-origin.git"
+  expect "collisions: the local checks run before the remote is read" 3 "does not contain origin/main's tip" "$CW" "$self" collisions
+  git -C "$CM" remote set-url origin "$CO"
   git -C "$CW" merge -q --no-edit origin/main >/dev/null
   git -C "$CM" remote set-url origin "$tmp/no-such-origin.git"
   expect "collisions: a remote that cannot be read is an error, not a refusal" 2 "cannot read origin's main" "$CW" "$self" collisions
   git -C "$CM" remote set-url origin "$CO"
   expect "collisions: back in step once the remote answers" 0 "no collisions" "$CW" "$self" collisions
+  # ssh: the repository's own core.sshCommand is kept, made non-interactive
+  printf '#!/bin/sh\necho "$*" >> "%s/ssh.log"; exit 1\n' "$tmp" > "$tmp/fakessh"; chmod +x "$tmp/fakessh"
+  git -C "$CM" config core.sshCommand "$tmp/fakessh -i key"
+  git -C "$CM" remote set-url origin "ssh://git@example.invalid/o/r.git"
+  expect "collisions: an ssh remote that refuses is an error" 2 "cannot read origin's main" "$CW" "$self" collisions
+  grep -q -- "-i key -o BatchMode=yes" "$tmp/ssh.log" 2>/dev/null && ok "collisions: core.sshCommand is kept, with BatchMode" \
+    || bad "collisions: core.sshCommand is kept, with BatchMode" "$(cat "$tmp/ssh.log" 2>/dev/null)"
+  git -C "$CM" config --unset core.sshCommand; git -C "$CM" remote set-url origin "$CO"
   kill "$P5" 2>/dev/null; wait "$P5" 2>/dev/null
   # launch, against a fake claude: --bg starts a sleep and records it as a session.
   local FB="$tmp/fakebin"; mkdir -p "$FB"

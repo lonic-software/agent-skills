@@ -195,8 +195,8 @@ prints a template (and the gate template, when that file is absent too). Its fie
 `fleet end` and a new `fleet init`.
 
 `.claude/gates.json` is the merge gate's config, read by `gate.sh` in every session, fleet or not.
-The gate reads the default branch's committed copy (origin's, else the local branch), never the work
-tree's: a change, or an uncommitted edit, cannot loosen the rules that judge it, and an edit is in
+The gate, `wait-pr-ci` and `fleet` read the default branch's committed copy (origin's, else the local
+branch; `fleet` reads its `main_ref`'s), never the work tree's: a change, or an uncommitted edit, cannot loosen the rules that judge it, and an edit is in
 force once it is on the default branch. Every field is optional, and GitHub with CI needs none of them:
 - `forge` — `github`, `gitlab`, `other` or `none`. Default: `github` when origin is on github.com,
   `none` with no remote. Any other remote is unrecognized: its merges are logged, not gated, until
@@ -209,7 +209,8 @@ force once it is on the default branch. Every field is optional, and GitHub with
   or skipping. A forge lists only the checks that have registered, so name the ones a merge needs;
   on GitHub, require the same ones on the forge (a ruleset), or its web UI can merge while CI is
   pending. `fleet init` warns when GitHub with CI names none.
-- `files_cmd` — shell printing change `$PR`'s changed paths. Built in for GitHub and GitLab.
+- `files_cmd` — shell printing change `$PR`'s changed paths, both sides of a rename; exit 3 means more
+  files than the forge lists, which denies the merge. Built in for GitHub and GitLab.
 - `protected_paths` — globs no session merges: the user merges those changes.
   `.claude/gates.json` and `.claude/fleet.json` are always protected, renames included.
 - `commit_email` — the author email every commit and push must carry. The gate refuses a commit
