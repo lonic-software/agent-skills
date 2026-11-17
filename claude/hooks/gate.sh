@@ -737,7 +737,7 @@ EOF
   git -C "$I" config user.email good@example.invalid
   allows "identity: the repository's own config matches"    "$I" "git commit -m x" HOME="$tmp/home2"
   allows "identity: a quoted git -C path is read"           "$tmp" "git -C \"$I\" commit -m x 2>&1"
-  allows "identity: a git -C target named by an expansion is left to the push" "$I" "git -C \"\$D\" commit -m x"
+  allows "identity: a git -C target named by an expansion is left to the push" "$I" "git -C \"\$D\" -c user.email=bad@x.invalid commit -m x"
   ( cd "$I" && git -c user.email=wrong@x.invalid -c user.name=w commit -q --allow-empty -m bad ) || return 1
   denies "identity: a push carrying a wrong author"         "not authored by the project's commit_email" "$I" "git push -u origin HEAD"
   denies "identity: a push naming the branch"               "wrong@x.invalid" "$I" "git push origin $(git -C "$I" symbolic-ref --short HEAD)"
