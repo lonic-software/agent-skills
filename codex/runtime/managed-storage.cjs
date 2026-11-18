@@ -2,6 +2,7 @@
 const fs = require('node:fs'),
   path = require('node:path'),
   { randomUUID, createHash } = require('node:crypto');
+const { tempPath } = require('./trusted-path.cjs');
 function regular(file) {
   const s = fs.lstatSync(file);
   if (
@@ -59,6 +60,7 @@ function writeJSON(file, value, exclusive = false) {
   fs.renameSync(temp, file);
 }
 function projectState(root, project) {
+  root = tempPath(root);
   directory(root);
   const canonical = fs.realpathSync(project),
     relative = path.relative(canonical, fs.realpathSync(root));
@@ -85,7 +87,7 @@ function projectState(root, project) {
 // All calls are made while the cooperative project gate is held. Persisted
 // records are recovery obligations, never authority to kill or resume a PID.
 function createIntentJournal(dir, runId) {
-  const file = path.join(dir, 'intent.json');
+  const file = path.join(tempPath(dir), 'intent.json');
   let state;
   const save = () => writeJSON(file, state);
   return Object.freeze({

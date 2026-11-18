@@ -77,7 +77,7 @@ async function fixture(action) {
     });
   } finally {
     assert.equal(signals, 0);
-    if (path.dirname(root) !== fs.realpathSync(os.tmpdir()))
+    if (path.dirname(fs.realpathSync(root)) !== fs.realpathSync(os.tmpdir()))
       throw Error('PATH');
     fs.rmSync(root, { recursive: true });
   }

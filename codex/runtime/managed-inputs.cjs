@@ -29,6 +29,8 @@ function createManagedInputs({
     fail();
   const { cleanGitEnvironment } = require('./managed-git-env.cjs');
   const cleanedEnv = cleanGitEnvironment(env);
+  const { tempPath } = require('./trusted-path.cjs');
+  cwd = tempPath(cwd);
   const root = fs.realpathSync(cwd);
   if (path.resolve(cwd) !== root) fail();
   const inside = (p) => {
@@ -36,6 +38,7 @@ function createManagedInputs({
     return r !== '..' && !r.startsWith('..' + path.sep) && !path.isAbsolute(r);
   };
   function bytes(file, allowMissing = false) {
+    file = tempPath(file);
     if (!inside(file)) fail();
     // A missing leaf behind a junction/symlink is not an ordinary deletion.
     // Inspect existing components even when the final pathname is absent.

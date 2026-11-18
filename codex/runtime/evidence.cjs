@@ -6,18 +6,11 @@ const fs = require('node:fs'),
   crypto = require('node:crypto'),
   { execFileSync } = require('node:child_process');
 function noLinks(target) {
-  const full = path.resolve(target),
-    root = path.parse(full).root;
-  let current = root;
-  for (const part of full.slice(root.length).split(path.sep).filter(Boolean)) {
-    current = path.join(current, part);
-    try {
-      if (fs.lstatSync(current).isSymbolicLink())
-        throw Error('Refusing linked job path: ' + current);
-    } catch (e) {
-      if (e.code !== 'ENOENT') throw e;
-    }
-  }
+  return require('./trusted-path.cjs').checkedPath(
+    target,
+    [],
+    'Refusing linked job path',
+  );
 }
 function within(root, file) {
   const rel = path.relative(root, file);
@@ -33,7 +26,7 @@ function createJob({ configFile, mode, repo, memo }) {
     throw Error('Source repository and rendered memo are required');
   let config;
   if (configFile) {
-    noLinks(configFile);
+    configFile = noLinks(configFile);
     config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
   } else config = require('./resolve-installation.cjs').config(repo);
   const known = new Set([
@@ -64,10 +57,8 @@ function createJob({ configFile, mode, repo, memo }) {
   const timeoutMs = config.timeoutMs ?? 240000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 900000)
     throw Error('Timeout must be 1000..900000 ms');
-  noLinks(repo);
-  noLinks(memo);
   repo = fs.realpathSync(repo);
-  memo = fs.realpathSync(memo);
+  memo = fs.realpathSync(noLinks(memo));
   if (!fs.statSync(repo).isDirectory() || !fs.statSync(memo).isFile())
     throw Error('Expected source directory and memo file');
   if (within(repo, memo))
@@ -83,7 +74,7 @@ function createJob({ configFile, mode, repo, memo }) {
   const pin = git(['rev-parse', 'HEAD']);
   if (!/^[0-9a-f]{40}$/.test(pin))
     throw Error('Expected a full source commit ID');
-  const parent = path.resolve(
+  const parent = noLinks(
     config.runRoot || path.join(os.tmpdir(), 'lonic-codex-evidence'),
   );
   noLinks(parent);

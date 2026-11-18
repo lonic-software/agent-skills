@@ -40,7 +40,7 @@ test('profile baseline is run-local content hash/size, auth stays metadata-only'
     assert.equal(guard.verify(), false);
     fs.writeFileSync(config, 'new baseline');
     assert.equal(guard.verify(), false);
-    assert.ok(reads.every((file) => file === config));
+    assert.ok(reads.every((file) => file === fs.realpathSync(config)));
     const next = createProfileGuard(root, { io });
     fs.utimesSync(auth, new Date(), new Date(Date.now() + 20000));
     assert.equal(next.verify(), false);

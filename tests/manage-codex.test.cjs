@@ -80,14 +80,22 @@ test('links and altered plans are refused', (t) => {
     p = savePlan(s.repo, s.project, 'example', s.file);
   fs.appendFileSync(s.file, ' ');
   assert.throws(() => transact(s.file, p.sha256), /digest/);
-  const link = path.join(s.root, 'link');
+  const linkedProject = path.join(s.root, 'linked-project');
+  fs.mkdirSync(linkedProject);
+  const link = path.join(linkedProject, '.agents');
   fs.symlinkSync(
     s.project,
     link,
     process.platform === 'win32' ? 'junction' : 'dir',
   );
   assert.throws(
-    () => savePlan(s.repo, link, 'example', path.join(s.root, 'second.json')),
+    () =>
+      savePlan(
+        s.repo,
+        linkedProject,
+        'example',
+        path.join(s.root, 'second.json'),
+      ),
     /link|junction/,
   );
 });

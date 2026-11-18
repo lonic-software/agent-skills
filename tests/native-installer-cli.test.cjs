@@ -21,6 +21,11 @@ test('native installer accepts full-preview and preserves preview/check semantic
     recursive: true,
   });
   fs.mkdirSync(project);
+  fs.mkdirSync(path.join(repo, 'codex/runtime'), { recursive: true });
+  fs.copyFileSync(
+    path.join(__dirname, '../codex/runtime/trusted-path.cjs'),
+    path.join(repo, 'codex/runtime/trusted-path.cjs'),
+  );
   for (const name of ['install', 'install.ps1', 'install-codex.cjs'])
     fs.copyFileSync(
       path.join(__dirname, '..', 'bin', name),

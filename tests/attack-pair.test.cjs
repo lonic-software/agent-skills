@@ -172,7 +172,7 @@ test('peer ledger findings are not returned by check and direct ledger reads are
   assert.equal(calls.length, 0);
   await call('run', {
     workspace: job.workspace,
-    command: ['git', '-C', x.repo, 'rev-parse', 'HEAD'],
+    command: ['git', '-C', fs.realpathSync(x.repo), 'rev-parse', 'HEAD'],
   });
   fs.writeFileSync(x.memo + '.evidence.jsonl', 'EXAMPLE SECRET PEER FINDING');
   const denied = await call('look', {

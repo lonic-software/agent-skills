@@ -508,11 +508,13 @@ test('both roles receive exact allowed paths and the native-probe exclusion', (t
     const s = setup(t, { mode }),
       text = readScopeInstructions(s.job);
     assert.ok(text.includes(JSON.stringify(fs.realpathSync(s.repo))));
-    assert.ok(text.includes(JSON.stringify(s.memo)));
+    assert.ok(text.includes(JSON.stringify(fs.realpathSync(s.memo))));
     assert.match(text, /native-probes.*NOT readable/);
     assert.match(text, /citation is not permission/);
     if (mode === 'attacker')
-      assert.ok(text.includes(JSON.stringify(s.memo + '.tetel')));
+      assert.ok(
+        text.includes(JSON.stringify(fs.realpathSync(s.memo + '.tetel'))),
+      );
     else assert.match(text, /grounder cannot read the memo or snapshot/);
   }
 });

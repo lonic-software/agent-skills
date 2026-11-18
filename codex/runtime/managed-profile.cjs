@@ -3,6 +3,7 @@ const fs = require('node:fs'),
   path = require('node:path'),
   { createHash } = require('node:crypto');
 function createProfileGuard(profile, { io = fs, audit = () => {} } = {}) {
+  profile = require('./trusted-path.cjs').tempPath(profile);
   const root = io.realpathSync(profile);
   if (root !== path.resolve(profile) || io.lstatSync(profile).isSymbolicLink())
     throw Error('MANAGED_PROFILE_UNCERTAIN');

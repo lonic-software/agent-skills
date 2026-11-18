@@ -3,15 +3,16 @@ const fs = require('node:fs'),
   path = require('node:path'),
   os = require('node:os');
 const { plainPath } = require('./queue-checkpoint.cjs');
+const { trustedRoot } = require('./trusted-path.cjs');
 function codeHome(value) {
-  return plainPath(
+  return trustedRoot(
     path.resolve(
       value || process.env.CODEX_HOME || path.join(os.homedir(), '.codex'),
     ),
   );
 }
 function roots(project, home) {
-  return { project: plainPath(path.resolve(project)), home: codeHome(home) };
+  return { project: trustedRoot(project), home: codeHome(home) };
 }
 function file(p) {
   plainPath(p);

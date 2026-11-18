@@ -4,21 +4,7 @@ const fs = require('node:fs'),
   crypto = require('node:crypto');
 const digest = (value) =>
   crypto.createHash('sha256').update(value).digest('hex');
-function plainPath(target) {
-  const full = path.resolve(target),
-    parts = full.slice(path.parse(full).root.length).split(path.sep);
-  let cursor = path.parse(full).root;
-  for (const part of parts) {
-    cursor = path.join(cursor, part);
-    try {
-      if (fs.lstatSync(cursor).isSymbolicLink())
-        throw Error('Checkpoint paths must not traverse links');
-    } catch (e) {
-      if (e.code !== 'ENOENT') throw e;
-    }
-  }
-  return full;
-}
+const { checkedPath: plainPath } = require('./trusted-path.cjs');
 function validate(data) {
   for (const key of [
     'runId',
@@ -54,7 +40,7 @@ function validate(data) {
     throw Error('Checkpoint must carry the matching run budget');
 }
 function readCheckpoint(file) {
-  plainPath(file);
+  file = plainPath(file);
   const envelope = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (
     envelope.schema !== 1 ||
@@ -104,6 +90,7 @@ function writeCheckpoint(directory, id, data) {
 function claimCheckpoint(file, expectedHash, consumerId) {
   if (typeof consumerId !== 'string' || !consumerId.trim())
     throw Error('Consumer identity is required');
+  file = plainPath(file);
   const saved = readCheckpoint(file);
   if (saved.sha256 !== expectedHash)
     throw Error('Checkpoint changed before continuation');

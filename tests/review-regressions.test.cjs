@@ -278,10 +278,8 @@ test('failed budget rename preserves the old receipt and removes its own temp fi
 });
 test('stale queue lock retains owner metadata and blocks session startup', async (t) => {
   const s = queue(t),
-    key =
-      process.platform === 'win32'
-        ? s.options.project.toLowerCase()
-        : s.options.project,
+    project = fs.realpathSync(s.options.project),
+    key = process.platform === 'win32' ? project.toLowerCase() : project,
     lock = path.join(
       os.tmpdir(),
       'lonic-codex-queue-locks',

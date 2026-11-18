@@ -11,6 +11,7 @@ const TOOL_SETS = {
   grounder: ['brief', 'look', 'run', 'fact', 'record', 'query', 'workspaces'],
   attacker: ['check', 'look', 'run', 'fact', 'record', 'query', 'workspaces'],
 };
+const { tempPath } = require('./trusted-path.cjs');
 class ReadScopeError extends Error {}
 function summarizeGateAudit(audit) {
   const deniedReads = audit.filter((e) => e.kind === 'read-denied');
@@ -24,8 +25,8 @@ function summarizeGateAudit(audit) {
 }
 function readScopeInstructions(job) {
   const repo = JSON.stringify(fs.realpathSync(job.repo)),
-    memo = JSON.stringify(path.resolve(job.memo)),
-    snapshot = JSON.stringify(path.resolve(job.memo) + '.tetel');
+    memo = JSON.stringify(tempPath(job.memo)),
+    snapshot = JSON.stringify(tempPath(job.memo) + '.tetel');
   return (
     'Bound read scope: after the exact pin check, look may read resolved paths under source root ' +
     repo +
@@ -55,7 +56,7 @@ function createBoundGate(catalog, upstream, job, audit) {
   if (!/^[0-9a-f]{40}$/.test(job.pin))
     throw Error('A full Git commit pin is required');
   const root = fs.realpathSync(job.repo),
-    memo = path.resolve(job.memo);
+    memo = tempPath(job.memo);
   const key = (p) => (process.platform === 'win32' ? p.toLowerCase() : p);
   const equal = (a, b) => key(a) === key(b);
   const inside = (base, p) => {
@@ -168,13 +169,10 @@ function createBoundGate(catalog, upstream, job, audit) {
         return deny('Workspace does not match this run');
       if (
         name === 'brief' &&
-        (args.authoring || !args.memo || !equal(path.resolve(args.memo), memo))
+        (args.authoring || !args.memo || !equal(tempPath(args.memo), memo))
       )
         return deny('Brief is restricted to the assigned memo');
-      if (
-        name === 'check' &&
-        (!args.file || !equal(path.resolve(args.file), memo))
-      )
+      if (name === 'check' && (!args.file || !equal(tempPath(args.file), memo)))
         return deny('Check is restricted to the assigned memo');
       if (name === 'look') {
         if (!pinned) return deny('Pinned source must be checked before reads');
@@ -218,7 +216,7 @@ function createBoundGate(catalog, upstream, job, audit) {
       if (
         name === 'record' &&
         (!args.memo ||
-          !equal(path.resolve(args.memo), memo) ||
+          !equal(tempPath(args.memo), memo) ||
           !args.from_fact ||
           args.input != null)
       )

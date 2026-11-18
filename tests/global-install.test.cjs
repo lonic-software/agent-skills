@@ -72,7 +72,7 @@ test('global CLI default previews, installs once and serves a second project wit
   fs.mkdirSync(other);
   assert.equal(
     resolve.skill(other, 'consult', f.home),
-    path.join(f.home, 'skills/consult/SKILL.md'),
+    fs.realpathSync(path.join(f.home, 'skills/consult/SKILL.md')),
   );
   assert.ok(fs.existsSync(path.join(f.home, 'agents/lonic-advisor-low.toml')));
   assert.deepEqual(fs.readdirSync(f.project), []);
@@ -102,7 +102,7 @@ test('cross-scope collision requires a decision, including a collision appearing
   assert.equal(bytes.toString(), 'EXAMPLE original');
   assert.equal(
     resolve.skill(f.project, 'sample', f.home),
-    path.join(f.project, '.agents/skills/sample/SKILL.md'),
+    fs.realpathSync(path.join(f.project, '.agents/skills/sample/SKILL.md')),
   );
   const g = fixture(t);
   source(g);
@@ -195,7 +195,7 @@ test('runtime and configuration lookup prefer project, merge top-level overrides
   );
   assert.equal(
     resolve.runtime(f.project, 'queue', f.home),
-    path.join(f.home, 'lonic/runtime/queue.cjs'),
+    fs.realpathSync(path.join(f.home, 'lonic/runtime/queue.cjs')),
   );
   assert.equal(resolve.config(f.project, f.home).model, 'EXAMPLE-global');
   const entry = path.join(f.project, '.codex/lonic/runtime/queue.cjs'),
@@ -205,7 +205,10 @@ test('runtime and configuration lookup prefer project, merge top-level overrides
     config,
     JSON.stringify({ model: 'EXAMPLE-project', allowedCommands: [] }),
   );
-  assert.equal(resolve.runtime(f.project, 'queue', f.home), entry);
+  assert.equal(
+    resolve.runtime(f.project, 'queue', f.home),
+    fs.realpathSync(entry),
+  );
   assert.equal(resolve.config(f.project, f.home).codex, 'EXAMPLE');
   assert.equal(resolve.config(f.project, f.home).model, 'EXAMPLE-project');
   assert.deepEqual(resolve.config(f.project, f.home).allowedCommands, []);

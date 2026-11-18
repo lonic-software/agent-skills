@@ -7,22 +7,12 @@ const crypto = require('node:crypto');
 const os = require('node:os');
 const digest = (data) => crypto.createHash('sha256').update(data).digest('hex');
 
+const {
+  trustedRoot,
+  checkedPath,
+} = require('../codex/runtime/trusted-path.cjs');
 function noLinks(target) {
-  const absolute = path.resolve(target);
-  const parsed = path.parse(absolute);
-  let cursor = parsed.root;
-  for (const part of absolute
-    .slice(parsed.root.length)
-    .split(path.sep)
-    .filter(Boolean)) {
-    cursor = path.join(cursor, part);
-    try {
-      if (fs.lstatSync(cursor).isSymbolicLink())
-        throw new Error(`Refusing symlink or junction: ${cursor}`);
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
-  }
+  return checkedPath(target, [], 'Refusing symlink or junction');
 }
 function within(root, relative) {
   const target = path.resolve(root, relative);
@@ -61,13 +51,13 @@ function plan(repo, project, selection, options = {}) {
     );
   if (scope === 'project' && !project)
     throw new Error('Project scope requires --project');
-  const contextProject = path.resolve(project || process.cwd());
-  const codexHome = path.resolve(
+  const contextProject = trustedRoot(project || process.cwd());
+  const codexHome = trustedRoot(
     options.codexHome ||
       process.env.CODEX_HOME ||
       path.join(os.homedir(), '.codex'),
   );
-  repo = path.resolve(repo);
+  repo = noLinks(repo);
   project = scope === 'global' ? codexHome : contextProject;
   noLinks(project);
   noLinks(contextProject);

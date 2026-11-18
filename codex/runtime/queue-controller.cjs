@@ -1,8 +1,8 @@
 'use strict';
 const fs = require('node:fs'),
   path = require('node:path'),
-  os = require('node:os'),
   crypto = require('node:crypto');
+const { bindRoot, tempRoot, tempPath } = require('./trusted-path.cjs');
 const { rpc } = require('./rpc-client.cjs');
 const { readAccountUsage } = require('./account-usage.cjs');
 const {
@@ -153,9 +153,7 @@ async function nativeSession(descriptor, options) {
     if (
       !listed.data
         .flatMap((row) => row.skills || [])
-        .some(
-          (skill) => path.resolve(skill.path) === entryFile && skill.enabled,
-        )
+        .some((skill) => tempPath(skill.path) === entryFile && skill.enabled)
     )
       throw Error('The project entry skill is not available and enabled');
     const dynamicTools = [
@@ -302,7 +300,8 @@ async function runQueue(options, adapters = {}) {
     options.exclusions.some((s) => typeof s !== 'string')
   )
     throw Error('Record explicit standing exclusions, or an empty list');
-  const project = fs.realpathSync(plainPath(options.project)),
+  const projectRoot = bindRoot(options.project);
+  const project = projectRoot.real,
     maxSteps = options.maxSteps ?? 20,
     timeoutMs = options.timeoutMs ?? 7200000;
   if (
@@ -333,11 +332,14 @@ async function runQueue(options, adapters = {}) {
       relative: options.relative,
     });
   const parent = plainPath(
-    options.runRoot || path.join(os.tmpdir(), 'lonic-codex-queues'),
+    options.runRoot || path.join(tempRoot.real, 'lonic-codex-queues'),
+    [projectRoot],
   );
   fs.mkdirSync(parent, { recursive: true });
   plainPath(parent);
-  const lockRoot = plainPath(path.join(os.tmpdir(), 'lonic-codex-queue-locks'));
+  const lockRoot = plainPath(
+    path.join(tempRoot.real, 'lonic-codex-queue-locks'),
+  );
   fs.mkdirSync(lockRoot, { recursive: true });
   plainPath(lockRoot);
   const lock = path.join(
