@@ -87,7 +87,8 @@ Confirm the resolved parameters back to the user in one or two lines, windows in
 3. **Do the item** under the project's own workflow, to its natural end: merged (if authorized), or a
    PR left open with review done (if not).
 4. **Update the queue**: tick the item, or mark it in progress or blocked with a one-line reason. File
-   any follow-up work you discovered into the queue, so it isn't lost in a handoff.
+   any follow-up work you discovered into the queue, so it isn't lost in a handoff. Move the
+   project's issue tracker with it where the user's tracker preference says to (delivery §C).
 5. **Check usage again** (§3). Under the threshold: hand off (§4). At or over: stop (§5).
 
 **Items too large for a session.** If an item clearly spans several phases (design, then slices), a
@@ -127,7 +128,7 @@ and include:
 - **Standing exclusions:** anything the user said to always ask about, or to never touch, in this run,
   including questions they declined inside a window (§1d).
 - **Where things stand:** what just finished (PR numbers, merge commits), any items parked as
-  blocked on the user, and anything in flight. If
+  blocked on the user, anything in flight, and any tracker write still owed (delivery §C). If
   the next item is a continuation, include its phase and any hard-won context it needs. Otherwise, let
   the next session read the queue itself; don't pre-pick an item the user might reorder.
 
@@ -156,8 +157,9 @@ The final report covers:
 
 ## Always ask, even mid-chain
 
-Merging is the only outward action this skill authorizes, and only per §1c — and only **the change
-for the item you are working**. Any other change, such as a PR someone else opened, a fix you
+Merging is the only outward action this skill authorizes on its own, and only per §1c; tracker
+writes are authorized by the user's tracker preference alone (delivery §C). Merging covers only **the
+change for the item you are working**. Any other change, such as a PR someone else opened, a fix you
 noticed on the way or a change you were asked to look at, is filed or left for the user, never merged
 by you, even when it is small and green. Still stop and ask before:
 releases or publishing, deploys, anything touching live infrastructure, destructive git (force-push,

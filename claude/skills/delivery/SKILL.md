@@ -301,6 +301,45 @@ starts — never a batch.
   live ones. When review rounds **escalate** instead of converging (each round finding something
   worse than the last), that is the signal to stop patching and discard the branch, rebuilding
   contract-first in slices instead.
+- **The tracker follows the work, where the user wants it to.** A project may keep each item's
+  status in an issue tracker (Jira, GitHub issues, Linear, …) apart from the code and the queue, or
+  have none, and a user may prefer to keep it themselves. Which holds is the user's preference, kept
+  at **`~/.claude/lonic/trackers.md`**, one block per project, keyed by the origin remote normalized
+  to `host/owner/repo` (no scheme, user, port or `.git`; the main checkout's absolute path for a
+  repository with no remote), so every worktree and clone of that remote reads the same block. A fork
+  is its own project:
+
+  ```
+  github.com/acme/widgets:
+    manage: yes              # yes | no | none (the project has no tracker)
+    tracker: jira acme.atlassian.net WID
+    server: atlassian        # the connection to write it through
+    start: In Progress       # the transition (name or id) for a started item
+    done: Done               # the transition for a finished one
+    slice-comment: yes       # a comment naming the PR and merge commit at each merged slice
+  ```
+
+  - **Read the project's block when an item starts.** With no file or no block, look for a tracker
+    (the project's instructions and memory, its commit tags, a connected server for it). If there is
+    one, ask the user once and write their answer as the block, `no` included, so it is never asked
+    again. Under queue-run the question belongs in the one setup message (§1); met later, it is a §1d
+    question like any other, so outside every window the tracker is left untouched and the question
+    goes to the final report. If there is none, write nothing and touch nothing; `none` is for the
+    user to record.
+  - **`no` and `none` mean the tracker is never written.** Access is not consent: a connected server
+    that can write the tracker is no permission to write it.
+  - **`yes` means status moves when the work does, in the same turn:** the item started (in a
+    fleet, when it is claimed) → `start`; each slice merged → its comment, where `slice-comment` says
+    so; the item finished → `done`, in the same turn the queue is ticked. Filing a follow-up as a
+    ticket follows the project's own filing rules. Take transition names or ids from the block or
+    from the tracker's own list, never guessed.
+  - **A tracker write that fails is an owed action.** Name it in the handoff prompt or the final
+    report, and the next session retries it before starting new work. One retry per session; a
+    write refused for missing permission is never routed through another connection or credential,
+    and stays owed until the user grants it. Trap seen: a transition that
+    failed on a connection that was not granted was reported once and never retried, and two more
+    items finished that night were never transitioned at all; three finished tickets sat in To Do
+    until the user noticed.
 
 ## D. Fix execution
 
