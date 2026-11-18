@@ -133,11 +133,18 @@ session (SendMessage, naming the slot) and notify the user.
 ## Overrides of queue-run
 
 - **§1, run parameters:** resolved once, by the fleet's `start` form, and recorded in the fleet's
-  `run.json` (threshold, queue locator, merge authority, windows, exclusions, look-ahead window). A
-  worker reads them from `fleet status`, never by asking again.
-- **§2 step 2, picking the item:** take the first unfinished row in the queue's first `lookahead`
-  unfinished rows (default 2N) that `fleet claim` accepts. Rank still decides. The window only lets
-  a slot skip a row another slot's area blocks.
+  `run.json` (threshold, queue locator, merge authority, windows, exclusions). A worker reads them
+  from `fleet status`, never by asking again.
+- **§2 step 2, picking the item:** walk the unfinished rows in rank order and take the first one
+  that is not blocked on the user and that `fleet claim` accepts. A row refused because another slot
+  holds it or its area is skipped for now, not for good: at every item boundary, walk again from
+  rank 1. Rank decides; another slot's claim or area is the only reason to pass over a free row.
+  If every eligible row is refused for a claim or an area alone, nothing is workable in parallel:
+  wait until `fleet status` shows a claim released (re-read it no more than once a minute, bounded,
+  in the background), then walk again. Intent: an idle slot is throughput lost, never a saving;
+  the claim line is what bounds spend, not the depth of the pick. (A fixed look-ahead window was
+  tried and removed: it never changed which row was picked, only made a slot idle when a row it
+  could have claimed sat just past the window.)
 - **§2 step 4, the queue doc:** "in progress" lives in the claims, not the doc. Write the doc only to
   tick, park or file. Every write is read-apply-retry: read the current revision, apply your one
   change, and on a revision-mismatch rejection read again and reapply. Never overwrite another
@@ -153,7 +160,8 @@ session (SendMessage, naming the slot) and notify the user.
 - **§4, handoff:** the prompt starts with the fleet's command (`fleet status` prints it), and names
   the slot and the claimed item in flight. The run parameters are in `run.json`, so it does not need to repeat them.
 - **§5, stopping:** a worker stops when the claim line refuses every eligible row, the queue is
-  done, or the fleet is halted. **The last worker out writes the summary** (check `fleet status`:
+  done, or the fleet is halted. A refusal for another slot's claim or area is not a stop: wait for
+  a release, as in §2 step 2. **The last worker out writes the summary** (check `fleet status`:
   no other live owner holds a claim), covering the whole fleet. `fleet end` is the user's command;
   never run it.
 
