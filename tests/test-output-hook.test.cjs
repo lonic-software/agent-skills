@@ -63,6 +63,35 @@ test('non-default sandbox permissions and unrecognized switches defer to the hos
     assert.deepEqual(rewrite(event(cmd)), {}, cmd);
   }
 });
+test('absolute, drive-qualified and parent-segment arguments defer to the host on every platform', () => {
+  for (const cmd of [
+    'node --test /abs/x.mjs',
+    'pytest ../outside',
+    'pytest ./tests/../sibling.py',
+    'pytest ..',
+    'pytest tests/..',
+    'node --test C:/abs/example.cjs',
+    'node --test C:\\abs\\example.cjs',
+    'pytest D:outside.py',
+    'pytest \\\\server\\share\\test.py',
+    'pytest //server/share/test.py',
+    'pytest tests\\..\\outside.py',
+    'pytest -- tests/..\\outside.py',
+    'pytest tests/valid.py ../outside',
+  ])
+    assert.deepEqual(rewrite(event(cmd)), {}, cmd);
+  for (const cmd of [
+    'pytest ./tests/test..name.py',
+    'go test ./...',
+    'node --test tests/unit/example.test.cjs',
+  ]) {
+    assert.equal(
+      rewrite(event(cmd)).hookSpecificOutput?.permissionDecision,
+      'allow',
+      cmd,
+    );
+  }
+});
 test('npx and bunx require an executable in the command working directory', (t) => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-local-runner-'));
   t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
@@ -147,11 +176,13 @@ test('rewritten command executes through the real platform shell and keeps a suc
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const file = path.join(root, 'example.test.cjs');
   fs.writeFileSync(file, 'require("node:test")("EXAMPLE pass",()=>{});');
-  const command = 'node --test ' + file.replace(/\\/g, '/');
-  const out = rewrite(event(command)).hookSpecificOutput.updatedInput.command;
+  const input = event('node --test example.test.cjs');
+  input.tool_input.workdir = root;
+  const out = rewrite(input).hookSpecificOutput.updatedInput.command;
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
   const child = spawnSync(out, {
+    cwd: root,
     shell: process.platform === 'win32' ? 'powershell.exe' : '/bin/bash',
     encoding: 'utf8',
     env,

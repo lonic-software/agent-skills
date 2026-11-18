@@ -167,7 +167,9 @@ the current target bytes and recover deliberately before creating a new plan.
 
 ## Optional test-output hook
 
-hooks/filter-test-output.cjs handles simple recognized test commands. Complex
+hooks/filter-test-output.cjs handles simple recognized test commands with relative
+arguments. Absolute paths, drive-qualified paths and paths containing a `..`
+segment pass through to the host. Both Windows and POSIX path syntax apply. Complex
 shell expressions and quoted arguments are left unchanged. FULL_TEST_OUTPUT=1
 in the environment, or that literal marker in the command, skips filtering.
 The wrapper retains stdout/stderr in an OS-temporary lonic-test-output-*/full.log

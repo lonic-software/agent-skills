@@ -19,10 +19,18 @@ function testCommand(tokens) {
       second === 'pytest')
   );
 }
-// Admit only known switches that consume no path, module, or executable argument.
-function safeFlags(tokens) {
+// Check path syntax from both platforms regardless of the host running the hook.
+function safeArguments(tokens) {
   return tokens.every((token, i) => {
-    if (!token.startsWith('-')) return true;
+    if (!token.startsWith('-')) {
+      // win32.isAbsolute also recognizes POSIX-style leading slashes. Reject
+      // drive-relative paths too: their base can differ from the working directory.
+      return (
+        !path.win32.isAbsolute(token) &&
+        !/^[a-z]:/i.test(token) &&
+        !token.split(/[\\/]/).includes('..')
+      );
+    }
     if (i === 1 && tokens[0] === 'node' && token === '--test') return true;
     if (i === 1 && ['python', 'python3'].includes(tokens[0]) && token === '-m')
       return true;
@@ -51,7 +59,7 @@ function rewrite(event) {
   if (command.includes('FULL_TEST_OUTPUT=1') || /[\r\n]/.test(command))
     return {};
   const tokens = command.trim().split(/\s+/);
-  if (!validTokens(tokens) || !testCommand(tokens) || !safeFlags(tokens))
+  if (!validTokens(tokens) || !testCommand(tokens) || !safeArguments(tokens))
     return {};
   if (['npx', 'bunx'].includes(tokens[0])) {
     const cwd = path.resolve(
