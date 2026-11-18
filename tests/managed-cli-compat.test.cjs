@@ -3,7 +3,7 @@ const test = require('node:test'), assert = require('node:assert/strict'), fs = 
 const {tomlValue} = require('../codex/runtime/managed-host.cjs');
 test('queue CLI without managed flag is identical to its original branch', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../codex/runtime/queue.cjs'), 'utf8');
-  const baseline = source.replace(" if(argv.includes('--managed'))return require('./managed-cli.cjs').main(argv);\n", '');
+  const baseline = source.replace(/^ if\(argv\.includes\('--managed'\)\)return require\('\.\/managed-cli\.cjs'\)\.main\(argv\);\r?\n/m, '');
   assert.notEqual(source, baseline);
   async function run(text, managed) {
     const calls = [], module = {exports: {}}, reads = [];
