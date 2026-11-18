@@ -211,7 +211,15 @@ function transact(file, approved, { rollback = false } = {}) {
     throw Error(
       'This plan already has an application record; inspect it before recovery',
     );
-  const release = takeLock(data.scope, data.project, approved);
+  const release = takeLock(
+    data.scope,
+    data.project,
+    JSON.stringify({
+      pid: process.pid,
+      operation: rollback ? 'rollback' : data.operation,
+      sha256: approved,
+    }),
+  );
   const changed = [];
   let result;
   try {

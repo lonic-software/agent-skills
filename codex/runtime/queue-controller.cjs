@@ -355,7 +355,7 @@ async function runQueue(options, adapters = {}) {
     project,
     queue: options.queue,
   });
-  fs.writeFileSync(lock, lockBytes, { flag: 'wx', mode: 0o600 });
+  require('./lock.cjs').acquireLock(lock, lockBytes);
   let root, report;
   try {
     root = fs.mkdtempSync(path.join(parent, 'run-'));

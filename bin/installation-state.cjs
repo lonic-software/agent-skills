@@ -111,7 +111,7 @@ function takeLock(scope, root, owner) {
   const dir = metadataDir(scope, root);
   fs.mkdirSync(dir, { recursive: true });
   const lock = checkedPath(path.join(dir, 'update.lock'));
-  fs.writeFileSync(lock, owner, { flag: 'wx', mode: 0o600 });
+  require('../codex/runtime/lock.cjs').acquireLock(lock, owner);
   return () => {
     try {
       if (fs.readFileSync(lock, 'utf8') === owner) fs.unlinkSync(lock);

@@ -150,7 +150,13 @@ test('stale updater lock blocks mutation and retains its digest', (t) => {
   const s = updater(t);
   fs.mkdirSync(path.dirname(s.lock), { recursive: true });
   fs.writeFileSync(s.lock, 'EXAMPLE-old-digest');
-  assert.throws(() => transact(s.file, s.plan.sha256), { code: 'EEXIST' });
+  assert.throws(
+    () => transact(s.file, s.plan.sha256),
+    (error) =>
+      error.code === 'EEXIST' &&
+      error.message.includes('EXAMPLE-old-digest') &&
+      error.message.includes('runtime/README.md#stale-lock-recovery'),
+  );
   assert.equal(fs.readFileSync(s.lock, 'utf8'), 'EXAMPLE-old-digest');
   assert.equal(fs.existsSync(s.receipt), false);
   for (const item of s.plan.files)
@@ -299,7 +305,11 @@ test('stale queue lock retains owner metadata and blocks session startup', async
       readUsage: async () => usage(),
       runSession: async () => assert.fail('Must not start'),
     }),
-    { code: 'EEXIST' },
+    (error) =>
+      error.code === 'EEXIST' &&
+      error.message.includes('EXAMPLE-stale') &&
+      error.message.includes('99999999') &&
+      error.message.includes('runtime/README.md#stale-lock-recovery'),
   );
   assert.equal(fs.readFileSync(lock, 'utf8'), owner);
 });

@@ -145,8 +145,9 @@ Locks are not automatically reclaimed after a crash:
 - Queue: `os.tmpdir()/lonic-codex-queue-locks/<project-hash>.lock`.
   The hash is SHA-256 of the real absolute project path, lowercased on Windows.
   Its JSON contains `runId`, `pid`, `project` and `queue`.
-- Updater: `<project>/.codex/lonic/update.lock`. Its contents are the approved
-  plan's SHA-256, not a process ID. Cleanup failures can leave this file behind.
+- Installation and update use `lonic/update.lock` below the selected Codex root.
+  Its JSON lists the PID and operation, with the selection for installs or the
+  approved plan SHA-256 for updates. Older update locks contain only a digest.
 - Attack pair: `<memo>.lonic-attack-pair.lock`, containing the pair ID and PID.
 
 On `EEXIST`, preserve and inspect the exact lock and associated run/plan receipts.

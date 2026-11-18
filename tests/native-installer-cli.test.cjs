@@ -22,10 +22,11 @@ test('native installer accepts full-preview and preserves preview/check semantic
   });
   fs.mkdirSync(project);
   fs.mkdirSync(path.join(repo, 'codex/runtime'), { recursive: true });
-  fs.copyFileSync(
-    path.join(__dirname, '../codex/runtime/trusted-path.cjs'),
-    path.join(repo, 'codex/runtime/trusted-path.cjs'),
-  );
+  for (const name of ['trusted-path.cjs', 'lock.cjs'])
+    fs.copyFileSync(
+      path.join(__dirname, '../codex/runtime', name),
+      path.join(repo, 'codex/runtime', name),
+    );
   for (const name of [
     'install',
     'install.ps1',

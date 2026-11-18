@@ -3,7 +3,7 @@
 #
 #   check-sync <tool>
 #
-# tool : claude, or codex --project PATH --skill SELECTION
+# tool : claude, or codex --scope project --project PATH --skill SELECTION
 #
 # Read-only: it never copies, edits, or deletes anything. `bin/install` is the
 # only writer, and this deliberately does not offer to "fix" what it finds —
