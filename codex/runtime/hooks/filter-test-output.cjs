@@ -1,6 +1,6 @@
 'use strict';
 const path = require('node:path');
-const { validTokens } = require('./test-output.cjs');
+const { validTokens, localRunner } = require('./test-output.cjs');
 function testCommand(tokens) {
   const [program, first, second] = tokens;
   return (
@@ -19,11 +19,31 @@ function testCommand(tokens) {
       second === 'pytest')
   );
 }
+// Admit only known switches that consume no path, module, or executable argument.
+function safeFlags(tokens) {
+  return tokens.every((token, i) => {
+    if (!token.startsWith('-')) return true;
+    if (i === 1 && tokens[0] === 'node' && token === '--test') return true;
+    if (i === 1 && ['python', 'python3'].includes(tokens[0]) && token === '-m')
+      return true;
+    return [
+      '-q',
+      '-v',
+      '--verbose',
+      '--runInBand',
+      '--run',
+      '--',
+      '--bail',
+    ].includes(token);
+  });
+}
 function rewrite(event) {
   if (
     event?.hook_event_name !== 'PreToolUse' ||
     event.tool_name !== 'Bash' ||
     typeof event.tool_input?.command !== 'string' ||
+    (Object.hasOwn(event.tool_input, 'sandbox_permissions') &&
+      event.tool_input.sandbox_permissions !== 'use_default') ||
     process.env.FULL_TEST_OUTPUT === '1'
   )
     return {};
@@ -31,7 +51,15 @@ function rewrite(event) {
   if (command.includes('FULL_TEST_OUTPUT=1') || /[\r\n]/.test(command))
     return {};
   const tokens = command.trim().split(/\s+/);
-  if (!validTokens(tokens) || !testCommand(tokens)) return {};
+  if (!validTokens(tokens) || !testCommand(tokens) || !safeFlags(tokens))
+    return {};
+  if (['npx', 'bunx'].includes(tokens[0])) {
+    const cwd = path.resolve(
+      event.cwd || process.cwd(),
+      event.tool_input.workdir || event.tool_input.cwd || '.',
+    );
+    if (!localRunner(tokens[1], cwd)) return {};
+  }
   const encoded = Buffer.from(
     path.join(__dirname, 'test-output.cjs'),
     'utf8',

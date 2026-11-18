@@ -13,6 +13,26 @@ function validTokens(tokens) {
     )
   );
 }
+// Execute the checked local shim directly so a later removal cannot trigger a download.
+function localRunner(binary, cwd) {
+  if (!['jest', 'vitest'].includes(binary)) return null;
+  const shim = path.join(
+    'node_modules',
+    '.bin',
+    binary + (process.platform === 'win32' ? '.cmd' : ''),
+  );
+  const file = path.resolve(cwd, shim);
+  try {
+    if (!fs.statSync(file).isFile()) return null;
+    fs.accessSync(
+      file,
+      process.platform === 'win32' ? fs.constants.F_OK : fs.constants.X_OK,
+    );
+  } catch {
+    return null;
+  }
+  return shim;
+}
 async function summarize(file) {
   let count = 0,
     context = 0;
@@ -65,6 +85,11 @@ async function main(tokens) {
     throw Error(
       'Only simple literal argument tokens are supported by this wrapper',
     );
+  if (['npx', 'bunx'].includes(tokens[0])) {
+    const shim = localRunner(tokens[1], process.cwd());
+    if (!shim) throw Error('Local test runner is unavailable');
+    tokens = [shim, ...tokens.slice(2)];
+  }
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-test-output-')),
     file = path.join(root, 'full.log');
   const fd = fs.openSync(file, 'wx', 0o600);
@@ -106,7 +131,7 @@ async function main(tokens) {
     process.exitCode =
       outcome.code ?? 128 + (os.constants.signals[outcome.signal] || 1);
 }
-module.exports = { validTokens, summarize, main };
+module.exports = { validTokens, localRunner, summarize, main };
 if (require.main === module)
   main(process.argv.slice(2)).catch((error) => {
     console.error(error.message);

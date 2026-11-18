@@ -178,7 +178,7 @@ Operator decision U1 retains this documented difference: the Codex hook returns
 the Claude hook omits that decision. Preservation of `untrusted` command approval
 has not been established. The independent Windows probe could not reach its
 local scripted provider, so it did not exercise the hook or an approval decision.
-Do not interpret this documented limitation as verified `untrusted` support.
+A rewritten command starts with `node -e`. Prefix-based deny or ask rules for the original command may therefore stop matching. Enforcement of those rules remains unverified (U1). Non-default sandbox permission requests and unrecognized flags pass directly to the host. `npx` and `bunx` tests require a local runner and execute that shim directly.
 
 ## Measured scope
 

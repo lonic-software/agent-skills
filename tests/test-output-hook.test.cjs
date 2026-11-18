@@ -10,12 +10,19 @@ const wrapper = path.resolve(
   __dirname,
   '../codex/runtime/hooks/test-output.cjs',
 );
+const inherited = process.env.FULL_TEST_OUTPUT;
+test.before(() => {
+  delete process.env.FULL_TEST_OUTPUT;
+});
+test.after(() => {
+  if (inherited !== undefined) process.env.FULL_TEST_OUTPUT = inherited;
+});
 const event = (command) => ({
   hook_event_name: 'PreToolUse',
   tool_name: 'Bash',
   tool_input: {
     command,
-    sandbox_permissions: 'require_escalated',
+    sandbox_permissions: 'use_default',
     justification: 'EXAMPLE permission request',
   },
 });
@@ -23,15 +30,73 @@ test('only simple recognized test commands are wrapped; permission fields stay i
   for (const cmd of [
     'npm test',
     'npm run test:unit',
-    'npx vitest run',
     'pytest -q',
     'go test ./...',
     'node --test tests/example.cjs',
   ]) {
     const out = rewrite(event(cmd)).hookSpecificOutput;
     assert.equal(out.permissionDecision, 'allow');
-    assert.equal(out.updatedInput.sandbox_permissions, 'require_escalated');
+    assert.equal(out.updatedInput.sandbox_permissions, 'use_default');
     assert.ok(out.updatedInput.command.endsWith('-- ' + cmd));
+  }
+});
+test('non-default sandbox permissions and unrecognized switches defer to the host', () => {
+  for (const permissions of ['require_escalated', 'unknown', null, '']) {
+    const input = event('npm test');
+    input.tool_input.sandbox_permissions = permissions;
+    assert.deepEqual(rewrite(input), {});
+  }
+  const input = event('npm test');
+  delete input.tool_input.sandbox_permissions;
+  assert.ok(rewrite(input).hookSpecificOutput);
+  for (const cmd of [
+    'node --test --import=fixture',
+    'node --test -r fixture',
+    'node --test --require fixture',
+    'go test -exec=fixture ./...',
+    'pytest -p fixture',
+    'npm run test:unit --prefix=fixture',
+    'jest --config fixture',
+    'vitest --setupFiles fixture',
+    'python -m pytest -pfixture',
+  ]) {
+    assert.deepEqual(rewrite(event(cmd)), {}, cmd);
+  }
+});
+test('npx and bunx require an executable in the command working directory', (t) => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-local-runner-'));
+  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
+  const bin = path.join(cwd, 'node_modules', '.bin');
+  fs.mkdirSync(bin, { recursive: true });
+  for (const [runner, binary] of [
+    ['npx', 'vitest'],
+    ['bunx', 'jest'],
+  ]) {
+    const input = event(runner + ' ' + binary);
+    input.tool_input.workdir = cwd;
+    assert.deepEqual(rewrite(input), {});
+    const shim = path.join(
+      bin,
+      binary + (process.platform === 'win32' ? '.cmd' : ''),
+    );
+    fs.writeFileSync(
+      shim,
+      process.platform === 'win32'
+        ? '@echo local-fixture\r\n'
+        : '#!/bin/sh\necho local-fixture\n',
+      { mode: 0o755 },
+    );
+    assert.ok(rewrite(input).hookSpecificOutput);
+    const run = spawnSync(process.execPath, [wrapper, runner, binary], {
+      cwd,
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stdout, /local-fixture/);
+    const log = run.stdout.match(/complete log: (.+)\]/)[1];
+    t.after(() =>
+      fs.rmSync(path.dirname(log), { recursive: true, force: true }),
+    );
   }
 });
 test('shell syntax, quoted args, alternate commands and escape hatch remain unchanged', () => {
