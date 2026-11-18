@@ -274,9 +274,13 @@ function main(argv) {
     );
   }
   if (action === 'apply' || action === 'rollback')
-    return transact(o['--plan'], o['--approved-sha256'], {
-      rollback: action === 'rollback',
-    });
+    return transact(
+      path.resolve(o['--project'] || '.', o['--plan']),
+      o['--approved-sha256'],
+      {
+        rollback: action === 'rollback',
+      },
+    );
   throw Error('Choose preview, remove (preview), apply or rollback');
 }
 module.exports = { savePlan, loadPlan, transact, main };
