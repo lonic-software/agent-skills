@@ -93,7 +93,9 @@ Traps seen, as evidence for the rules below:
 ## The merge turn (replaces how queue-run merges)
 
 Review, rounds and fixes all happen **before** `turn enter`; never run a review round inside the
-turn. Inside it:
+turn. The turn is for **your claimed item's change only**: a change for anything else, such as
+another slot's PR, one the user opened, or a side fix, is filed or left for the user, never merged
+by you (queue-run's "Always ask"). Inside it:
 
 1. Read the change's state back — from the forge, or from the default branch where there is none.
    If an earlier holder of this slot left it half-merged, finish from what is there.
@@ -110,8 +112,15 @@ turn. Inside it:
    a deadline long enough for the fleet's CI load. With no CI: run the complete local suites on that
    exact head under the suite lock — `fleet with-lock suite -- delivery/verify-head -- <suites>` —
    which stamps it. Then confirm the default branch's tip is still the one you merged.
-6. **Merge.** On a forge, use its merge command pinned to the verified head (on GitHub,
-   `gh pr merge <N> --match-head-commit <sha>`). With no forge, `fleet land` (or
+   `fleet collisions` checks it, and the version lines: it refuses when your HEAD lacks the main
+   ref's tip, when the main ref is behind its remote, or when a merge of main kept a version line
+   (the config's `version_lines`) that both sides added. Two branches bumping a counter to the same
+   value merge without a conflict; take the next value, or ask the user when both sides really
+   carry one change. The gate runs it before every merge in a fleet.
+6. **Merge.** On a forge, use its merge command pinned to the verified head, from the slot whose
+   HEAD is that head (on GitHub, `gh pr merge <N> --match-head-commit <sha>`). A change touching a
+   protected path is the user's to merge: the gate refuses it, so leave the turn and tell them. With
+   no forge, `fleet land` (or
    `fleet land --squash -m <message>`): it checks the turn and the stamp, then moves the default
    branch to your head by compare-and-swap. No forge means the main checkout stays detached while
    the fleet runs; `fleet land` refuses otherwise. Then `fleet turn leave`.
@@ -180,16 +189,27 @@ final report rather than into the files, since every slot reads them.
 Two checked-in files. `fleet init` reads `.claude/fleet.json`; when it is absent, init refuses and
 prints a template (and the gate template, when that file is absent too). Its fields:
 - the worktree root and the build-directory policy;
-- `main_ref`, the ref slots branch from: `origin/main` with a forge, the local `main` without one;
+- `main_ref`, the ref slots branch from: `origin/main` with a forge, the local `main` without one.
+  It names the ref the gate reads its config from (the default branch, origin's copy when there
+  is one): `fleet init` refuses another;
 - the heavy commands that need the suite lock, as regexes, each with its bound;
 - the serial resources, each `pool` (with its values) or `counter` (with a command that prints the
   current maximum on `$REF`);
 - the mechanical files and the command that regenerates each;
+- `version_lines` (optional): `{pattern, paths}`, an extended regex matching a hand-numbered
+  version line, such as a format constant, and the globs it lives in; `fleet collisions` reads it;
 - the branch update method (always `merge`);
 - the area vocabulary.
 
+`fleet init` copies it into the fleet's state, so an edit reaches a running fleet only after
+`fleet end` and a new `fleet init`.
+
 `.claude/gates.json` is the merge gate's config, read by `gate.sh` in every session, fleet or not.
-Every field is optional, and GitHub with CI needs none of them:
+The gate, `wait-pr-ci` and `fleet` read the default branch's committed copy (origin's, else the local
+branch; `fleet` reads its `main_ref`'s), never the work tree's: a change, or an uncommitted edit, cannot loosen the rules that judge it, and an edit is in
+force once it is on the default branch. While the committed copy does not parse, the gate denies a merge
+until the user fixes it (`gh`/`glab`, any `pr merge`/`mr merge`, the `merge_cmd` still legible in
+the broken text, and a local merge into the default branch where local merges are gated); commits and pushes still run on the defaults. Every field is optional, and GitHub with CI needs none of them:
 - `forge` — `github`, `gitlab`, `other` or `none`. Default: `github` when origin is on github.com,
   `none` with no remote. Any other remote is unrecognized: its merges are logged, not gated, until
   configured.
@@ -197,7 +217,21 @@ Every field is optional, and GitHub with CI needs none of them:
   head-pinning flag, and shell commands printing change `$PR`'s head sha and its checks as JSON
   `[{name, bucket}]`. Built in for GitHub only.
 - `ci` — whether CI exists. Default: on for GitHub; elsewhere on when `checks_cmd` is set.
-- `required_checks` — the names that must pass. Default: every listed check.
+- `required_checks` — names that must be listed and pass, **on top of** every listed check passing
+  or skipping. A forge lists only the checks that have registered, so name the ones a merge needs;
+  on GitHub, require the same ones on the forge (a ruleset), or its web UI can merge while CI is
+  pending. `fleet init` warns when GitHub with CI names none.
+- `files_cmd` — shell printing change `$PR`'s changed paths, both sides of a rename; exit 3 means more
+  files than the forge lists, which denies the merge. Built in for GitHub and GitLab.
+- `protected_paths` — globs no session merges: the user merges those changes.
+  `.claude/gates.json` and `.claude/fleet.json` are always protected, renames included.
+- `commit_email` — the author email every commit and push must carry. The gate refuses a commit
+  set up otherwise (in git's order: `--author`, `GIT_AUTHOR_EMAIL`, `user.email`, in the repository
+  `git -C` names) and a push carrying another author or naming commits it cannot list (in a
+  repository the command names readably; a `git -C` given by an expansion is refused only where the
+  working directory sets `commit_email`), and `fleet init` refuses a repository whose
+  configured email differs.
 - `verify_cmd` — the complete local suite command. With no CI, its `verify-head` stamp on the
   merged head is the merge evidence.
-- `default_branch` — default: origin's HEAD, else `main` or `master`.
+- `default_branch` — the branch a local merge is judged against. Default: origin's HEAD, else
+  `main` or `master`; the config itself is always read from that default, never from this field.

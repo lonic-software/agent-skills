@@ -182,7 +182,7 @@ documented — routing decisions elsewhere should cite this section, not restate
     pass at it — CI checks, or a `verify-head` stamp where there is no CI. The project's
     `.claude/gates.json` names its forge commands and required checks; GitHub with CI needs none.
     Wait for CI with `${CLAUDE_SKILL_DIR}/wait-pr-ci <PR> [deadline]` in the background — never a
-    hand-written loop. It reads the same `.claude/gates.json` forge commands, judges the head it
+    hand-written loop. It reads the same `.claude/gates.json` forge commands and required checks, judges the head it
     started on, and exits 0 green, 1 red (named), 2 deadline with no verdict, 3 no CI, 4 head moved;
     `--self-test` checks it. Read its exit status, never a piped summary of it. A wrapper preserves the status of what it wraps: no
     `| tail`/`| head`/`| grep` on a command whose exit status is the verdict — read the status first,
