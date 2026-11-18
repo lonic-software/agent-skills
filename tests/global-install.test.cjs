@@ -216,6 +216,31 @@ test('runtime and configuration lookup prefer project, merge top-level overrides
   assert.throws(() => resolve.config(f.project, f.home));
   assert.throws(() => resolve.runtime(f.project, 'invalid', f.home));
 });
+test('copying the shipped example into project overrides identifies the forbidden key and operator config location', (t) => {
+  const f = fixture(t);
+  const { project, home } = f;
+  const installed = plan(repo, project, 'queue-run', {
+    scope: 'project',
+    codexHome: home,
+  });
+  apply(installed);
+  const dir = path.join(fs.realpathSync(project), '.codex/lonic');
+  const example = path.join(dir, 'runtime-config.example.json');
+  const override = path.join(dir, 'runtime-config.json');
+  fs.copyFileSync(example, override);
+  assert.throws(() => resolve.config(project, home), {
+    message:
+      'Project runtime configuration forbids key "codex" in ' +
+      override +
+      '. Use CODEX_HOME/lonic/runtime-config.json for executable, command and path settings, or pass a standalone file with --config PATH. Project overrides accept only schema, model and timeoutMs.',
+  });
+  put(path.join(home, 'lonic/runtime-config.json'), fs.readFileSync(example));
+  put(override, JSON.stringify({ model: 'project-model' }));
+  assert.deepEqual(resolve.config(project, home), {
+    ...JSON.parse(fs.readFileSync(example, 'utf8')),
+    model: 'project-model',
+  });
+});
 test('project runtime config refuses program, path and unknown keys even without a global config', (t) => {
   const f = fixture(t);
   const file = path.join(f.project, '.codex/lonic/runtime-config.json');

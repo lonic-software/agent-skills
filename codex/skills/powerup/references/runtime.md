@@ -7,9 +7,12 @@ CODEX_HOME/lonic/runtime (CODEX_HOME defaults to the OS home/.codex).
 Use the selected absolute path, quoted as a separate shell argument.
 The read-only helper at either installation, resolve-installation.cjs, accepts
 PROJECT and queue or evidence and prints the selected runtime/config paths.
-Without --config, global lonic/runtime-config.json is read first and project
-.codex/lonic/runtime-config.json overrides its top-level fields. Arrays/objects
-replace; invalid project configuration refuses. Explicit --config is standalone.
+Set executables, allowedCommands and runRoot in `CODEX_HOME/lonic/runtime-config.json`
+or in a standalone file selected with `--config PATH`. A project-only installation
+ships the template at `PROJECT/.codex/lonic/runtime-config.example.json`. Copy
+it to the global path, or edit a separate copy and pass it with `--config`.
+During automatic lookup, `PROJECT/.codex/lonic/runtime-config.json` may
+override only `schema`, `model` and `timeoutMs`.
 Do not infer an account, model, budget or authority from installation scope.
 
 

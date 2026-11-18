@@ -64,7 +64,7 @@ function config(project, home) {
   const files = configLayers(project, home);
   if (!files.length)
     throw Error(
-      'Create a reviewed project or global lonic/runtime-config.json from runtime-config.example.json',
+      'Copy runtime-config.example.json to CODEX_HOME/lonic/runtime-config.json and edit it, or supply a reviewed standalone file with --config PATH.',
     );
   let value = {};
   for (const { scope, path: p } of files) {
@@ -79,7 +79,7 @@ function config(project, home) {
               JSON.stringify(key) +
               ' in ' +
               p +
-              '. Set executable, command and path options in trusted global configuration or an explicit --config file.',
+              '. Use CODEX_HOME/lonic/runtime-config.json for executable, command and path settings, or pass a standalone file with --config PATH. Project overrides accept only schema, model and timeoutMs.',
           );
       }
     }

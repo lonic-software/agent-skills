@@ -60,13 +60,18 @@ write is performed. Runtime scripts are inert until invoked.
 | Skills | CODEX_HOME/skills/<name> | PROJECT/.agents/skills/<name> |
 | Native role TOMLs | CODEX_HOME/agents | PROJECT/.codex/agents |
 | Runtime | CODEX_HOME/lonic/runtime | PROJECT/.codex/lonic/runtime |
-| Operator configuration | CODEX_HOME/lonic/runtime-config.json | PROJECT/.codex/lonic/runtime-config.json |
+| Runtime configuration | `CODEX_HOME/lonic/runtime-config.json` (operator settings) | `PROJECT/.codex/lonic/runtime-config.json` (optional overrides for `schema`, `model`, `timeoutMs` only) |
 
-The runtime selection ships runtime-config.example.json beside runtime. Copy it
-to the global runtime-config.json as an explicit operator setup step and set
-approved model/executable values. Project overrides accept only schema, model
-and timeoutMs. Keep credentials outside both files. Install/update/removal
-leave the actual operator runtime-config.json alone.
+For ordinary queue and evidence runs, put executable settings (`codex`, `tetel`),
+command lists (`allowedCommands`), and output paths (`runRoot`) in the global
+operator file or a standalone file selected with `--config PATH`.
+
+With a project-only install, the template is
+`PROJECT/.codex/lonic/runtime-config.example.json`. Copy it to
+`CODEX_HOME/lonic/runtime-config.json` (create the parent directory if needed)
+and edit the executable names and model. Alternatively, save an edited copy
+at a path you control and pass `--config PATH` on each invocation. This loads
+that file alone. Keep credentials outside runtime configuration files.
 
 Identical target files are retained. Differing bytes refuse normal installation;
 use the reviewed updater instead. Links/junctions refuse. The preview reports

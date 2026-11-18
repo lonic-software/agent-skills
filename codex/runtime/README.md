@@ -7,14 +7,20 @@ native Codex processes using the existing login and the configured model.
 
 ## Configuration
 
-Create CODEX_HOME/lonic/runtime-config.json or the project override
-.codex/lonic/runtime-config.json only with setup authorization. The installer
-ships runtime-config.example.json, never overwrites the operator configuration.
-Without --config, queue and evidence load the global configuration, then apply
-project overrides for schema, model and timeoutMs. A project file containing
-another key fails with an error. Configure executables, allowedCommands and
-runRoot globally or in an explicitly selected standalone --config. Runtime and ordinary entry-skill lookup prefer the project then
-CODEX_HOME; resolve-installation.cjs PROJECT queue|evidence prints selected paths.
+For ordinary queue and evidence runs, configure `codex`, `tetel`,
+`allowedCommands` and `runRoot` in `CODEX_HOME/lonic/runtime-config.json`
+or a standalone file passed with `--config PATH`. If CODEX_HOME is unset,
+it defaults to the user's `.codex` directory under their home directory.
+
+With only a project-scope install, copy the shipped
+`PROJECT/.codex/lonic/runtime-config.example.json` to the global path above
+and edit it, or save an edited copy elsewhere and pass its path with `--config`.
+Automatic lookup reads the global file and then the optional project override
+at `PROJECT/.codex/lonic/runtime-config.json`. The project file accepts only
+`schema`, `model` and `timeoutMs`. Explicit `--config PATH` loads one file.
+
+Runtime and ordinary entry-skill lookup prefer the project then CODEX_HOME.
+`resolve-installation.cjs PROJECT queue|evidence` prints the selected paths.
 Managed retains its explicit configuration/admission contract.
 
 In the commands below, replace RUNTIME with that selected absolute runtime path;
@@ -36,7 +42,7 @@ command = 'C:\tools\tetel.exe'). In the isolated Windows Codex 0.167.0 zero-turn
 probe this user registration exposed 14 tools without project trust. Tool calls
 by a model were not tested. The installer never edits this configuration.
 
-Example:
+Example global or standalone runtime configuration:
 
 ```json
 {
