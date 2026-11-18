@@ -82,6 +82,8 @@ The `lonic-` prefix is a brand namespace so these don't collide with your own ag
 
 Model names (Fable / Opus / Sonnet) are Anthropic-specific. The two design agents run on **Opus** deliberately: they are long, tool-heavy loops, and running them on Fable was measured consuming an extreme amount of tokens for the same work — not a default anyone should inherit. The advisor is the opposite case, being consulted rarely and for judgment only, so its **model and default effort are a per-user preference** stored at `~/.claude/lonic/advisor.md`; `consult` asks once on first use (recommending Fable, with its plan/cost caveats, and Opus as the strong alternative) and remembers.
 
+Whether agents keep a project's issue tracker up to date is a per-user preference too, per project, stored at `~/.claude/lonic/trackers.md` (`delivery` §C): a project with a tracker and no entry is asked about once, `no` and `none` leave the tracker untouched, and nothing is inferred from a connected server being able to write it.
+
 ## Install
 
 ### As a Claude Code plugin (simplest)
