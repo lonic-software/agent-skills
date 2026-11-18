@@ -26,7 +26,12 @@ test('native installer accepts full-preview and preserves preview/check semantic
     path.join(__dirname, '../codex/runtime/trusted-path.cjs'),
     path.join(repo, 'codex/runtime/trusted-path.cjs'),
   );
-  for (const name of ['install', 'install.ps1', 'install-codex.cjs'])
+  for (const name of [
+    'install',
+    'install.ps1',
+    'install-codex.cjs',
+    'installation-state.cjs',
+  ])
     fs.copyFileSync(
       path.join(__dirname, '..', 'bin', name),
       path.join(repo, 'bin', name),

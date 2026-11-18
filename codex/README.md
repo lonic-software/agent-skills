@@ -63,8 +63,9 @@ write is performed. Runtime scripts are inert until invoked.
 | Operator configuration | CODEX_HOME/lonic/runtime-config.json | PROJECT/.codex/lonic/runtime-config.json |
 
 The runtime selection ships runtime-config.example.json beside runtime. Copy it
-to runtime-config.json only as an explicit operator setup step, set approved
-model/executable values, and never put credentials in it. Install/update/removal
+to the global runtime-config.json as an explicit operator setup step and set
+approved model/executable values. Project overrides accept only schema, model
+and timeoutMs. Keep credentials outside both files. Install/update/removal
 leave the actual operator runtime-config.json alone.
 
 Identical target files are retained. Differing bytes refuse normal installation;
@@ -73,9 +74,19 @@ same-name skills in the opposite scope for the selected project context (cwd by
 default). Decide to remove one installation or explicitly --on-duplicate keep-both
 to acknowledge coexistence; otherwise apply refuses. The other copy is never
 overwritten. A global installer cannot enumerate every project on the machine.
-Future project installations check their own context. Removing a selected bundle
-can affect another selection sharing its files: review the full plan; shared
-ownership/atomic updates remain B13 deferred work.
+Future project installations check their own context.
+
+Install records the scope, canonical root, selection owners and SHA-256 of
+each installed file in `lonic/install-receipt.json` under CODEX_HOME or
+PROJECT/.codex. Update compares those records to the new package. Remove
+uses the recorded files even when the newer package dropped them. A shared
+file stays installed until its last owning selection is removed. Apply and
+rollback include the receipt in the same reviewed transaction.
+
+For a legacy installation, back up local edits and identify the original
+package revision. Use the current installer with the original package files,
+review --check and run --apply for each installed selection at that revision
+to record matching files. Then restore the newer package and preview the update.
 
 Installation copying is not a security boundary. Project trust remains a separate
 Codex decision; the managed mode still requires exact-project trust. The ordinary

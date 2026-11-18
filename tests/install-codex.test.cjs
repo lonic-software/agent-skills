@@ -117,7 +117,11 @@ test('a partial write is retained and reported while earlier complete files roll
     failure;
   try {
     fs.writeSync = function (fd, buffer, ...args) {
-      writes++;
+      if (
+        Buffer.isBuffer(buffer) &&
+        p.files.some((f) => f.bytes.equals(buffer))
+      )
+        writes++;
       if (writes === 2) {
         originalWrite.call(fs, fd, buffer, 0, 7, null);
         const error = new Error('EXAMPLE injected disk-full write');

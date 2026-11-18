@@ -5,6 +5,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const os = require('node:os');
+const {
+  readInventory,
+  nextInventory,
+  writeInventory,
+  takeLock,
+} = require('./installation-state.cjs');
 const digest = (data) => crypto.createHash('sha256').update(data).digest('hex');
 
 const {
@@ -41,7 +47,7 @@ function listFiles(directory) {
   }
   return result;
 }
-function plan(repo, project, selection, options = {}) {
+function destination(project, options = {}) {
   const scope = options.scope || 'project';
   if (!['global', 'project'].includes(scope))
     throw new Error('Choose --scope global or project');
@@ -57,7 +63,6 @@ function plan(repo, project, selection, options = {}) {
       process.env.CODEX_HOME ||
       path.join(os.homedir(), '.codex'),
   );
-  repo = noLinks(repo);
   project = scope === 'global' ? codexHome : contextProject;
   noLinks(project);
   noLinks(contextProject);
@@ -66,6 +71,13 @@ function plan(repo, project, selection, options = {}) {
     throw new Error('Project must be an existing directory');
   if (fs.existsSync(project) && !fs.statSync(project).isDirectory())
     throw new Error('Target must be a directory');
+  return { scope, contextProject, codexHome, project };
+}
+function plan(repo, project, selection, options = {}) {
+  const dest = destination(project, options);
+  const { scope, contextProject, codexHome } = dest;
+  project = dest.project;
+  repo = noLinks(repo);
   if (scope === 'global' && selection === 'test-filter-hook')
     throw new Error(
       'Native hook activation is project-only; choose --scope project',
@@ -190,6 +202,23 @@ function apply(planned) {
     );
   if (planned.files.some((file) => file.status === 'CONFLICT'))
     throw new Error('Existing content differs; no files were changed');
+  verifyInstall(planned);
+  const release = takeLock(
+    planned.scope,
+    planned.project,
+    JSON.stringify({
+      pid: process.pid,
+      operation: 'install',
+      selection: planned.selection,
+    }),
+  );
+  try {
+    return applyLocked(planned);
+  } finally {
+    release();
+  }
+}
+function verifyInstall(planned) {
   // Recheck the entire plan before writing, then create each new file exclusively.
   for (const file of planned.files) {
     noLinks(file.target);
@@ -204,6 +233,24 @@ function apply(planned) {
     if (digest(fs.readFileSync(file.source)) !== file.sha256)
       throw new Error(`Source changed since preview: ${file.source}`);
   }
+}
+function applyLocked(planned) {
+  verifyInstall(planned);
+  const inventory = readInventory(planned.scope, planned.project);
+  const next = nextInventory(inventory.state, planned.selection, planned.files);
+  const desired = new Map(
+    planned.files.map((f) => [f.relative.split(path.sep).join('/'), f.sha256]),
+  );
+  if (
+    inventory.state.files.some(
+      (row) =>
+        row.owners.includes(planned.selection) &&
+        desired.get(row.path) !== row.sha256,
+    )
+  )
+    throw Error(
+      'Recorded package differs. Prepare a reviewed update plan for this selection.',
+    );
   const created = [];
   try {
     for (const file of planned.files.filter(
@@ -221,6 +268,7 @@ function apply(planned) {
       if (digest(fs.readFileSync(file.target)) !== file.sha256)
         throw new Error(`Readback failed: ${file.target}`);
     }
+    writeInventory(inventory, next);
   } catch (error) {
     // Remove only files this invocation created and whose bytes still match.
     const retained = [];
@@ -320,4 +368,4 @@ if (require.main === module) {
     process.exitCode = 1;
   }
 }
-module.exports = { plan, apply, main, noLinks };
+module.exports = { plan, apply, main, noLinks, destination };

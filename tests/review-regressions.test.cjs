@@ -39,11 +39,12 @@ function updater(t) {
     }),
   );
   for (const name of ['SKILL.md', 'z.txt']) {
-    fs.writeFileSync(path.join(dir, name), 'NEW ' + name);
-    const target = path.join(project, '.agents/skills/example', name);
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, 'ORIGINAL ' + name);
+    fs.writeFileSync(path.join(dir, name), 'ORIGINAL ' + name);
   }
+  const installer = require('../bin/install-codex.cjs');
+  installer.apply(installer.plan(repo, project, 'example'));
+  for (const name of ['SKILL.md', 'z.txt'])
+    fs.writeFileSync(path.join(dir, name), 'NEW ' + name);
   const file = path.join(root, 'plan.json'),
     plan = savePlan(repo, project, 'example', file);
   return {

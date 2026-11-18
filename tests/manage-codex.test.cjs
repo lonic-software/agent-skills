@@ -5,6 +5,7 @@ const test = require('node:test'),
   path = require('node:path'),
   os = require('node:os');
 const { savePlan, transact } = require('../bin/manage-codex.cjs');
+const { plan, apply } = require('../bin/install-codex.cjs');
 function setup(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-update-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -15,6 +16,19 @@ function setup(t) {
     recursive: true,
   });
   fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(
+    path.join(repo, 'codex', 'manifest.json'),
+    JSON.stringify({
+      schema: 1,
+      selections: { example: { skills: ['example'], agents: [] } },
+      blocked: {},
+    }),
+  );
+  fs.writeFileSync(
+    path.join(repo, 'codex/skills/example/SKILL.md'),
+    'EXAMPLE installed',
+  );
+  apply(plan(repo, project, 'example'));
   fs.writeFileSync(target, 'EXAMPLE user customization');
   fs.writeFileSync(
     path.join(repo, 'codex', 'skills', 'example', 'SKILL.md'),
@@ -23,14 +37,6 @@ function setup(t) {
   fs.writeFileSync(
     path.join(repo, 'codex', 'skills', 'example', 'new.txt'),
     'EXAMPLE new file',
-  );
-  fs.writeFileSync(
-    path.join(repo, 'codex', 'manifest.json'),
-    JSON.stringify({
-      schema: 1,
-      selections: { example: { skills: ['example'], agents: [] } },
-      blocked: {},
-    }),
   );
   return {
     root,
@@ -82,7 +88,7 @@ test('links and altered plans are refused', (t) => {
   assert.throws(() => transact(s.file, p.sha256), /digest/);
   const linkedProject = path.join(s.root, 'linked-project');
   fs.mkdirSync(linkedProject);
-  const link = path.join(linkedProject, '.agents');
+  const link = path.join(linkedProject, '.codex');
   fs.symlinkSync(
     s.project,
     link,

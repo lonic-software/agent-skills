@@ -3,7 +3,14 @@
 const fs = require('node:fs'),
   path = require('node:path'),
   crypto = require('node:crypto');
-const { plan } = require('./install-codex.cjs');
+const {
+  readInventory,
+  nextInventory,
+  inventoryRelative,
+  takeLock,
+  safeRelative,
+} = require('./installation-state.cjs');
+const { plan, destination } = require('./install-codex.cjs');
 const { plainPath } = require('../codex/runtime/queue-checkpoint.cjs');
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const current = (file) => {
@@ -13,8 +20,23 @@ const current = (file) => {
   return fs.readFileSync(file);
 };
 const hash = (bytes) => (bytes === null ? null : sha(bytes));
+function payload(relative, before, after) {
+  return {
+    relative,
+    before: before?.toString('base64') ?? null,
+    beforeSha: hash(before),
+    after: after?.toString('base64') ?? null,
+    afterSha: hash(after),
+  };
+}
 function savePlan(repo, project, selection, file, options = {}) {
-  const selected = plan(repo, project, selection, options);
+  if (typeof selection !== 'string' || !/^[a-z0-9-]+$/.test(selection))
+    throw Error('Invalid installation selection');
+  const dest = destination(project, options);
+  const inventory = readInventory(dest.scope, dest.project, selection);
+  const selected = options.remove
+    ? { ...dest, files: [], duplicates: [], collisionTargets: [] }
+    : plan(repo, project, selection, options);
   project = selected.project;
   if (
     selected.duplicates.length &&
@@ -24,30 +46,48 @@ function savePlan(repo, project, selection, file, options = {}) {
     throw Error(
       'Cross-scope skill collision: choose a scope or --on-duplicate keep-both',
     );
-  if (options.remove && selected.files.some((f) => f.status === 'CONFLICT'))
-    throw Error(
-      'Removal refuses edited files; preserve or restore them before planning removal',
-    );
   file = plainPath(file);
   if (fs.existsSync(file)) throw Error('Plan already exists');
-  const files = selected.files
-    .filter((f) =>
-      options.remove ? f.status === 'MATCH' : f.status !== 'MATCH',
-    )
-    .map((f) => {
-      const before = current(f.target);
-      return {
-        relative: f.relative,
-        before: before?.toString('base64') ?? null,
-        beforeSha: hash(before),
-        after: options.remove ? null : f.bytes.toString('base64'),
-        afterSha: options.remove ? null : f.sha256,
-      };
-    });
-  if (files.some((f) => path.resolve(project, f.relative) === file))
-    throw Error('Plan must not replace an installation target');
+  const desired = new Map(
+    selected.files.map((f) => [f.relative.split(path.sep).join('/'), f]),
+  );
+  const names = new Set([...desired.keys()]);
+  const owned = new Map(inventory.state.files.map((row) => [row.path, row]));
+  for (const row of owned.values())
+    if (row.owners.includes(selection)) names.add(row.path);
+  const files = [],
+    guards = [];
+  for (const name of names) {
+    const target = plainPath(path.join(project, name));
+    if (target === file)
+      throw Error('Plan must not replace an installation target');
+    const row = owned.get(name),
+      proposed = desired.get(name);
+    if (!proposed && row.owners.some((owner) => owner !== selection)) continue;
+    const before = current(target),
+      after = proposed?.bytes ?? null;
+    if (!proposed && before && hash(before) !== row.sha256)
+      throw Error(
+        'Removal refuses edited files: ' +
+          target +
+          '. Preserve or restore the installed version before removal.',
+      );
+    const entry = payload(name, before, after);
+    if (entry.beforeSha === entry.afterSha)
+      guards.push({ relative: name, sha256: entry.beforeSha });
+    else files.push(entry);
+  }
+  if (file === inventory.file)
+    throw Error('Plan must not replace the installation receipt');
+  const installation = payload(
+    inventoryRelative(selected.scope),
+    inventory.bytes,
+    nextInventory(inventory.state, selection, selected.files),
+  );
   const data = {
-    schema: 1,
+    schema: 2,
+    installation,
+    guards,
     scope: selected.scope,
     project: path.resolve(project),
     selection,
@@ -79,32 +119,41 @@ function loadPlan(file, expected) {
   if (!/^[a-f0-9]{64}$/.test(expected || '') || sha(bytes) !== expected)
     throw Error('Plan digest differs from the approved SHA-256');
   const data = JSON.parse(bytes);
+  if (data.schema === 1)
+    throw Error(
+      'Legacy plan has no installation receipt. Prepare a new plan with the current installer.',
+    );
   if (
-    data.schema !== 1 ||
-    !['global', 'project'].includes(data.scope || 'project') ||
+    data.schema !== 2 ||
+    !data.installation ||
+    data.installation.relative !== inventoryRelative(data.scope) ||
+    !Array.isArray(data.guards) ||
+    !['global', 'project'].includes(data.scope) ||
     !path.isAbsolute(data.project) ||
     !Array.isArray(data.files)
   )
     throw Error('Invalid update plan');
   plainPath(data.project);
   const seen = new Set();
-  for (const f of data.files) {
+  const guards = new Set(data.guards);
+  for (const f of [...data.files, ...data.guards, data.installation]) {
     if (typeof f.relative !== 'string' || path.isAbsolute(f.relative))
       throw Error('Invalid target');
-    const relative = f.relative.replaceAll('\\', '/');
+    const relative = f.relative;
+    const agentPrefix = data.scope === 'global' ? 'agents/' : '.codex/agents/';
+    const foreignAgent =
+      relative.startsWith(agentPrefix) &&
+      !relative.startsWith(agentPrefix + 'lonic-');
     if (
-      relative.split('/').some((p) => !p || p === '.' || p === '..') ||
-      !(
-        data.scope === 'global'
-          ? /^(skills\/[a-z0-9-]+\/|agents\/lonic-[a-z0-9-]+\.toml$|lonic\/runtime\/|lonic\/runtime-config\.example\.json$)/
-          : /^(\.agents\/skills\/[a-z0-9-]+\/|\.codex\/agents\/lonic-[a-z0-9-]+\.toml$|\.codex\/lonic\/runtime\/|\.codex\/lonic\/runtime-config\.example\.json$)/
-      ).test(relative)
+      f !== data.installation &&
+      (!safeRelative(data.scope, relative) || foreignAgent)
     )
       throw Error('Target outside the Codex package: ' + relative);
     const key = relative.toLowerCase();
     if (seen.has(key)) throw Error('Duplicate target');
     seen.add(key);
     f.target = plainPath(path.join(data.project, f.relative));
+    if (guards.has(f)) continue;
     f.beforeBytes = f.before === null ? null : Buffer.from(f.before, 'base64');
     f.afterBytes = f.after === null ? null : Buffer.from(f.after, 'base64');
     if (
@@ -162,20 +211,14 @@ function transact(file, approved, { rollback = false } = {}) {
     throw Error(
       'This plan already has an application record; inspect it before recovery',
     );
-  const lock = plainPath(
-    path.join(
-      data.project,
-      ...(data.scope === 'global' ? ['lonic'] : ['.codex', 'lonic']),
-      'update.lock',
-    ),
-  );
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  plainPath(lock);
-  fs.writeFileSync(lock, approved, { flag: 'wx', mode: 0o600 });
+  const release = takeLock(data.scope, data.project, approved);
   const changed = [];
   let result;
   try {
-    for (const f of data.files)
+    for (const g of data.guards)
+      if (hash(current(g.target)) !== g.sha256)
+        throw Error('File changed since the approved plan: ' + g.target);
+    for (const f of [...data.files, data.installation])
       if (hash(current(f.target)) !== (rollback ? f.afterSha : f.beforeSha))
         throw Error('File changed since the approved plan: ' + f.target);
     if (!rollback)
@@ -184,7 +227,10 @@ function transact(file, approved, { rollback = false } = {}) {
         JSON.stringify({ sha256: approved, status: 'applying' }) + '\n',
         { flag: 'wx', mode: 0o600 },
       );
-    for (const f of rollback ? [...data.files].reverse() : data.files)
+    const ordered = rollback ? [...data.files].reverse() : [...data.files];
+    if (data.installation.beforeSha !== data.installation.afterSha)
+      ordered.push(data.installation);
+    for (const f of ordered)
       replace(
         f.target,
         rollback ? f.beforeBytes : f.afterBytes,
@@ -229,11 +275,7 @@ function transact(file, approved, { rollback = false } = {}) {
       );
     throw error;
   } finally {
-    try {
-      if (fs.readFileSync(lock, 'utf8') === approved) fs.unlinkSync(lock);
-    } catch {
-      /* Preserve the transaction result; a retained lock requires manual reconciliation. */
-    }
+    release();
   }
 }
 function main(argv) {
