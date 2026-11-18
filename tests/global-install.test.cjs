@@ -201,20 +201,41 @@ test('runtime and configuration lookup prefer project, merge top-level overrides
   const entry = path.join(f.project, '.codex/lonic/runtime/queue.cjs'),
     config = path.join(f.project, '.codex/lonic/runtime-config.json');
   put(entry, 'EXAMPLE project');
-  put(
-    config,
-    JSON.stringify({ model: 'EXAMPLE-project', allowedCommands: [] }),
-  );
+  put(config, JSON.stringify({ model: 'EXAMPLE-project', timeoutMs: 1200 }));
   assert.equal(
     resolve.runtime(f.project, 'queue', f.home),
     fs.realpathSync(entry),
   );
   assert.equal(resolve.config(f.project, f.home).codex, 'EXAMPLE');
   assert.equal(resolve.config(f.project, f.home).model, 'EXAMPLE-project');
-  assert.deepEqual(resolve.config(f.project, f.home).allowedCommands, []);
+  assert.deepEqual(resolve.config(f.project, f.home).allowedCommands, [
+    ['EXAMPLE-global'],
+  ]);
+  assert.equal(resolve.config(f.project, f.home).timeoutMs, 1200);
   put(config, '{');
   assert.throws(() => resolve.config(f.project, f.home));
   assert.throws(() => resolve.runtime(f.project, 'invalid', f.home));
+});
+test('project runtime config refuses program, path and unknown keys even without a global config', (t) => {
+  const f = fixture(t);
+  const file = path.join(f.project, '.codex/lonic/runtime-config.json');
+  for (const key of [
+    'codex',
+    'tetel',
+    'allowedCommands',
+    'runRoot',
+    'command',
+    'outputDir',
+    '__proto__',
+  ]) {
+    put(file, JSON.stringify({ [key]: 'fixture' }));
+    assert.throws(
+      () => resolve.config(f.project, f.home),
+      (error) =>
+        error.message.includes(key) &&
+        error.message.includes('Project runtime configuration'),
+    );
+  }
 });
 test('global hook-only selection refuses and all runtime packaging leaves actual configuration untouched', (t) => {
   const f = fixture(t);

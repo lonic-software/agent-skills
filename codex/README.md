@@ -121,11 +121,17 @@ runtime path, quoting each argument separately. Queue entry-skill lookup also
 prefers PROJECT/.agents/skills over CODEX_HOME/skills, and supplies that explicit
 path to Codex. No project copy is needed for an ordinary globally installed run.
 
-Without --config, queue (--project) and evidence (--repo) combine global
-runtime-config.json with project overrides. Top-level values replace, including
-arrays and objects; invalid present project JSON refuses instead of falling back.
-Explicit --config keeps its prior standalone meaning. Managed launch keeps its
-explicit configuration and admission requirements.
+Project-first lookup is a trust boundary. A cloned repository can supply the
+runtime JavaScript that executes and the entry skill whose instructions reach
+Codex, even with a global installation. Review the project runtime and skills
+before invoking them in an unfamiliar checkout.
+
+Without --config, queue (--project) and evidence (--repo) read global
+runtime-config.json, then accept only schema, model and timeoutMs from the
+project layer. Any other project key stops lookup with an error naming the key
+and file. Put executable names, command lists and run directories in the
+operator-controlled global configuration or a deliberately selected standalone
+--config file. Managed launch retains its own admission requirements.
 
 Native test-filter-hook activation remains project-only; that selection refuses
 global scope. A full global runtime contains inert hook files but does not enable

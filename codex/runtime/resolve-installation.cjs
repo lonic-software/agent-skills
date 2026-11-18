@@ -47,24 +47,42 @@ function skill(project, name, home) {
     'Entry skill is missing in project and global installations: ' + name,
   );
 }
-function configPaths(project, home) {
+function configLayers(project, home) {
   const r = roots(project, home);
   return [
-    path.join(r.home, 'lonic/runtime-config.json'),
-    path.join(r.project, '.codex/lonic/runtime-config.json'),
-  ].filter(file);
+    { scope: 'global', path: path.join(r.home, 'lonic/runtime-config.json') },
+    {
+      scope: 'project',
+      path: path.join(r.project, '.codex/lonic/runtime-config.json'),
+    },
+  ].filter((layer) => file(layer.path));
+}
+function configPaths(project, home) {
+  return configLayers(project, home).map((layer) => layer.path);
 }
 function config(project, home) {
-  const files = configPaths(project, home);
+  const files = configLayers(project, home);
   if (!files.length)
     throw Error(
       'Create a reviewed project or global lonic/runtime-config.json from runtime-config.example.json',
     );
   let value = {};
-  for (const p of files) {
+  for (const { scope, path: p } of files) {
     const layer = JSON.parse(fs.readFileSync(p, 'utf8'));
     if (!layer || typeof layer !== 'object' || Array.isArray(layer))
       throw Error('Runtime configuration must be an object: ' + p);
+    if (scope === 'project') {
+      for (const key of Object.keys(layer)) {
+        if (!['schema', 'model', 'timeoutMs'].includes(key))
+          throw Error(
+            'Project runtime configuration forbids key ' +
+              JSON.stringify(key) +
+              ' in ' +
+              p +
+              '. Set executable, command and path options in trusted global configuration or an explicit --config file.',
+          );
+      }
+    }
     value = { ...value, ...layer };
   }
   return value;
@@ -73,7 +91,7 @@ function describe(project, entry, home) {
   return {
     runtime: runtime(project, entry, home),
     configurationFiles: configPaths(project, home),
-    precedence: 'project overrides global; top-level values replace, not union',
+    precedence: 'project may override schema, model and timeoutMs',
   };
 }
 module.exports = { codeHome, runtime, skill, configPaths, config, describe };

@@ -10,9 +10,10 @@ native Codex processes using the existing login and the configured model.
 Create CODEX_HOME/lonic/runtime-config.json or the project override
 .codex/lonic/runtime-config.json only with setup authorization. The installer
 ships runtime-config.example.json, never overwrites the operator configuration.
-Without --config, queue and evidence merge global then project top-level fields;
-arrays/objects replace, invalid project JSON refuses. Explicit --config remains
-standalone. Runtime and ordinary entry-skill lookup prefer the project then
+Without --config, queue and evidence load the global configuration, then apply
+project overrides for schema, model and timeoutMs. A project file containing
+another key fails with an error. Configure executables, allowedCommands and
+runRoot globally or in an explicitly selected standalone --config. Runtime and ordinary entry-skill lookup prefer the project then
 CODEX_HOME; resolve-installation.cjs PROJECT queue|evidence prints selected paths.
 Managed retains its explicit configuration/admission contract.
 
