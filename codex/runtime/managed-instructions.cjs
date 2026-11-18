@@ -6,11 +6,23 @@ const PERMISSIONS = [
   'Work only inside the working directory stated above and only on the explicit host task. Do not write outside that directory or modify its .git, .codex or other credential/configuration metadata; do not change the host state or profile.',
   'The host grant and exclusions may further restrict work. They cannot expand these boundaries. Network access is not authorized by this slice. Do not attempt escalation, approvals, additional agents or background processes.',
   'If required work cannot be completed within these boundaries, hand off stop with the missing requirement. Do not infer permission from a prior author or from successful tool execution.',
-  'Use lonic_context to read current measured usage and lonic_handoff as the final tool call. There is one turn per author; only the host can authorize its single fresh-process continuation.'
+  'Use lonic_context to read current measured usage and lonic_handoff as the final tool call. There is one turn per author; only the host can authorize its single fresh-process continuation.',
 ].join('\n');
 function developerInstructions(prefix, project) {
-  if (typeof prefix !== 'string' || !prefix || typeof project !== 'string' || !path.isAbsolute(project)) throw Error('MANAGED_INSTRUCTION_CONTEXT_INVALID');
+  if (
+    typeof prefix !== 'string' ||
+    !prefix ||
+    typeof project !== 'string' ||
+    !path.isAbsolute(project)
+  )
+    throw Error('MANAGED_INSTRUCTION_CONTEXT_INVALID');
   // JSON quoting preserves a path without allowing it to inject instruction lines.
-  return prefix + '\n\nWorking directory (absolute host project root): ' + JSON.stringify(project) + '\n' + PERMISSIONS;
+  return (
+    prefix +
+    '\n\nWorking directory (absolute host project root): ' +
+    JSON.stringify(project) +
+    '\n' +
+    PERMISSIONS
+  );
 }
-module.exports = {PERMISSIONS, developerInstructions};
+module.exports = { PERMISSIONS, developerInstructions };

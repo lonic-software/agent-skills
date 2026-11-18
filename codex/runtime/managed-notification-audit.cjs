@@ -3,6 +3,8 @@
 // Audit failure must not turn a progress notification into a stop condition.
 function auditNotification(audit, message) {
   if (typeof message?.method !== 'string') return;
-  try { audit?.({event: 'native-notification', method: message.method}); } catch {}
+  try {
+    audit?.({ event: 'native-notification', method: message.method });
+  } catch {}
 }
-module.exports = {auditNotification};
+module.exports = { auditNotification };

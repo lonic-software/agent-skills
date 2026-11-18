@@ -8,7 +8,7 @@ function createContinuation(attempt) {
       spent = true; // Before the first await, admission, meter or spawn.
       return attempt();
     },
-    spent: () => spent
+    spent: () => spent,
   });
 }
-module.exports = {createContinuation};
+module.exports = { createContinuation };

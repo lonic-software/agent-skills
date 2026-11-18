@@ -1,8 +1,63 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict');const {summarize}=require('../codex/runtime/usage-report.cjs');
-const c=n=>({inputTokens:n,cachedInputTokens:n/2,cacheWriteInputTokens:0,outputTokens:10,reasoningOutputTokens:2,totalTokens:n+10});
-const event=(n,turn='turn1',thread='main')=>({method:'thread/tokenUsage/updated',params:{threadId:thread,turnId:turn,tokenUsage:{total:c(n),last:c(100),modelContextWindow:1000}}});
-const prices={model:'EXAMPLE-model',source:'EXAMPLE DATA, NOT REAL PRICES',asOf:'2026-11-10',inputPerMillion:2,cachedInputPerMillion:0.5,cacheWritePerMillion:2,outputPerMillion:4};
-test('cumulative updates and duplicates are not double counted',()=>{const s=summarize([event(100),event(100),event(200),event(300,'turn2')],{mainThreadId:'main'});assert.equal(s.turns.length,2);assert.equal(s.turns[0].tokens.inputTokens,200);assert.equal(s.turns[1].tokens.inputTokens,100);assert.equal(s.context.lastRequestTokens,110);assert.equal(s.turns[0].apiPriceEquivalentUSD,null)});
-test('cost and break-even use explicit model-matched rates; unknown is not zero',()=>{const s=summarize([event(100),event(100,'subturn','child')],{mainThreadId:'main',model:'EXAMPLE-model',prices,nextPhaseTokens:10});assert.equal(s.breakEven.strictlyMoreThanTurns,0.4);assert.equal(s.turns[0].apiPriceEquivalentUSD,0.000165);assert.equal(s.turns[1].apiPriceEquivalentUSD,null);assert.equal(s.subscriptionCharge,null);assert.throws(()=>summarize([],{model:'different',prices}),/differs/);assert.equal(summarize([]).context,null)});
-test('malformed and decreasing totals are reported without inventing negative usage',()=>{const s=summarize([event(100),event(50),{method:'thread/tokenUsage/updated',params:{}}]);assert.equal(s.invalidEvents,2);assert.equal(s.threads[0].total.inputTokens,100)});
+const test = require('node:test'),
+  assert = require('node:assert/strict');
+const { summarize } = require('../codex/runtime/usage-report.cjs');
+const c = (n) => ({
+  inputTokens: n,
+  cachedInputTokens: n / 2,
+  cacheWriteInputTokens: 0,
+  outputTokens: 10,
+  reasoningOutputTokens: 2,
+  totalTokens: n + 10,
+});
+const event = (n, turn = 'turn1', thread = 'main') => ({
+  method: 'thread/tokenUsage/updated',
+  params: {
+    threadId: thread,
+    turnId: turn,
+    tokenUsage: { total: c(n), last: c(100), modelContextWindow: 1000 },
+  },
+});
+const prices = {
+  model: 'EXAMPLE-model',
+  source: 'EXAMPLE DATA, NOT REAL PRICES',
+  asOf: '2026-11-10',
+  inputPerMillion: 2,
+  cachedInputPerMillion: 0.5,
+  cacheWritePerMillion: 2,
+  outputPerMillion: 4,
+};
+test('cumulative updates and duplicates are not double counted', () => {
+  const s = summarize(
+    [event(100), event(100), event(200), event(300, 'turn2')],
+    { mainThreadId: 'main' },
+  );
+  assert.equal(s.turns.length, 2);
+  assert.equal(s.turns[0].tokens.inputTokens, 200);
+  assert.equal(s.turns[1].tokens.inputTokens, 100);
+  assert.equal(s.context.lastRequestTokens, 110);
+  assert.equal(s.turns[0].apiPriceEquivalentUSD, null);
+});
+test('cost and break-even use explicit model-matched rates; unknown is not zero', () => {
+  const s = summarize([event(100), event(100, 'subturn', 'child')], {
+    mainThreadId: 'main',
+    model: 'EXAMPLE-model',
+    prices,
+    nextPhaseTokens: 10,
+  });
+  assert.equal(s.breakEven.strictlyMoreThanTurns, 0.4);
+  assert.equal(s.turns[0].apiPriceEquivalentUSD, 0.000165);
+  assert.equal(s.turns[1].apiPriceEquivalentUSD, null);
+  assert.equal(s.subscriptionCharge, null);
+  assert.throws(() => summarize([], { model: 'different', prices }), /differs/);
+  assert.equal(summarize([]).context, null);
+});
+test('malformed and decreasing totals are reported without inventing negative usage', () => {
+  const s = summarize([
+    event(100),
+    event(50),
+    { method: 'thread/tokenUsage/updated', params: {} },
+  ]);
+  assert.equal(s.invalidEvents, 2);
+  assert.equal(s.threads[0].total.inputTokens, 100);
+});
