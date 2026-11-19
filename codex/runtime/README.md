@@ -148,7 +148,9 @@ measurement freshness; exact usage stops and cost savings are not guaranteed.
 
 Locks are not automatically reclaimed after a crash:
 
-- Queue: `os.tmpdir()/lonic-codex-queue-locks/<project-hash>.lock`.
+- Queue: `os.tmpdir()/lonic-codex-<uid>/queue-locks/<project-hash>.lock` on POSIX;
+  on Windows the UID is replaced by a SHA-256 hash of the OS account name and home directory.
+  During an upgrade, do not run an old and a new queue at the same time.
   The hash is SHA-256 of the real absolute project path, lowercased on Windows.
   Its JSON contains `runId`, `pid`, `project` and `queue`.
 - Installation and update use `lonic/update.lock` below the selected Codex root.

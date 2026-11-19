@@ -3,6 +3,7 @@ const fs = require('node:fs'),
   path = require('node:path'),
   crypto = require('node:crypto');
 const { bindRoot, tempRoot, tempPath } = require('./trusted-path.cjs');
+const { queueLockDirectory } = require('./queue-lock-directory.cjs');
 const { rpc } = require('./rpc-client.cjs');
 const { readAccountUsage } = require('./account-usage.cjs');
 const {
@@ -337,11 +338,7 @@ async function runQueue(options, adapters = {}) {
   );
   fs.mkdirSync(parent, { recursive: true });
   plainPath(parent);
-  const lockRoot = plainPath(
-    path.join(tempRoot.real, 'lonic-codex-queue-locks'),
-  );
-  fs.mkdirSync(lockRoot, { recursive: true });
-  plainPath(lockRoot);
+  const lockRoot = queueLockDirectory();
   const lock = path.join(
     lockRoot,
     crypto

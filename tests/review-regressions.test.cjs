@@ -288,11 +288,9 @@ test('stale queue lock retains owner metadata and blocks session startup', async
     project = fs.realpathSync(s.options.project),
     key = process.platform === 'win32' ? project.toLowerCase() : project,
     lock = path.join(
-      os.tmpdir(),
-      'lonic-codex-queue-locks',
+      require('../codex/runtime/queue-lock-directory.cjs').queueLockDirectory(),
       crypto.createHash('sha256').update(key).digest('hex') + '.lock',
     );
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
   const owner = JSON.stringify({
     runId: 'EXAMPLE-stale',
     pid: 99999999,
