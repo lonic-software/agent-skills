@@ -10,14 +10,35 @@ const wrapper = path.resolve(
   __dirname,
   '../codex/runtime/hooks/test-output.cjs',
 );
+let testRoot;
+const savedHome = process.env.CODEX_HOME;
 const inherited = process.env.FULL_TEST_OUTPUT;
 test.before(() => {
   delete process.env.FULL_TEST_OUTPUT;
+  testRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-hook-tests-')));
+  process.env.CODEX_HOME = path.join(testRoot, 'codex-home');
+  fs.mkdirSync(process.env.CODEX_HOME);
+  // Do not consult machine policy or a developer's real ancestor .codex directory.
+  const lstat = fs.lstatSync;
+  test.mock.method(fs, 'lstatSync', function (file, ...args) {
+    if (typeof file === 'string' && !file.startsWith(testRoot + path.sep) &&
+        (path.basename(file).toLowerCase() === '.codex' ||
+         path.basename(path.dirname(file)).toLowerCase() === '.codex' ||
+         ['rules', 'requirements.toml'].includes(path.basename(file)) ||
+         file === '/etc/codex'))
+      throw Object.assign(Error('absent in fixture'), { code: 'ENOENT' });
+    return lstat.call(fs, file, ...args);
+  });
 });
 test.after(() => {
+  test.mock.restoreAll();
+  if (savedHome === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = savedHome;
   if (inherited !== undefined) process.env.FULL_TEST_OUTPUT = inherited;
+  fs.rmSync(testRoot, { recursive: true, force: true });
 });
 const event = (command) => ({
+  cwd: testRoot,
   hook_event_name: 'PreToolUse',
   tool_name: 'Bash',
   tool_input: {
@@ -93,7 +114,7 @@ test('absolute, drive-qualified and parent-segment arguments defer to the host o
   }
 });
 test('npx and bunx require an executable in the command working directory', (t) => {
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-local-runner-'));
+  const cwd = fs.mkdtempSync(path.join(testRoot, 'lonic-local-runner-'));
   t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
   const bin = path.join(cwd, 'node_modules', '.bin');
   fs.mkdirSync(bin, { recursive: true });
@@ -151,7 +172,7 @@ test('shell syntax, quoted args, alternate commands and escape hatch remain unch
   );
 });
 test('real subprocess exit code and complete log survive long filtered output', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-filter-fixture-'));
+  const root = fs.mkdtempSync(path.join(testRoot, 'lonic-filter-fixture-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const script = path.join(root, 'example.cjs');
   fs.writeFileSync(
@@ -172,7 +193,7 @@ test('real subprocess exit code and complete log survive long filtered output', 
   t.after(() => fs.rmSync(path.dirname(log), { recursive: true, force: true }));
 });
 test('rewritten command executes through the real platform shell and keeps a successful status', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-hook-fixture-'));
+  const root = fs.mkdtempSync(path.join(testRoot, 'lonic-hook-fixture-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const file = path.join(root, 'example.test.cjs');
   fs.writeFileSync(file, 'require("node:test")("EXAMPLE pass",()=>{});');
@@ -210,4 +231,89 @@ test('a missing child command fails explicitly instead of reporting success', (t
     t.after(() =>
       fs.rmSync(path.dirname(log), { recursive: true, force: true }),
     );
+});
+
+test('a user rules file leaves the original command and approval to Codex', () => {
+  const rule = path.join(process.env.CODEX_HOME, 'rules', 'team.rules');
+  fs.mkdirSync(path.dirname(rule));
+  try {
+    fs.writeFileSync(rule, '');
+    assert.deepEqual(rewrite(event('npm test')), {});
+  } finally {
+    fs.rmSync(path.dirname(rule), { recursive: true });
+  }
+});
+
+test('a parent rule applies to a nested workdir and to its session cwd', (t) => {
+  const project = fs.mkdtempSync(path.join(testRoot, 'team-'));
+  const nested = path.join(project, 'repo', 'src');
+  const rules = path.join(project, '.codex', 'rules');
+  fs.mkdirSync(nested, { recursive: true });
+  fs.mkdirSync(rules, { recursive: true });
+  fs.writeFileSync(path.join(rules, 'local.rules'), 'contents need not be valid');
+  const input = event('npm test');
+  input.tool_input.workdir = path.relative(input.cwd, nested);
+  assert.deepEqual(rewrite(input), {});
+  input.cwd = nested;
+  input.tool_input.workdir = testRoot;
+  assert.deepEqual(rewrite(input), {});
+});
+
+test('empty rule directories and unrelated files preserve the existing rewrite', () => {
+  const dir = path.join(process.env.CODEX_HOME, 'rules');
+  fs.mkdirSync(dir);
+  try {
+    fs.writeFileSync(path.join(dir, 'notes.txt'), 'no rules');
+    const result = rewrite(event('npm test')).hookSpecificOutput;
+    assert.equal(result.permissionDecision, 'allow');
+    assert.ok(result.updatedInput.command.endsWith('-- npm test'));
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('unreadable rules directory defers without returning an approval', t => {
+  const dir = path.join(process.env.CODEX_HOME, 'rules');
+  fs.mkdirSync(dir);
+  t.after(() => fs.rmdirSync(dir));
+  const read = fs.readdirSync;
+  t.mock.method(fs, 'readdirSync', function (name, ...args) {
+    if (name === dir) throw Object.assign(Error('access denied'), { code: 'EACCES' });
+    return read.call(fs, name, ...args);
+  });
+  assert.deepEqual(rewrite(event('npm test')), {});
+});
+
+test('a symlink loop on the rules path defers to Codex', {
+  skip: process.platform === 'win32' && 'POSIX symlink fixture',
+}, t => {
+  const dir = path.join(process.env.CODEX_HOME, 'rules');
+  fs.symlinkSync('rules', dir);
+  t.after(() => fs.unlinkSync(dir));
+  assert.deepEqual(rewrite(event('npm test')), {});
+});
+
+test('unset CODEX_HOME checks the default rules directory under the user home', t => {
+  const home = fs.mkdtempSync(path.join(testRoot, 'fallback-'));
+  const dir = path.join(home, '.codex', 'rules');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'default.rules'), '');
+  t.mock.method(os, 'homedir', () => home);
+  const explicit = process.env.CODEX_HOME;
+  delete process.env.CODEX_HOME;
+  try {
+    assert.deepEqual(rewrite(event('npm test')), {});
+  } finally {
+    process.env.CODEX_HOME = explicit;
+  }
+});
+
+test('a filesystem error before listing user rules also defers to Codex', t => {
+  const dir = path.join(process.env.CODEX_HOME, 'rules');
+  const stat = fs.lstatSync;
+  t.mock.method(fs, 'lstatSync', function (file, ...args) {
+    if (file === dir) throw Object.assign(Error('access denied'), { code: 'EACCES' });
+    return stat.call(fs, file, ...args);
+  });
+  assert.deepEqual(rewrite(event('npm test')), {});
 });

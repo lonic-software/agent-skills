@@ -185,12 +185,24 @@ real shell exit/log tests, and approved native hook activation passed in the
 Windows and Ubuntu demos. Every new installation still needs explicit activation.
 Direct script tests alone do not establish native hook coverage.
 
-Operator decision U1 retains this documented difference: the Codex hook returns
-`permissionDecision: "allow"` with its rewritten command;
-the Claude hook omits that decision. Preservation of `untrusted` command approval
-has not been established. The independent Windows probe could not reach its
-local scripted provider, so it did not exercise the hook or an approval decision.
-A rewritten command starts with `node -e`. Prefix-based deny or ask rules for the original command may therefore stop matching. Enforcement of those rules remains unverified (U1). Non-default sandbox permission requests and unrecognized flags pass directly to the host. `npx` and `bunx` tests require a local runner and execute that shim directly.
+U1: the Codex hook returns `permissionDecision: "allow"` when it rewrites a
+command; the Claude hook omits that decision. In an offline check with Windows
+Codex CLI 0.169.0-alpha.11.1, the original `npm test` matched the `forbidden`
+and `prompt` rules in separate checks. The rewritten command matched neither.
+We did not observe which command a live session evaluates.
+
+The hook therefore returns no decision and leaves the command unchanged if it
+finds a `.rules` entry in the user rules directory (`CODEX_HOME/rules`, default
+`~/.codex/rules`), in `.codex/rules` from the command or session directory up
+to the filesystem root, or in the system Codex rules directory. It also defers
+if a local system `requirements.toml` exists or if it cannot inspect a path.
+It does not parse rules or determine project trust. Centrally managed policies
+and other rule sources outside its view cannot be detected reliably. **Do not
+enable this hook where authorization depends on such policies.**
+
+Non-default sandbox permission requests and unrecognized flags still pass
+directly to the host. `npx` and `bunx` tests require a local runner and execute
+that shim directly.
 
 ## Measured scope
 
