@@ -17,7 +17,7 @@ function checkedDirectory(dir, uid) {
   else if (!stat.isDirectory()) reason = 'is not a directory';
   else if (uid !== null && stat.uid !== uid)
     reason = 'is owned by uid ' + stat.uid + ', expected ' + uid;
-  else if (uid !== null && (stat.mode & 0o022))
+  else if (uid !== null && stat.mode & 0o022)
     reason = 'is writable by group or others';
   if (reason) throw Error('Unsafe queue lock directory: ' + dir + ' ' + reason);
 }
@@ -29,7 +29,8 @@ function queueLockDirectory(temp = tempRoot.real) {
   let account = uid;
   if (uid === null) {
     const { username, homedir } = os.userInfo();
-    account = crypto.createHash('sha256')
+    account = crypto
+      .createHash('sha256')
       .update(JSON.stringify([username.toLowerCase(), homedir.toLowerCase()]))
       .digest('hex');
   }

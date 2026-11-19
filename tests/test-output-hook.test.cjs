@@ -15,17 +15,22 @@ const savedHome = process.env.CODEX_HOME;
 const inherited = process.env.FULL_TEST_OUTPUT;
 test.before(() => {
   delete process.env.FULL_TEST_OUTPUT;
-  testRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-hook-tests-')));
+  testRoot = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'lonic-hook-tests-')),
+  );
   process.env.CODEX_HOME = path.join(testRoot, 'codex-home');
   fs.mkdirSync(process.env.CODEX_HOME);
   // Do not consult machine policy or a developer's real ancestor .codex directory.
   const lstat = fs.lstatSync;
   test.mock.method(fs, 'lstatSync', function (file, ...args) {
-    if (typeof file === 'string' && !file.startsWith(testRoot + path.sep) &&
-        (path.basename(file).toLowerCase() === '.codex' ||
-         path.basename(path.dirname(file)).toLowerCase() === '.codex' ||
-         ['rules', 'requirements.toml'].includes(path.basename(file)) ||
-         file === '/etc/codex'))
+    if (
+      typeof file === 'string' &&
+      !file.startsWith(testRoot + path.sep) &&
+      (path.basename(file).toLowerCase() === '.codex' ||
+        path.basename(path.dirname(file)).toLowerCase() === '.codex' ||
+        ['rules', 'requirements.toml'].includes(path.basename(file)) ||
+        file === '/etc/codex')
+    )
       throw Object.assign(Error('absent in fixture'), { code: 'ENOENT' });
     return lstat.call(fs, file, ...args);
   });
@@ -250,7 +255,10 @@ test('a parent rule applies to a nested workdir and to its session cwd', (t) => 
   const rules = path.join(project, '.codex', 'rules');
   fs.mkdirSync(nested, { recursive: true });
   fs.mkdirSync(rules, { recursive: true });
-  fs.writeFileSync(path.join(rules, 'local.rules'), 'contents need not be valid');
+  fs.writeFileSync(
+    path.join(rules, 'local.rules'),
+    'contents need not be valid',
+  );
   const input = event('npm test');
   input.tool_input.workdir = path.relative(input.cwd, nested);
   assert.deepEqual(rewrite(input), {});
@@ -272,28 +280,33 @@ test('empty rule directories and unrelated files preserve the existing rewrite',
   }
 });
 
-test('unreadable rules directory defers without returning an approval', t => {
+test('unreadable rules directory defers without returning an approval', (t) => {
   const dir = path.join(process.env.CODEX_HOME, 'rules');
   fs.mkdirSync(dir);
   t.after(() => fs.rmdirSync(dir));
   const read = fs.readdirSync;
   t.mock.method(fs, 'readdirSync', function (name, ...args) {
-    if (name === dir) throw Object.assign(Error('access denied'), { code: 'EACCES' });
+    if (name === dir)
+      throw Object.assign(Error('access denied'), { code: 'EACCES' });
     return read.call(fs, name, ...args);
   });
   assert.deepEqual(rewrite(event('npm test')), {});
 });
 
-test('a symlink loop on the rules path defers to Codex', {
-  skip: process.platform === 'win32' && 'POSIX symlink fixture',
-}, t => {
-  const dir = path.join(process.env.CODEX_HOME, 'rules');
-  fs.symlinkSync('rules', dir);
-  t.after(() => fs.unlinkSync(dir));
-  assert.deepEqual(rewrite(event('npm test')), {});
-});
+test(
+  'a symlink loop on the rules path defers to Codex',
+  {
+    skip: process.platform === 'win32' && 'POSIX symlink fixture',
+  },
+  (t) => {
+    const dir = path.join(process.env.CODEX_HOME, 'rules');
+    fs.symlinkSync('rules', dir);
+    t.after(() => fs.unlinkSync(dir));
+    assert.deepEqual(rewrite(event('npm test')), {});
+  },
+);
 
-test('unset CODEX_HOME checks the default rules directory under the user home', t => {
+test('unset CODEX_HOME checks the default rules directory under the user home', (t) => {
   const home = fs.mkdtempSync(path.join(testRoot, 'fallback-'));
   const dir = path.join(home, '.codex', 'rules');
   fs.mkdirSync(dir, { recursive: true });
@@ -308,11 +321,12 @@ test('unset CODEX_HOME checks the default rules directory under the user home', 
   }
 });
 
-test('a filesystem error before listing user rules also defers to Codex', t => {
+test('a filesystem error before listing user rules also defers to Codex', (t) => {
   const dir = path.join(process.env.CODEX_HOME, 'rules');
   const stat = fs.lstatSync;
   t.mock.method(fs, 'lstatSync', function (file, ...args) {
-    if (file === dir) throw Object.assign(Error('access denied'), { code: 'EACCES' });
+    if (file === dir)
+      throw Object.assign(Error('access denied'), { code: 'EACCES' });
     return stat.call(fs, file, ...args);
   });
   assert.deepEqual(rewrite(event('npm test')), {});

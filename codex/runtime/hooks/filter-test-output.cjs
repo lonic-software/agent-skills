@@ -60,7 +60,10 @@ function rulesAbsent(event, cwd) {
   function directoryExists(dir) {
     const entry = optionalEntry(dir);
     if (entry) {
-      if (entry.isDirectory() || (entry.isSymbolicLink() && fs.statSync(dir).isDirectory()))
+      if (
+        entry.isDirectory() ||
+        (entry.isSymbolicLink() && fs.statSync(dir).isDirectory())
+      )
         return true;
       throw Error('Not a directory');
     }
@@ -71,23 +74,35 @@ function rulesAbsent(event, cwd) {
   }
   function hasRules(root) {
     const dir = path.join(root, 'rules');
-    return directoryExists(dir) &&
-      fs.readdirSync(dir).some(name => name.toLowerCase().endsWith('.rules'));
+    return (
+      directoryExists(dir) &&
+      fs.readdirSync(dir).some((name) => name.toLowerCase().endsWith('.rules'))
+    );
   }
   try {
     const home = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
     if (!path.isAbsolute(home) || hasRules(home)) return false;
-    const system = process.platform === 'win32'
-      ? path.join(process.env.ProgramData || path.join(path.parse(process.env.SystemRoot).root, 'ProgramData'), 'OpenAI', 'Codex')
-      : '/etc/codex';
-    if (!path.isAbsolute(system) || hasRules(system) ||
-        optionalEntry(path.join(system, 'requirements.toml')))
+    const system =
+      process.platform === 'win32'
+        ? path.join(
+            process.env.ProgramData ||
+              path.join(path.parse(process.env.SystemRoot).root, 'ProgramData'),
+            'OpenAI',
+            'Codex',
+          )
+        : '/etc/codex';
+    if (
+      !path.isAbsolute(system) ||
+      hasRules(system) ||
+      optionalEntry(path.join(system, 'requirements.toml'))
+    )
       return false;
 
     // An explicit tool workdir can be outside the session's configuration tree.
     const visited = new Set();
     for (const start of new Set([cwd, event.cwd || process.cwd()])) {
-      if (!path.isAbsolute(start) || !fs.statSync(start).isDirectory()) return false;
+      if (!path.isAbsolute(start) || !fs.statSync(start).isDirectory())
+        return false;
       for (let dir of [start, fs.realpathSync(start)]) {
         while (!visited.has(dir)) {
           visited.add(dir);
@@ -127,7 +142,8 @@ function rewrite(event) {
     return {};
   }
   if (!rulesAbsent(event, cwd)) return {};
-  if (['npx', 'bunx'].includes(tokens[0]) && !localRunner(tokens[1], cwd)) return {};
+  if (['npx', 'bunx'].includes(tokens[0]) && !localRunner(tokens[1], cwd))
+    return {};
   const encoded = Buffer.from(
     path.join(__dirname, 'test-output.cjs'),
     'utf8',
