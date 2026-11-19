@@ -18,11 +18,13 @@ object-level rules owned by consult, delivery, or design-doc.
 - A recurrence despite an existing rule, often requiring a mechanism change.
 - A direct user request to improve the rules.
 
-A one-off is an incident note, not a universal rule. Codex does not promise to
-auto-load a project MEMORY.md index. Open the relevant project-owned record
-before claiming a cross-session recurrence. If no record is configured, use
-current evidence or ask where the user wants records stored. Do not create
-global memory or invent a previous incident.
+The default project memory file, `.codex/lonic/memory.md`, holds incident
+evidence and `promoted into` notes alongside suggested run preferences.
+Codex does not load it automatically. If it exists, read it before claiming a
+recurrence across sessions. Without evidence of a prior incident, treat a
+one-off as a note, not a rule. Create or edit the file only with the user's
+approval. The user decides whether to commit it to the repository.
+Do not create global memory or invent a previous incident.
 
 ## Proposal and gate
 
@@ -39,10 +41,11 @@ mechanical typo/path fixes do not. Several related candidates may share a review
 If the required advisor is unavailable, leave the proposal pending.
 
 Skills hold the rule. Incident records hold the evidence and rationale. Link
-the approved rule to its incident and mark the incident as promoted; preserve
-the original evidence. An obsolete incident note must not override a current
-rule. Verify installed/source drift before editing and never silently copy one
-side over the other. Report any installation step for approval.
+the approved rule to its incident. With approval, append
+`promoted into <skill> §X` to the incident, naming the actual skill and section.
+Never delete the original evidence. An obsolete note must not override a
+current rule. Verify installed/source drift before editing and never silently
+copy one side over the other. Report any installation step for approval.
 
 Every activated mode announces what it changes. Keep new rules in their proper
 owner and prefer consolidation over adding another overlapping skill.

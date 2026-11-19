@@ -105,3 +105,39 @@ test('missing installation receipt gives a recovery instruction for remove and u
       /No installation receipt.*originally installed revision.*--apply/,
     );
 });
+
+test('project update and removal preserve the user-owned memory file', (t) => {
+  const { root, source, project, skill } = fixture(t);
+  const options = {
+    scope: 'project',
+    codexHome: path.join(root, 'codex-home'),
+  };
+  const memoryFile = path.join(project, '.codex/lonic/memory.md');
+  const installed = path.join(project, '.agents/skills/example/SKILL.md');
+  apply(plan(source, project, 'one', options));
+  assert.equal(fs.existsSync(memoryFile), false);
+  const evidence = Buffer.from(
+    'Incident 1: original evidence\r\npromoted into example §2\r\n',
+  );
+  fs.writeFileSync(memoryFile, evidence);
+
+  fs.writeFileSync(path.join(skill, 'SKILL.md'), 'new package version');
+  const update = savePlan(
+    source,
+    project,
+    'one',
+    path.join(root, 'update'),
+    options,
+  );
+  transact(update.file, update.sha256);
+  assert.equal(fs.readFileSync(installed, 'utf8'), 'new package version');
+  assert.deepEqual(fs.readFileSync(memoryFile), evidence);
+
+  const removal = savePlan(source, project, 'one', path.join(root, 'remove'), {
+    ...options,
+    remove: true,
+  });
+  transact(removal.file, removal.sha256);
+  assert.equal(fs.existsSync(installed), false);
+  assert.deepEqual(fs.readFileSync(memoryFile), evidence);
+});

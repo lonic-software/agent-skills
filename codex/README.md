@@ -88,6 +88,10 @@ uses the recorded files even when the newer package dropped them. A shared
 file stays installed until its last owning selection is removed. Apply and
 rollback include the receipt in the same reviewed transaction.
 
+The project memory file, `.codex/lonic/memory.md`, is the Codex counterpart to
+Claude's `MEMORY.md`. The installer does not create it. Update and removal
+leave it untouched because it is not an installed package file.
+
 For a legacy installation, back up local edits and identify the original
 package revision. Use the current installer with the original package files,
 review --check and run --apply for each installed selection at that revision
