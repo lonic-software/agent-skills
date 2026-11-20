@@ -20,7 +20,9 @@ read refreshes it the same way.
 ## 1. Resolve the run parameters (first session only)
 
 A session started by a handoff gets every parameter of this section in its prompt. In that case, do
-not ask again: run `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark resolved` and go straight to §2.
+not ask again. When `powerup-mark show` lacks the prompt's availability windows (a fresh process
+clears the record), record them first, one `powerup-mark window "<rule>"` per rule; then run
+`${CLAUDE_SKILL_DIR}/../powerup/powerup-mark resolved` and go straight to §2.
 
 Otherwise, resolve them from the user's prompt, and ask only for what is missing (availability
 windows, §1d, are the exception: never asked for). Put every missing question into **one**
