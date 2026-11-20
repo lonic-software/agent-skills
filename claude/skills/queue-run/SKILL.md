@@ -140,7 +140,7 @@ If the handoff tool is unavailable, stop (§5) and print the ready-to-paste prom
 
 Stop when any of these holds: the threshold is reached, the queue has no unblocked items left (an
 item parked as blocked on the user counts as blocked, §1d), or something is broken in a way the chain shouldn't guess
-past (CI infrastructure down, auth expired, repeated review non-convergence).
+past (CI infrastructure down, auth expired, review non-convergence: the review ledger owes a direction verdict, delivery §C, that the run cannot give itself, such as a cut).
 
 Run `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark clear` at the stop, whichever command started the
 chain, so a later unrelated compaction in this tree injects nothing.

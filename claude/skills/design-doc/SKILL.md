@@ -184,7 +184,8 @@ are real, and they route to the instruments that own them (delivery §B owns the
 into prose. **Ending the design phase does not predict a light code review.** Mechanism defects
 surface at the implementation gates *by design* — moving a defect from prose to a diff is what makes
 it real and fixable, not what makes it free. Budget the code-review rounds accordingly; their yield
-is the system working, not the stopping rule failing.
+is the system working, not the stopping rule failing — until the review ledger owes a direction
+check (delivery §C). From then on, heavy yield is the signal, not health.
 
 A closed design is ready to implement — after the checklist under **When it is ready** in
 `method.md`. The end of a design is a phase boundary: `powerup`'s phase-boundary rule owns whether to
