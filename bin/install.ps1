@@ -19,28 +19,65 @@
     copies the hook scripts and prints the settings.json entry to add.
 
 .PARAMETER Tool
-    Which coding tool to install into (currently only "claude").
+    claude, or codex for the global-default installation preview.
 
 .PARAMETER Skill
     powerup | consult | design-doc | delivery | evolve | queue-run | queue-fleet
     | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
+    Codex also accepts core-preview | full-preview.
+
+.PARAMETER Project
+    Existing project context. Required only with -Scope project.
+
+.PARAMETER Apply
+    Apply the Codex preview after review. Without this switch, only preview.
+
+.PARAMETER Check
+    Compare installed Codex files with the selected source files.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('claude')]
+    [ValidateSet('claude', 'codex')]
     [string]$Tool,
 
     [Parameter(Mandatory = $true, Position = 1)]
     [ValidateSet('powerup', 'consult', 'design-doc', 'delivery', 'evolve', 'queue-run',
+                 'core-preview', 'full-preview',
                  'queue-fleet', 'powerup-auto', 'powerup-fleet', 'test-filter-hook', 'gate-hook')]
-    [string]$Skill
+    [string]$Skill,
+
+    [string]$Project,
+    [ValidateSet('global', 'project')]
+    [string]$Scope = 'global',
+    [string]$CodexHome,
+    [ValidateSet('keep-both')]
+    [string]$OnDuplicate,
+    [switch]$Apply,
+    [switch]$Check
 )
 
 $ErrorActionPreference = 'Stop'
 
 # pult calls the bash sibling; run directly, the repo root is this script's parent.
 $repoRoot = Split-Path -Parent $PSScriptRoot
+
+if ($Tool -eq 'codex') {
+    if ($Scope -eq 'project' -and -not $Project) { throw 'Project scope requires -Project.' }
+    if ($Apply -and $Check) { throw 'Use either -Apply or -Check, not both.' }
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'Codex preview requires Node.js 18 or later; no installation was attempted.' }
+    $nodeArgs = @((Join-Path $PSScriptRoot 'install-codex.cjs'), '--scope', $Scope, '--skill', $Skill)
+    if ($Project) { $nodeArgs += @('--project', $Project) }
+    if ($CodexHome) { $nodeArgs += @('--codex-home', $CodexHome) }
+    if ($OnDuplicate) { $nodeArgs += @('--on-duplicate', $OnDuplicate) }
+    if ($Apply) { $nodeArgs += '--apply' }
+    if ($Check) { $nodeArgs += '--check' }
+    & node @nodeArgs
+    exit $LASTEXITCODE
+}
+if ($PSBoundParameters.ContainsKey('Scope') -or $CodexHome -or $OnDuplicate -or $Project -or $Apply -or $Check -or $Skill -in @('core-preview', 'full-preview')) {
+    throw 'Project preview options apply only to the codex target.'
+}
 
 # --- Per-tool config layout -------------------------------------------------
 switch ($Tool) {

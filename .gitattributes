@@ -1,0 +1,3 @@
+bin/install text eol=lf
+bin/check-sync text eol=lf
+codex/** text eol=lf

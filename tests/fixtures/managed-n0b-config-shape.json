@@ -1,0 +1,5680 @@
+{
+  "schema": 1,
+  "description": "N0b observed names/types only; synthetic replay supplies all values. Unresolved names retain their hash label.",
+  "scopes": [
+    {
+      "scope": "effective",
+      "keys": [
+        {
+          "name": "model",
+          "type": "string"
+        },
+        {
+          "name": "review_model",
+          "type": "null"
+        },
+        {
+          "name": "model_context_window",
+          "type": "null"
+        },
+        {
+          "name": "model_auto_compact_token_limit",
+          "type": "null"
+        },
+        {
+          "name": "model_auto_compact_token_limit_scope",
+          "type": "null"
+        },
+        {
+          "name": "model_provider",
+          "type": "null"
+        },
+        {
+          "name": "approval_policy",
+          "type": "null"
+        },
+        {
+          "name": "approvals_reviewer",
+          "type": "null"
+        },
+        {
+          "name": "sandbox_mode",
+          "type": "null"
+        },
+        {
+          "name": "sandbox_workspace_write",
+          "type": "null"
+        },
+        {
+          "name": "forced_chatgpt_workspace_id",
+          "type": "null"
+        },
+        {
+          "name": "forced_login_method",
+          "type": "null"
+        },
+        {
+          "name": "web_search",
+          "type": "string"
+        },
+        {
+          "name": "tools",
+          "type": "null"
+        },
+        {
+          "name": "instructions",
+          "type": "null"
+        },
+        {
+          "name": "developer_instructions",
+          "type": "null"
+        },
+        {
+          "name": "compact_prompt",
+          "type": "null"
+        },
+        {
+          "name": "model_reasoning_effort",
+          "type": "string"
+        },
+        {
+          "name": "model_reasoning_summary",
+          "type": "null"
+        },
+        {
+          "name": "model_verbosity",
+          "type": "null"
+        },
+        {
+          "name": "service_tier",
+          "type": "string"
+        },
+        {
+          "name": "analytics",
+          "type": "object"
+        },
+        {
+          "name": "apps",
+          "type": "null"
+        },
+        {
+          "name": "browser_use",
+          "type": "null"
+        },
+        {
+          "name": "computer_use",
+          "type": "null"
+        },
+        {
+          "name": "desktop",
+          "type": "object"
+        },
+        {
+          "name": "file_opener",
+          "type": "string"
+        },
+        {
+          "name": "project_doc_max_bytes",
+          "type": "number"
+        },
+        {
+          "name": "cli_auth_credentials_store",
+          "type": "string"
+        },
+        {
+          "name": "notice",
+          "type": "null"
+        },
+        {
+          "name": "experimental_realtime_ws_base_url",
+          "type": "null"
+        },
+        {
+          "name": "show_raw_agent_reasoning",
+          "type": "null"
+        },
+        {
+          "name": "suppress_unstable_features_warning",
+          "type": "null"
+        },
+        {
+          "name": "feedback",
+          "type": "object"
+        },
+        {
+          "name": "orchestrator",
+          "type": "null"
+        },
+        {
+          "name": "js_repl_node_path",
+          "type": "null"
+        },
+        {
+          "name": "agents",
+          "type": "object"
+        },
+        {
+          "name": "allow_symlinked_codex_home",
+          "type": "null"
+        },
+        {
+          "name": "mcp_enterprise_managed_auth",
+          "type": "null"
+        },
+        {
+          "name": "skills",
+          "type": "object"
+        },
+        {
+          "name": "marketplaces",
+          "type": "object"
+        },
+        {
+          "name": "profiles",
+          "type": "object"
+        },
+        {
+          "name": "hooks",
+          "type": "object"
+        },
+        {
+          "name": "chatgpt_base_url",
+          "type": "string"
+        },
+        {
+          "name": "model_instructions_file",
+          "type": "null"
+        },
+        {
+          "name": "ghost_snapshot",
+          "type": "null"
+        },
+        {
+          "name": "hide_agent_reasoning",
+          "type": "boolean"
+        },
+        {
+          "name": "experimental_realtime_ws_backend_prompt",
+          "type": "null"
+        },
+        {
+          "name": "disable_paste_burst",
+          "type": "null"
+        },
+        {
+          "name": "log_dir",
+          "type": "string"
+        },
+        {
+          "name": "projects",
+          "type": "object"
+        },
+        {
+          "name": "realtime",
+          "type": "null"
+        },
+        {
+          "name": "experimental_realtime_ws_startup_context",
+          "type": "null"
+        },
+        {
+          "name": "tool_suggest",
+          "type": "null"
+        },
+        {
+          "name": "openai_base_url",
+          "type": "null"
+        },
+        {
+          "name": "allow_login_shell",
+          "type": "boolean"
+        },
+        {
+          "name": "mcp_optional_startup_grace_ms",
+          "type": "null"
+        },
+        {
+          "name": "tool_output_token_limit",
+          "type": "null"
+        },
+        {
+          "name": "mcp_oauth_callback_port",
+          "type": "null"
+        },
+        {
+          "name": "auto_review",
+          "type": "null"
+        },
+        {
+          "name": "responses_api_metadata",
+          "type": "null"
+        },
+        {
+          "name": "memories",
+          "type": "null"
+        },
+        {
+          "name": "experimental_compact_prompt_file",
+          "type": "null"
+        },
+        {
+          "name": "oss_provider",
+          "type": "null"
+        },
+        {
+          "name": "apps_mcp_product_sku",
+          "type": "null"
+        },
+        {
+          "name": "daybreak",
+          "type": "null"
+        },
+        {
+          "name": "features",
+          "type": "object"
+        },
+        {
+          "name": "include_collaboration_mode_instructions",
+          "type": "boolean"
+        },
+        {
+          "name": "history",
+          "type": "object"
+        },
+        {
+          "name": "notify",
+          "type": "array"
+        },
+        {
+          "name": "profile",
+          "type": "null"
+        },
+        {
+          "name": "mcp_oauth_credentials_store",
+          "type": "string"
+        },
+        {
+          "name": "js_repl_node_module_dirs",
+          "type": "null"
+        },
+        {
+          "name": "sqlite_home",
+          "type": "string"
+        },
+        {
+          "name": "experimental_thread_store_endpoint",
+          "type": "null"
+        },
+        {
+          "name": "experimental_use_unified_exec_tool",
+          "type": "null"
+        },
+        {
+          "name": "model_post_turn_compact_threshold_percent",
+          "type": "null"
+        },
+        {
+          "name": "include_environment_context",
+          "type": "boolean"
+        },
+        {
+          "name": "include_permissions_instructions",
+          "type": "boolean"
+        },
+        {
+          "name": "otel",
+          "type": "null"
+        },
+        {
+          "name": "include_apps_instructions",
+          "type": "boolean"
+        },
+        {
+          "name": "tui",
+          "type": "object"
+        },
+        {
+          "name": "experimental_thread_store",
+          "type": "null"
+        },
+        {
+          "name": "thread_unload_delay_secs",
+          "type": "null"
+        },
+        {
+          "name": "personality",
+          "type": "string"
+        },
+        {
+          "name": "mcp_servers",
+          "type": "object"
+        },
+        {
+          "name": "cloud",
+          "type": "null"
+        },
+        {
+          "name": "experimental_realtime_ws_model",
+          "type": "null"
+        },
+        {
+          "name": "model_catalog_json",
+          "type": "null"
+        },
+        {
+          "name": "experimental_realtime_start_instructions",
+          "type": "null"
+        },
+        {
+          "name": "goals",
+          "type": "null"
+        },
+        {
+          "name": "plugins",
+          "type": "object"
+        },
+        {
+          "name": "windows",
+          "type": "object"
+        },
+        {
+          "name": "shell_environment_policy",
+          "type": "object"
+        },
+        {
+          "name": "permissions",
+          "type": "null"
+        },
+        {
+          "name": "audio",
+          "type": "null"
+        },
+        {
+          "name": "default_permissions",
+          "type": "null"
+        },
+        {
+          "name": "plan_mode_reasoning_effort",
+          "type": "null"
+        },
+        {
+          "name": "background_terminal_max_timeout",
+          "type": "number"
+        },
+        {
+          "name": "project_doc_fallback_filenames",
+          "type": "array"
+        },
+        {
+          "name": "mcp_oauth_callback_url",
+          "type": "null"
+        },
+        {
+          "name": "model_providers",
+          "type": "object"
+        },
+        {
+          "name": "experimental_realtime_webrtc_call_base_url",
+          "type": "null"
+        },
+        {
+          "name": "project_root_markers",
+          "type": "array"
+        },
+        {
+          "name": "check_for_update_on_startup",
+          "type": "null"
+        },
+        {
+          "name": "include_environment_context_time",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "scope": "effective.features",
+      "keys": [
+        {
+          "name": "network_proxy",
+          "type": "null"
+        },
+        {
+          "name": "apps",
+          "type": "boolean"
+        },
+        {
+          "name": "hooks",
+          "type": "boolean"
+        },
+        {
+          "name": "js_repl",
+          "type": "boolean"
+        },
+        {
+          "name": "memories",
+          "type": "boolean"
+        },
+        {
+          "name": "multi_agent",
+          "type": "boolean"
+        },
+        {
+          "name": "plugins",
+          "type": "boolean"
+        },
+        {
+          "name": "api_key_cyber_access_programs",
+          "type": "boolean"
+        },
+        {
+          "name": "api_key_model_discovery",
+          "type": "boolean"
+        },
+        {
+          "name": "auth_elicitation",
+          "type": "boolean"
+        },
+        {
+          "name": "background_paginated_rollout_migration",
+          "type": "boolean"
+        },
+        {
+          "name": "codex_apps_mcp_2026_07_28",
+          "type": "boolean"
+        },
+        {
+          "name": "mcp_2026_07_28",
+          "type": "boolean"
+        },
+        {
+          "name": "mcp_connection_sharing",
+          "type": "boolean"
+        },
+        {
+          "name": "mentions_v2",
+          "type": "boolean"
+        },
+        {
+          "name": "remote_control",
+          "type": "boolean"
+        },
+        {
+          "name": "remote_plugin",
+          "type": "boolean"
+        },
+        {
+          "name": "tool_suggest",
+          "type": "boolean"
+        },
+        {
+          "name": "windows_sandbox_service",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "scope": "layer[0].config",
+      "keys": [
+        {
+          "name": "mcp_servers",
+          "type": "object"
+        },
+        {
+          "name": "features",
+          "type": "object"
+        },
+        {
+          "name": "agents",
+          "type": "object"
+        },
+        {
+          "name": "skills",
+          "type": "object"
+        },
+        {
+          "name": "project_doc_max_bytes",
+          "type": "number"
+        },
+        {
+          "name": "web_search",
+          "type": "string"
+        },
+        {
+          "name": "log_dir",
+          "type": "string"
+        },
+        {
+          "name": "sqlite_home",
+          "type": "string"
+        },
+        {
+          "name": "analytics",
+          "type": "object"
+        },
+        {
+          "name": "feedback",
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "scope": "layer[0].features",
+      "keys": [
+        {
+          "name": "apps",
+          "type": "boolean"
+        },
+        {
+          "name": "plugins",
+          "type": "boolean"
+        },
+        {
+          "name": "hooks",
+          "type": "boolean"
+        },
+        {
+          "name": "memories",
+          "type": "boolean"
+        },
+        {
+          "name": "multi_agent",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "scope": "layer[1].config",
+      "keys": []
+    },
+    {
+      "scope": "layer[1].features",
+      "keys": []
+    },
+    {
+      "scope": "layer[2].config",
+      "keys": [
+        {
+          "name": "personality",
+          "type": "string"
+        },
+        {
+          "name": "model",
+          "type": "string"
+        },
+        {
+          "name": "model_reasoning_effort",
+          "type": "string"
+        },
+        {
+          "name": "service_tier",
+          "type": "string"
+        },
+        {
+          "name": "notify",
+          "type": "array"
+        },
+        {
+          "name": "marketplaces",
+          "type": "object"
+        },
+        {
+          "name": "plugins",
+          "type": "object"
+        },
+        {
+          "name": "features",
+          "type": "object"
+        },
+        {
+          "name": "mcp_servers",
+          "type": "object"
+        },
+        {
+          "name": "shell_environment_policy",
+          "type": "object"
+        },
+        {
+          "name": "desktop",
+          "type": "object"
+        },
+        {
+          "name": "windows",
+          "type": "object"
+        },
+        {
+          "name": "projects",
+          "type": "object"
+        },
+        {
+          "name": "tui",
+          "type": "object"
+        },
+        {
+          "name": "hooks",
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "scope": "layer[2].features",
+      "keys": [
+        {
+          "name": "js_repl",
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "scope": "layer[3].config",
+      "keys": []
+    },
+    {
+      "scope": "layer[3].features",
+      "keys": []
+    }
+  ],
+  "shape": {
+    "type": "object",
+    "fields": [
+      {
+        "name": "config",
+        "type": "object",
+        "fields": [
+          {
+            "name": "model",
+            "type": "string"
+          },
+          {
+            "name": "review_model",
+            "type": "null"
+          },
+          {
+            "name": "model_context_window",
+            "type": "null"
+          },
+          {
+            "name": "model_auto_compact_token_limit",
+            "type": "null"
+          },
+          {
+            "name": "model_auto_compact_token_limit_scope",
+            "type": "null"
+          },
+          {
+            "name": "model_provider",
+            "type": "null"
+          },
+          {
+            "name": "approval_policy",
+            "type": "null"
+          },
+          {
+            "name": "approvals_reviewer",
+            "type": "null"
+          },
+          {
+            "name": "sandbox_mode",
+            "type": "null"
+          },
+          {
+            "name": "sandbox_workspace_write",
+            "type": "null"
+          },
+          {
+            "name": "forced_chatgpt_workspace_id",
+            "type": "null"
+          },
+          {
+            "name": "forced_login_method",
+            "type": "null"
+          },
+          {
+            "name": "web_search",
+            "type": "string"
+          },
+          {
+            "name": "tools",
+            "type": "null"
+          },
+          {
+            "name": "instructions",
+            "type": "null"
+          },
+          {
+            "name": "developer_instructions",
+            "type": "null"
+          },
+          {
+            "name": "compact_prompt",
+            "type": "null"
+          },
+          {
+            "name": "model_reasoning_effort",
+            "type": "string"
+          },
+          {
+            "name": "model_reasoning_summary",
+            "type": "null"
+          },
+          {
+            "name": "model_verbosity",
+            "type": "null"
+          },
+          {
+            "name": "service_tier",
+            "type": "string"
+          },
+          {
+            "name": "analytics",
+            "type": "object",
+            "fields": [
+              {
+                "name": "enabled",
+                "type": "boolean"
+              }
+            ]
+          },
+          {
+            "name": "apps",
+            "type": "null"
+          },
+          {
+            "name": "browser_use",
+            "type": "null"
+          },
+          {
+            "name": "computer_use",
+            "type": "null"
+          },
+          {
+            "name": "desktop",
+            "type": "object",
+            "fields": [
+              {
+                "name": "key-sha256:8663b89f4f5e18f210c83b9710d55a1d4f03a4aeba5efdb603c15d47efd5f6f8",
+                "type": "boolean"
+              },
+              {
+                "name": "key-sha256:5271d8f2c8f4edca56332bd41cbb2bba9f37b69a2d529a969a5f496b5aec94e3",
+                "type": "number"
+              },
+              {
+                "name": "key-sha256:9bef89d9f9313b5c94096caa127ebdeb06ea3118b75719980033e5e3e1dad360",
+                "type": "boolean"
+              },
+              {
+                "name": "key-sha256:7032a42f9573fe6818216c0e377fd58f0da6f29df33b77a3efeccfde4e307794",
+                "type": "string"
+              },
+              {
+                "name": "key-sha256:4c3048d2669bd8afb2afbae42f7d91cd2efc22635931af1d764ec3520c0f3ed8",
+                "type": "number"
+              },
+              {
+                "name": "key-sha256:5c0426466fad34ed062b7a52671f21c97626c4fd7e74253aa2b061c8d2fe9da8",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "file_opener",
+            "type": "string"
+          },
+          {
+            "name": "project_doc_max_bytes",
+            "type": "number"
+          },
+          {
+            "name": "cli_auth_credentials_store",
+            "type": "string"
+          },
+          {
+            "name": "notice",
+            "type": "null"
+          },
+          {
+            "name": "experimental_realtime_ws_base_url",
+            "type": "null"
+          },
+          {
+            "name": "show_raw_agent_reasoning",
+            "type": "null"
+          },
+          {
+            "name": "suppress_unstable_features_warning",
+            "type": "null"
+          },
+          {
+            "name": "feedback",
+            "type": "object",
+            "fields": [
+              {
+                "name": "enabled",
+                "type": "boolean"
+              }
+            ]
+          },
+          {
+            "name": "orchestrator",
+            "type": "null"
+          },
+          {
+            "name": "js_repl_node_path",
+            "type": "null"
+          },
+          {
+            "name": "agents",
+            "type": "object",
+            "fields": [
+              {
+                "name": "enabled",
+                "type": "boolean"
+              },
+              {
+                "name": "max_concurrent_threads_per_session",
+                "type": "null"
+              },
+              {
+                "name": "max_depth",
+                "type": "null"
+              },
+              {
+                "name": "default_subagent_model",
+                "type": "null"
+              },
+              {
+                "name": "default_subagent_reasoning_effort",
+                "type": "null"
+              },
+              {
+                "name": "job_max_runtime_seconds",
+                "type": "null"
+              },
+              {
+                "name": "interrupt_message",
+                "type": "null"
+              }
+            ]
+          },
+          {
+            "name": "allow_symlinked_codex_home",
+            "type": "null"
+          },
+          {
+            "name": "mcp_enterprise_managed_auth",
+            "type": "null"
+          },
+          {
+            "name": "skills",
+            "type": "object",
+            "fields": [
+              {
+                "name": "bundled",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "include_instructions",
+                "type": "boolean"
+              }
+            ]
+          },
+          {
+            "name": "marketplaces",
+            "type": "object",
+            "fields": [
+              {
+                "name": "key-sha256:4aa52531dc874c15bc49ddac92eee234a8ed277ee0d53a316913297205defe6f",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "last_updated",
+                    "type": "null"
+                  },
+                  {
+                    "name": "last_revision",
+                    "type": "null"
+                  },
+                  {
+                    "name": "source_type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "source",
+                    "type": "string"
+                  },
+                  {
+                    "name": "ref",
+                    "type": "null"
+                  },
+                  {
+                    "name": "sparse_paths",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:278a72fb513e4aee80f63cba8de401e43a43f80299b37e9b13f8a1eb51d860f2",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "last_updated",
+                    "type": "null"
+                  },
+                  {
+                    "name": "last_revision",
+                    "type": "null"
+                  },
+                  {
+                    "name": "source_type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "source",
+                    "type": "string"
+                  },
+                  {
+                    "name": "ref",
+                    "type": "null"
+                  },
+                  {
+                    "name": "sparse_paths",
+                    "type": "null"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "profiles",
+            "type": "object",
+            "fields": []
+          },
+          {
+            "name": "hooks",
+            "type": "object",
+            "fields": [
+              {
+                "name": "PreModelRequest",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "PostModelRequest",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "PreToolUse",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "PermissionRequest",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "PostToolUse",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "PreCompact",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "PostCompact",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "SessionStart",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "SessionEnd",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "UserPromptSubmit",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "SubagentStart",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "SubagentStop",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "Stop",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "Interrupt",
+                "type": "array",
+                "items": []
+              },
+              {
+                "name": "state",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "key-sha256:a3902b0ec2b378cec12a5f76c09240d4d7a2c554cb85c6c103152e3c21c794ba",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "trusted_hash",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "chatgpt_base_url",
+            "type": "string"
+          },
+          {
+            "name": "model_instructions_file",
+            "type": "null"
+          },
+          {
+            "name": "ghost_snapshot",
+            "type": "null"
+          },
+          {
+            "name": "hide_agent_reasoning",
+            "type": "boolean"
+          },
+          {
+            "name": "experimental_realtime_ws_backend_prompt",
+            "type": "null"
+          },
+          {
+            "name": "disable_paste_burst",
+            "type": "null"
+          },
+          {
+            "name": "log_dir",
+            "type": "string"
+          },
+          {
+            "name": "projects",
+            "type": "object",
+            "fields": [
+              {
+                "name": "key-sha256:ed307b6ab07571c375bff98788e93e7dc9ae927eff843241beff963f9cc5ea03",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:8f860540ca82ff23b25daf8c45edadea2b88c8fadca0e6770685f94fd623df57",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:97d893acea9d5274a83c8c9d5fde384e52f785ba34f3466983ddbb937c0e9582",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:029134002083d44995e928ea3d3d6f207f7e4e229b94b90038df73ecb0eeac7d",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:d382d5560da3ff1e4261fbb8aa3954b8d9a8a9a44ec8133bc0f3ae89cf32c23d",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:83edf8d6267e8be4a8fd1eacb1d1c4e06ecb463798f1c80eabb5478a78c883d2",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:2fbba0421bf1352efbe9f5b46220a4584e0536469f6b81920b3e1428dab8eb27",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:b50a0b5d8dfdc7ea51542d55a607ba67f8aa323301f8fb7bc45c57ff008bea34",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:b93d502e04ae93ab834990676604a0392ac5f5b14011477cba4daa984b03500d",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:7d8ec2073e951fbbc7af9fd2362626ca556dfd981b23cd7e6550d94d24fd2db3",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:0630ec71de52c5654a7423eb53375da1b7d8064d2fe93b77bf7e7391e65f78ca",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:01ae63e7cc731619ce8664670ba4c4787a13f0c3f7559b6209038bd487e9df3a",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "trust_level",
+                    "type": "string"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "realtime",
+            "type": "null"
+          },
+          {
+            "name": "experimental_realtime_ws_startup_context",
+            "type": "null"
+          },
+          {
+            "name": "tool_suggest",
+            "type": "null"
+          },
+          {
+            "name": "openai_base_url",
+            "type": "null"
+          },
+          {
+            "name": "allow_login_shell",
+            "type": "boolean"
+          },
+          {
+            "name": "mcp_optional_startup_grace_ms",
+            "type": "null"
+          },
+          {
+            "name": "tool_output_token_limit",
+            "type": "null"
+          },
+          {
+            "name": "mcp_oauth_callback_port",
+            "type": "null"
+          },
+          {
+            "name": "auto_review",
+            "type": "null"
+          },
+          {
+            "name": "responses_api_metadata",
+            "type": "null"
+          },
+          {
+            "name": "memories",
+            "type": "null"
+          },
+          {
+            "name": "experimental_compact_prompt_file",
+            "type": "null"
+          },
+          {
+            "name": "oss_provider",
+            "type": "null"
+          },
+          {
+            "name": "apps_mcp_product_sku",
+            "type": "null"
+          },
+          {
+            "name": "daybreak",
+            "type": "null"
+          },
+          {
+            "name": "features",
+            "type": "object",
+            "fields": [
+              {
+                "name": "network_proxy",
+                "type": "null"
+              },
+              {
+                "name": "apps",
+                "type": "boolean"
+              },
+              {
+                "name": "hooks",
+                "type": "boolean"
+              },
+              {
+                "name": "js_repl",
+                "type": "boolean"
+              },
+              {
+                "name": "memories",
+                "type": "boolean"
+              },
+              {
+                "name": "multi_agent",
+                "type": "boolean"
+              },
+              {
+                "name": "plugins",
+                "type": "boolean"
+              },
+              {
+                "name": "api_key_cyber_access_programs",
+                "type": "boolean"
+              },
+              {
+                "name": "api_key_model_discovery",
+                "type": "boolean"
+              },
+              {
+                "name": "auth_elicitation",
+                "type": "boolean"
+              },
+              {
+                "name": "background_paginated_rollout_migration",
+                "type": "boolean"
+              },
+              {
+                "name": "codex_apps_mcp_2026_07_28",
+                "type": "boolean"
+              },
+              {
+                "name": "mcp_2026_07_28",
+                "type": "boolean"
+              },
+              {
+                "name": "mcp_connection_sharing",
+                "type": "boolean"
+              },
+              {
+                "name": "mentions_v2",
+                "type": "boolean"
+              },
+              {
+                "name": "remote_control",
+                "type": "boolean"
+              },
+              {
+                "name": "remote_plugin",
+                "type": "boolean"
+              },
+              {
+                "name": "tool_suggest",
+                "type": "boolean"
+              },
+              {
+                "name": "windows_sandbox_service",
+                "type": "boolean"
+              }
+            ]
+          },
+          {
+            "name": "include_collaboration_mode_instructions",
+            "type": "boolean"
+          },
+          {
+            "name": "history",
+            "type": "object",
+            "fields": [
+              {
+                "name": "persistence",
+                "type": "string"
+              },
+              {
+                "name": "max_bytes",
+                "type": "null"
+              }
+            ]
+          },
+          {
+            "name": "notify",
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "profile",
+            "type": "null"
+          },
+          {
+            "name": "mcp_oauth_credentials_store",
+            "type": "string"
+          },
+          {
+            "name": "js_repl_node_module_dirs",
+            "type": "null"
+          },
+          {
+            "name": "sqlite_home",
+            "type": "string"
+          },
+          {
+            "name": "experimental_thread_store_endpoint",
+            "type": "null"
+          },
+          {
+            "name": "experimental_use_unified_exec_tool",
+            "type": "null"
+          },
+          {
+            "name": "model_post_turn_compact_threshold_percent",
+            "type": "null"
+          },
+          {
+            "name": "include_environment_context",
+            "type": "boolean"
+          },
+          {
+            "name": "include_permissions_instructions",
+            "type": "boolean"
+          },
+          {
+            "name": "otel",
+            "type": "null"
+          },
+          {
+            "name": "include_apps_instructions",
+            "type": "boolean"
+          },
+          {
+            "name": "tui",
+            "type": "object",
+            "fields": [
+              {
+                "name": "notifications",
+                "type": "boolean"
+              },
+              {
+                "name": "notification_method",
+                "type": "string"
+              },
+              {
+                "name": "notification_condition",
+                "type": "string"
+              },
+              {
+                "name": "animations",
+                "type": "boolean"
+              },
+              {
+                "name": "screen_reader_detection_done",
+                "type": "boolean"
+              },
+              {
+                "name": "effects",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "starfield",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "key-sha256:2210f4cdbae8b28a2ceafb26f6b1d9dd5842a4597db23115cf9f980488b389ea",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "welcome",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "effort",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "progress",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "title",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "rendering",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "mermaid",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "math",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "tables",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "lists",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "show_tooltips",
+                "type": "boolean"
+              },
+              {
+                "name": "show_server_version_notice",
+                "type": "boolean"
+              },
+              {
+                "name": "auto_recap",
+                "type": "boolean"
+              },
+              {
+                "name": "disable_paste_burst",
+                "type": "null"
+              },
+              {
+                "name": "vim_mode_default",
+                "type": "boolean"
+              },
+              {
+                "name": "question_esc_back",
+                "type": "boolean"
+              },
+              {
+                "name": "raw_output_mode",
+                "type": "boolean"
+              },
+              {
+                "name": "fullscreen_transcript",
+                "type": "boolean"
+              },
+              {
+                "name": "mouse_scroll_speed",
+                "type": "null"
+              },
+              {
+                "name": "copy_on_select",
+                "type": "string"
+              },
+              {
+                "name": "copy_on_select_clear_selection",
+                "type": "boolean"
+              },
+              {
+                "name": "right_click_paste",
+                "type": "string"
+              },
+              {
+                "name": "alternate_screen",
+                "type": "string"
+              },
+              {
+                "name": "status_line",
+                "type": "null"
+              },
+              {
+                "name": "status_line_use_colors",
+                "type": "boolean"
+              },
+              {
+                "name": "terminal_title",
+                "type": "null"
+              },
+              {
+                "name": "theme",
+                "type": "null"
+              },
+              {
+                "name": "pet",
+                "type": "null"
+              },
+              {
+                "name": "pet_anchor",
+                "type": "string"
+              },
+              {
+                "name": "session_picker_view",
+                "type": "null"
+              },
+              {
+                "name": "agents_overview_grouping",
+                "type": "string"
+              },
+              {
+                "name": "resume_cwd",
+                "type": "null"
+              },
+              {
+                "name": "keymap",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "global",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "leader",
+                        "type": "null"
+                      },
+                      {
+                        "name": "open_agents",
+                        "type": "null"
+                      },
+                      {
+                        "name": "open_transcript",
+                        "type": "null"
+                      },
+                      {
+                        "name": "find_transcript",
+                        "type": "null"
+                      },
+                      {
+                        "name": "select_transcript",
+                        "type": "null"
+                      },
+                      {
+                        "name": "focus_activity",
+                        "type": "null"
+                      },
+                      {
+                        "name": "open_external_editor",
+                        "type": "null"
+                      },
+                      {
+                        "name": "copy",
+                        "type": "null"
+                      },
+                      {
+                        "name": "clear_terminal",
+                        "type": "null"
+                      },
+                      {
+                        "name": "submit",
+                        "type": "null"
+                      },
+                      {
+                        "name": "queue",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_shortcuts",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_vim_mode",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_fast_mode",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_raw_output",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_side_conversation",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "chat",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "open_presets",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_voice",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_voice_mute",
+                        "type": "null"
+                      },
+                      {
+                        "name": "interrupt_turn",
+                        "type": "null"
+                      },
+                      {
+                        "name": "decrease_reasoning_effort",
+                        "type": "null"
+                      },
+                      {
+                        "name": "increase_reasoning_effort",
+                        "type": "null"
+                      },
+                      {
+                        "name": "previous_permission_mode",
+                        "type": "null"
+                      },
+                      {
+                        "name": "next_permission_mode",
+                        "type": "null"
+                      },
+                      {
+                        "name": "edit_queued_message",
+                        "type": "null"
+                      },
+                      {
+                        "name": "prompt_stack_back",
+                        "type": "null"
+                      },
+                      {
+                        "name": "skip_question",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "composer",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "submit",
+                        "type": "null"
+                      },
+                      {
+                        "name": "queue",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_shortcuts",
+                        "type": "null"
+                      },
+                      {
+                        "name": "history_search_previous",
+                        "type": "null"
+                      },
+                      {
+                        "name": "history_search_next",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "editor",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "insert_newline",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_left",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_right",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_up",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_down",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_word_left",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_word_right",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_line_start",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_line_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "delete_backward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "delete_forward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "delete_backward_word",
+                        "type": "null"
+                      },
+                      {
+                        "name": "delete_forward_word",
+                        "type": "null"
+                      },
+                      {
+                        "name": "kill_line_start",
+                        "type": "null"
+                      },
+                      {
+                        "name": "kill_whole_line",
+                        "type": "null"
+                      },
+                      {
+                        "name": "kill_line_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "yank",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "vim_normal",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "enter_insert",
+                        "type": "null"
+                      },
+                      {
+                        "name": "append_after_cursor",
+                        "type": "null"
+                      },
+                      {
+                        "name": "append_line_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "insert_line_start",
+                        "type": "null"
+                      },
+                      {
+                        "name": "open_line_below",
+                        "type": "null"
+                      },
+                      {
+                        "name": "open_line_above",
+                        "type": "null"
+                      },
+                      {
+                        "name": "enter_replace_mode",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_left",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_right",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_up",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_down",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_word_forward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_word_backward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_word_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_line_start",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_line_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "find_forward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "find_backward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "till_forward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "till_backward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "jump_top",
+                        "type": "null"
+                      },
+                      {
+                        "name": "jump_bottom",
+                        "type": "null"
+                      },
+                      {
+                        "name": "delete_char",
+                        "type": "null"
+                      },
+                      {
+                        "name": "replace_char",
+                        "type": "null"
+                      },
+                      {
+                        "name": "repeat_last_change",
+                        "type": "null"
+                      },
+                      {
+                        "name": "substitute_char",
+                        "type": "null"
+                      },
+                      {
+                        "name": "delete_to_line_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "change_to_line_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "yank_line",
+                        "type": "null"
+                      },
+                      {
+                        "name": "paste_after",
+                        "type": "null"
+                      },
+                      {
+                        "name": "start_delete_operator",
+                        "type": "null"
+                      },
+                      {
+                        "name": "start_yank_operator",
+                        "type": "null"
+                      },
+                      {
+                        "name": "start_change_operator",
+                        "type": "null"
+                      },
+                      {
+                        "name": "undo",
+                        "type": "null"
+                      },
+                      {
+                        "name": "redo",
+                        "type": "null"
+                      },
+                      {
+                        "name": "cancel_operator",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "vim_operator",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "delete_line",
+                        "type": "null"
+                      },
+                      {
+                        "name": "yank_line",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_left",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_right",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_up",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_down",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_word_forward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_word_backward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_word_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_line_start",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_line_end",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_find_forward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_find_backward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_till_forward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_till_backward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_jump_top",
+                        "type": "null"
+                      },
+                      {
+                        "name": "motion_jump_bottom",
+                        "type": "null"
+                      },
+                      {
+                        "name": "select_inner_text_object",
+                        "type": "null"
+                      },
+                      {
+                        "name": "select_around_text_object",
+                        "type": "null"
+                      },
+                      {
+                        "name": "cancel",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "vim_search",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "forward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "backward",
+                        "type": "null"
+                      },
+                      {
+                        "name": "next",
+                        "type": "null"
+                      },
+                      {
+                        "name": "previous",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "vim_text_object",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "word",
+                        "type": "null"
+                      },
+                      {
+                        "name": "big_word",
+                        "type": "null"
+                      },
+                      {
+                        "name": "parentheses",
+                        "type": "null"
+                      },
+                      {
+                        "name": "brackets",
+                        "type": "null"
+                      },
+                      {
+                        "name": "braces",
+                        "type": "null"
+                      },
+                      {
+                        "name": "double_quote",
+                        "type": "null"
+                      },
+                      {
+                        "name": "single_quote",
+                        "type": "null"
+                      },
+                      {
+                        "name": "key-sha256:e588bc18bd3d44f7dcc9767048e7b1b8ad2bc6b009c5405a2940911c4ab92be6",
+                        "type": "null"
+                      },
+                      {
+                        "name": "cancel",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "pager",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "scroll_up",
+                        "type": "null"
+                      },
+                      {
+                        "name": "scroll_down",
+                        "type": "null"
+                      },
+                      {
+                        "name": "page_up",
+                        "type": "null"
+                      },
+                      {
+                        "name": "page_down",
+                        "type": "null"
+                      },
+                      {
+                        "name": "half_page_up",
+                        "type": "null"
+                      },
+                      {
+                        "name": "half_page_down",
+                        "type": "null"
+                      },
+                      {
+                        "name": "jump_top",
+                        "type": "null"
+                      },
+                      {
+                        "name": "jump_bottom",
+                        "type": "null"
+                      },
+                      {
+                        "name": "close",
+                        "type": "null"
+                      },
+                      {
+                        "name": "close_transcript",
+                        "type": "null"
+                      },
+                      {
+                        "name": "find",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "list",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "move_up",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_down",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_left",
+                        "type": "null"
+                      },
+                      {
+                        "name": "move_right",
+                        "type": "null"
+                      },
+                      {
+                        "name": "page_up",
+                        "type": "null"
+                      },
+                      {
+                        "name": "page_down",
+                        "type": "null"
+                      },
+                      {
+                        "name": "jump_top",
+                        "type": "null"
+                      },
+                      {
+                        "name": "jump_bottom",
+                        "type": "null"
+                      },
+                      {
+                        "name": "accept",
+                        "type": "null"
+                      },
+                      {
+                        "name": "cancel",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "agents",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "resume",
+                        "type": "null"
+                      },
+                      {
+                        "name": "search",
+                        "type": "null"
+                      },
+                      {
+                        "name": "new_task",
+                        "type": "null"
+                      },
+                      {
+                        "name": "new_worktree",
+                        "type": "null"
+                      },
+                      {
+                        "name": "fork",
+                        "type": "null"
+                      },
+                      {
+                        "name": "rename",
+                        "type": "null"
+                      },
+                      {
+                        "name": "stop",
+                        "type": "null"
+                      },
+                      {
+                        "name": "archive",
+                        "type": "null"
+                      },
+                      {
+                        "name": "delete",
+                        "type": "null"
+                      },
+                      {
+                        "name": "hide",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_pin",
+                        "type": "null"
+                      },
+                      {
+                        "name": "toggle_grouping",
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "approval",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "open_fullscreen",
+                        "type": "null"
+                      },
+                      {
+                        "name": "open_thread",
+                        "type": "null"
+                      },
+                      {
+                        "name": "approve",
+                        "type": "null"
+                      },
+                      {
+                        "name": "approve_for_session",
+                        "type": "null"
+                      },
+                      {
+                        "name": "approve_for_prefix",
+                        "type": "null"
+                      },
+                      {
+                        "name": "deny",
+                        "type": "null"
+                      },
+                      {
+                        "name": "decline",
+                        "type": "null"
+                      },
+                      {
+                        "name": "cancel",
+                        "type": "null"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "presets",
+                "type": "object",
+                "fields": []
+              },
+              {
+                "name": "model_availability_nux",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "key-sha256:2da8faee9a3ed7401be88eab08f9f50de122763b54cdce94dced4c0d06e0ee4f",
+                    "type": "number"
+                  }
+                ]
+              },
+              {
+                "name": "terminal_resize_reflow_max_rows",
+                "type": "null"
+              }
+            ]
+          },
+          {
+            "name": "experimental_thread_store",
+            "type": "null"
+          },
+          {
+            "name": "thread_unload_delay_secs",
+            "type": "null"
+          },
+          {
+            "name": "personality",
+            "type": "string"
+          },
+          {
+            "name": "mcp_servers",
+            "type": "object",
+            "fields": [
+              {
+                "name": "node_repl",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "command",
+                    "type": "string"
+                  },
+                  {
+                    "name": "args",
+                    "type": "array",
+                    "items": []
+                  },
+                  {
+                    "name": "env",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "key-sha256:36e1049ae192028fe8242ad05b045188785126d9a60a5a0d7219fe8211ad9bd1",
+                        "type": "string"
+                      },
+                      {
+                        "name": "CODEX_HOME",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:b7bde2008f3558bd225742930f0d9a7ccb00a06f885d3e8700b1f344d547485f",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:9e3fd5a0bb01f6d357ff346b09d1876829a0d5896dbab42bfe26c8d9f8a3ac39",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:2b72a3f5645eef122d509cfb6b84c88d7b6be098dbd49df21396fe74a5cf8a29",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:0faaf1e4361cde64b38a23b061b9ac8bf8f50d712bfce51b4a95ce860a7409b3",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:521e77a36152c5e981a716b0f7825a5c3c9b74cfa95c1602961b66f4bbae0a65",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:c557d86615b8306352ea7bd3249b4631c72bc346f4423e59000ab419cdd4b043",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:4ac571f22e3792a9202800011ae8bbf762a11d76bc850fa692ff678775e6b86b",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:a1e164eb85264b9a27eca5afd531982cc0cb87c823d31a94dd9cc4a3a9ca6bf7",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:a28d46444fabf822881e692a444458a8b16f8a0ffb53c4bf12225bc389673c4f",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:5ddaaed99b7afccda55f778cb0120e00238096d99cb001bdfbbda0beab0ea85b",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:7824517da73a094dcbbfedbae18bc346ce2ae6fcd9cac5527764061cceddfdb7",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:aa6addb635176596b042b67d7dab51a2129778519d674bfc65cb1bb5b2596a40",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:e43b8f5b559ca1ec217267e8814e5ec6b5d8b35536d16b737b1c4646cb945cf2",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:c03a8d4da9e72054ca085e2861e6579720967128f5715564466524c73b9aa396",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:5060aa0af8018b8f9986c257e91afd0396aa88089f71a10aca81e6752dc6665e",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "env_vars",
+                    "type": "array",
+                    "items": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "environment_id",
+                    "type": "string"
+                  },
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  },
+                  {
+                    "name": "startup_timeout_sec",
+                    "type": "number"
+                  },
+                  {
+                    "name": "tool_timeout_sec",
+                    "type": "null"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "cloud",
+            "type": "null"
+          },
+          {
+            "name": "experimental_realtime_ws_model",
+            "type": "null"
+          },
+          {
+            "name": "model_catalog_json",
+            "type": "null"
+          },
+          {
+            "name": "experimental_realtime_start_instructions",
+            "type": "null"
+          },
+          {
+            "name": "goals",
+            "type": "null"
+          },
+          {
+            "name": "plugins",
+            "type": "object",
+            "fields": [
+              {
+                "name": "key-sha256:4aa35e19324b04a043cba161f555b5f26aaec26d30c883ed0dd378d4315588f4",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:14a750a2ecb3380f324a2268279971f8c392fd96b03daa4b3933d162bff042bc",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:61f17f8c2b7394ead4e6cd61d1b53fd46a4e22edd0bab7cdd10962a01e3176aa",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:8058f9ced2e33548e9ee26902d0dbc7703e6076578292037cd6ef6889f8606c1",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:4fff9ba1508c7237b2d7d9a11f99b6dc72b346bdbc9da1468b797199b3cd0238",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:883a0b0f7913ef6db1a7cc58c54ac3c462164754add3ea643485e0530c3f65d9",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:67e7a684f91dfd15b90813b3637e0d814767fa84155d853bdb5e811bded5e259",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:64ad37648604acf9636ac15d7035ed31537672cfd1ad11256ac269d5e1f88d4a",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:2672edf68fb28bcf57d1235c1904a36f628b1806976650de106722e9c625c9c3",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              },
+              {
+                "name": "key-sha256:136c227cecca706fdbd0ff4fd5d5a4d660c3acee53cc9f0fd2385c297d66d06a",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "windows",
+            "type": "object",
+            "fields": [
+              {
+                "name": "sandbox",
+                "type": "string"
+              },
+              {
+                "name": "allow_mxc",
+                "type": "null"
+              }
+            ]
+          },
+          {
+            "name": "shell_environment_policy",
+            "type": "object",
+            "fields": [
+              {
+                "name": "inherit",
+                "type": "null"
+              },
+              {
+                "name": "ignore_default_excludes",
+                "type": "null"
+              },
+              {
+                "name": "exclude",
+                "type": "null"
+              },
+              {
+                "name": "set",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "key-sha256:08e5bf1009fea1d2c3d0f6ba2d9ae3fe3c76e4a115c9ac7b93cb4e9bb698a571",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "include_only",
+                "type": "null"
+              },
+              {
+                "name": "filters",
+                "type": "null"
+              },
+              {
+                "name": "experimental_use_profile",
+                "type": "null"
+              }
+            ]
+          },
+          {
+            "name": "permissions",
+            "type": "null"
+          },
+          {
+            "name": "audio",
+            "type": "null"
+          },
+          {
+            "name": "default_permissions",
+            "type": "null"
+          },
+          {
+            "name": "plan_mode_reasoning_effort",
+            "type": "null"
+          },
+          {
+            "name": "background_terminal_max_timeout",
+            "type": "number"
+          },
+          {
+            "name": "project_doc_fallback_filenames",
+            "type": "array",
+            "items": []
+          },
+          {
+            "name": "mcp_oauth_callback_url",
+            "type": "null"
+          },
+          {
+            "name": "model_providers",
+            "type": "object",
+            "fields": []
+          },
+          {
+            "name": "experimental_realtime_webrtc_call_base_url",
+            "type": "null"
+          },
+          {
+            "name": "project_root_markers",
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "check_for_update_on_startup",
+            "type": "null"
+          },
+          {
+            "name": "include_environment_context_time",
+            "type": "boolean"
+          }
+        ]
+      },
+      {
+        "name": "origins",
+        "type": "object",
+        "fields": [
+          {
+            "name": "key-sha256:7f2a9d79ec623dd43ecc11747b8183819b2c7524dd388232a272e27442735d53",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:2d971e09867818fbe98b1504749e9f98d6182cbe26ef028ea71e393fad2f0657",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "log_dir",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:89ce6dc0ace75aec694bac7607ea3ad72e6f751402f240dabc6fd72b024fdf3b",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "personality",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:8b06a485081be6b87ebe1f8f600c3fb3edc2a8f9bb84f585352ff12c5c723f91",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:465de8ede3dc8b084b87d01e90eed368cf63a605175902aa6076b308eaf36b99",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "web_search",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:1c3af0076b28a53ba86e88264042bffd595e744c073ad9f82639a79c931ebffa",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:0d9b74cc2de8eae1e4a2e3d21da62a4bd69f7d63fb3a3165ade1cd256e3c071a",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:7c5d0f3e3f458c7fc7726b5ee35ae438018677a0f9f9b6230a8b0b96821dd2af",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:4f64bf3370f10c9250b35aafd7c81149c664cd39c7f699fb4e29eb4182af664a",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:45448f315cd3caeea02181b0d0722b39f96dc815a5d91499f8fd66cf9081c44b",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:56c79317736470435c8155e25c6b46c55e51ac1ffdb2b9de7bde23f805c513f2",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:49e7e6eefb9e897e9bcecac6ad554114e4441852b9dfea5b4e1a8e597d354ef7",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:d38588ca625ea53cbfec340636c7930252dd4d0ff6ab1331a192358261e03bca",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:fa40ac27f2c2b15243622c79a25330bd16a52e78fa9a8339e01369c116397a58",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:7ac2f1dce064928e429163e72bb1609c3913462252a7ccffe3acfdf14de4ce5f",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:4e1f27cfd760efb689ae83e334f14489bce1d42a2267941080d0e28faf68db69",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "sqlite_home",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:ccda4bec84c05d1667d60c81fa0287b2aab907bf660054029f56afd0e37fb681",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:6585ccf0521ee9c4d6a89c80d4aa25ab76c4e8c5e06c8f2bf16a7b41fc5aee79",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:a094e15eced0e8c4ee055ef68437b2bc2a17aabab9797e1e5a16fc13e0443deb",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:f5a90a7f82b74ee2e2e7e79cf8c8804a14c52b15c35255a969906a2f598c818e",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:5b38fa546fe180ae9398f630685983b540e41a5c813a701be1e7f16ec62a9e74",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:5d7a398b9d262ec85316ed1e199ecf83c581942a9e1d41564d2374a60752e6cf",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:93b9926fb234841f33c97b2e2276b3455c4901bda7ce2ee6c52ad8410a1e03a6",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:7c01b035d97be9b620e3d86819e18e9e4c069f5465520b3e746c798377ec9239",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "project_doc_max_bytes",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:a3b70a750b216943e3934cf6b68efa5524c72b4f8f5d900980fcfb26729c67f8",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "service_tier",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:77791df208c3313443273d3c81bc608c0ba1f19f418318d59e7ac3956ddb15ba",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:ae8570401516a508b93d9479db9a408a7680cc1170a679cac85cc25cf86c5c5e",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:56e61c8962d8d1d6368e91b48c9da75701ce8fe4f51204d94ac46c8d6d7fabbe",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:9a8952b88dac0078e27a4910ee07e5549af752f71f234378132980f580a3dc22",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:0d562c1b697f7fe8e15cd2fa5633142bc5978127b0e420767c7069778ee76a60",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:5d966e36d1320e366ccc90c232f37582fc6939464538e9a400ce05270b436ec0",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:cf5747e60902fd525664e119ec35f862f778efab78057b84df03cf5f51abc454",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:f5c0e59ac120135df1e88fb037ae26578230f26530c35be146ac4c54edd70053",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:7ab5a58c31ea4ce12a74c97ed70142c064a4bffb69d92f67de5848fda92dd08d",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:0a830a794895eb95b3c11fa3f0a5e9bccdaddf61a169410192ef652f99bb82d5",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:8b3e83c4c41a7cb3ec41c5dc6fa375b3499f3e18480ebf6c9ba9509136d34333",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:fb17cbd9e8b3597c526c951d4a1ca1f33052c016af1bdfdbb2635ff5abf9c12a",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:6896dc26cb9055647f1336061e24a6d2ba0bc609fed2b5e016042b3c3b742f7f",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:ac8db332dc281d8e36e3014714a7992fdd717a3361ab45233300a67a1e382780",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:e3b3de038fc2ec6a06ff0550a518f9229be39fbf831d77e5511bdfe6e32c59ad",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:d9d8c453fa8312e8e7b21572e4ea19c07b93f57794f55c5f47802c1e80d2a470",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:6ebe86f6a81a392bcc8337d97b9ca3060d34f13a55e2bc227f417a580f67c6a6",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:40806e163c2f60b3ca5bd840bda9720f68e6bfb1b9e0df626421aee4f02f86c2",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:822a85cc7d35f727d3b5d0218fb7074c3ae229cda8fbaa2ef841b8fce5b50575",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:1abcf56e52e3160fbb7ed916804731abd9532ea4ee7f5d3b88ba81dc8c2f84cb",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:69adcb8bd198a834a70dc2cf9399eb7221ba9b44acdbce540f8599403437a0aa",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:0dbae64c1da480be47ff2fc88213a83be36a9ed702dc879404796532c8cef725",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:f91b7a67ff9d0cd4305c8daf283d21f7091b1b9e70f06b62cf979a61d2c9befc",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:49ed4c385280b4221debb7b8563411131c41074556d07503b4ab53ebf788dff5",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:ac6103d4196926cb9d81505882bd09c326657d98173749d7b17eb7f52c32127f",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:d0b3294d1ebf4a9023b3c0825667d8f30cbb0b7b37efe5b2c1dd023a251f4dc0",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:ac9af9a28e5a6b9711581297c2d2cbcddf7c2d9e7ca9ec0c0cae9ee7b87fde1f",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:0637a1ec745f79a00d5f2b6df44a24b0e8331e68fed3fdcc70d7230fa09bdf44",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "model_reasoning_effort",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "model",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:3d7696cdcf0b5171f178f8e8f644b7289e6dbc83ca1d0485bad98410168498ad",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:136d952fc4fbed47f2addb943498d28dfc75f56a434d42e30cb05cfb0e891dad",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:a79907535b89aa009c1f6105a6b92333f5744bec17b15af435f9314f569dc498",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:e9d3d8f71fdc29ba0f54b01e8877c7f76453cb0844bad45cfec0030c7d9c45b3",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:a7cdeb2ce5217b5075a3b69116c14274acef56fa6d14e087193e7d1c34752d5a",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:5e97ec25542bc5fdedcf4212812c521e86250ce47b1d574bbc633364d12c27f6",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:1bfcace74284ddc7e3fd7877507d0733b7fad378100d944a331936dec77d1580",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:4fef8c536c444f9f4a18e7e5fa1513bfd73e0938a807db85be0a3ad67a9a41b2",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:bf4df2b9161c6f519959d6b376b7dd87c3dfeeeb444c0137ae3a38b918672fc5",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:de42356427b70b660599e4145de21a52a024503fcccb89023d4afc6fdcdc2578",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:097ecfe332fbe432e22a1ab1278d0aca5c4d70d002ccabf90b17bf6f537e1c9b",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:376ffdb7491a75fb48b2afb5714514ebe3b23f9c48431e4b18f0cd2364efbf9a",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:3823e34137a81c7706a109eff9ea051b072ac95bda6cb85498ac5c3eb8e8fa0a",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:cd07e495f7cc842b3effb9aaf0b8e3b25277960134e76da65dacd330d30505e3",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:0e8141ee9d5d4e0e44901bfcab9ac5bbb3ad21b8700929391f6aa2c9488ddca1",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:9dc72de5922828cd052766be1383f2cb9035b7d01180360eb9831d270cc2796b",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:a601d83d3a98c47b0339c946bd26d413db8d9c2d34bef090bc913e4c94bc981f",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:895caacd983af62db177727fdc8bd6153f4a15e9a76132c400ec17eea87aad30",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:590f6e3cad27ff74c8257974c50810ae140587b92d3f45201676bdaa64b5eb40",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:63cb4d571dcffb245359cc0b4f965a0c4ec10744ad6b2d0f3090d230489329c8",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "key-sha256:4011a08e1300912a82ae2689a82ec76d699168812675b662ea489fb3b30fe663",
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "layers",
+        "type": "array",
+        "items": [
+          {
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "name": "config",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "mcp_servers",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "node_repl",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "features",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "apps",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "plugins",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "hooks",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "memories",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "multi_agent",
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "agents",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "enabled",
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "skills",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "bundled",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "include_instructions",
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "project_doc_max_bytes",
+                    "type": "number"
+                  },
+                  {
+                    "name": "web_search",
+                    "type": "string"
+                  },
+                  {
+                    "name": "log_dir",
+                    "type": "string"
+                  },
+                  {
+                    "name": "sqlite_home",
+                    "type": "string"
+                  },
+                  {
+                    "name": "analytics",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "enabled",
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "feedback",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "enabled",
+                        "type": "boolean"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "dotCodexFolder",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "name": "config",
+                "type": "object",
+                "fields": []
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  },
+                  {
+                    "name": "profile",
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "name": "config",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "personality",
+                    "type": "string"
+                  },
+                  {
+                    "name": "model",
+                    "type": "string"
+                  },
+                  {
+                    "name": "model_reasoning_effort",
+                    "type": "string"
+                  },
+                  {
+                    "name": "service_tier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "notify",
+                    "type": "array",
+                    "items": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "marketplaces",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "key-sha256:4aa52531dc874c15bc49ddac92eee234a8ed277ee0d53a316913297205defe6f",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "source_type",
+                            "type": "string"
+                          },
+                          {
+                            "name": "source",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:278a72fb513e4aee80f63cba8de401e43a43f80299b37e9b13f8a1eb51d860f2",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "source_type",
+                            "type": "string"
+                          },
+                          {
+                            "name": "source",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "plugins",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "key-sha256:8058f9ced2e33548e9ee26902d0dbc7703e6076578292037cd6ef6889f8606c1",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:61f17f8c2b7394ead4e6cd61d1b53fd46a4e22edd0bab7cdd10962a01e3176aa",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:2672edf68fb28bcf57d1235c1904a36f628b1806976650de106722e9c625c9c3",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:67e7a684f91dfd15b90813b3637e0d814767fa84155d853bdb5e811bded5e259",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:883a0b0f7913ef6db1a7cc58c54ac3c462164754add3ea643485e0530c3f65d9",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:14a750a2ecb3380f324a2268279971f8c392fd96b03daa4b3933d162bff042bc",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:136c227cecca706fdbd0ff4fd5d5a4d660c3acee53cc9f0fd2385c297d66d06a",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:4aa35e19324b04a043cba161f555b5f26aaec26d30c883ed0dd378d4315588f4",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:4fff9ba1508c7237b2d7d9a11f99b6dc72b346bdbc9da1468b797199b3cd0238",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:64ad37648604acf9636ac15d7035ed31537672cfd1ad11256ac269d5e1f88d4a",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "enabled",
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "features",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "js_repl",
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "mcp_servers",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "node_repl",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "args",
+                            "type": "array",
+                            "items": []
+                          },
+                          {
+                            "name": "command",
+                            "type": "string"
+                          },
+                          {
+                            "name": "env_vars",
+                            "type": "array",
+                            "items": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          {
+                            "name": "startup_timeout_sec",
+                            "type": "number"
+                          },
+                          {
+                            "name": "env",
+                            "type": "object",
+                            "fields": [
+                              {
+                                "name": "key-sha256:36e1049ae192028fe8242ad05b045188785126d9a60a5a0d7219fe8211ad9bd1",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:5ddaaed99b7afccda55f778cb0120e00238096d99cb001bdfbbda0beab0ea85b",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:c03a8d4da9e72054ca085e2861e6579720967128f5715564466524c73b9aa396",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:7824517da73a094dcbbfedbae18bc346ce2ae6fcd9cac5527764061cceddfdb7",
+                                "type": "string"
+                              },
+                              {
+                                "name": "CODEX_HOME",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:521e77a36152c5e981a716b0f7825a5c3c9b74cfa95c1602961b66f4bbae0a65",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:a28d46444fabf822881e692a444458a8b16f8a0ffb53c4bf12225bc389673c4f",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:a1e164eb85264b9a27eca5afd531982cc0cb87c823d31a94dd9cc4a3a9ca6bf7",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:aa6addb635176596b042b67d7dab51a2129778519d674bfc65cb1bb5b2596a40",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:b7bde2008f3558bd225742930f0d9a7ccb00a06f885d3e8700b1f344d547485f",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:c557d86615b8306352ea7bd3249b4631c72bc346f4423e59000ab419cdd4b043",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:9e3fd5a0bb01f6d357ff346b09d1876829a0d5896dbab42bfe26c8d9f8a3ac39",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:4ac571f22e3792a9202800011ae8bbf762a11d76bc850fa692ff678775e6b86b",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:e43b8f5b559ca1ec217267e8814e5ec6b5d8b35536d16b737b1c4646cb945cf2",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:0faaf1e4361cde64b38a23b061b9ac8bf8f50d712bfce51b4a95ce860a7409b3",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:2b72a3f5645eef122d509cfb6b84c88d7b6be098dbd49df21396fe74a5cf8a29",
+                                "type": "string"
+                              },
+                              {
+                                "name": "key-sha256:5060aa0af8018b8f9986c257e91afd0396aa88089f71a10aca81e6752dc6665e",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "shell_environment_policy",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "set",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "key-sha256:08e5bf1009fea1d2c3d0f6ba2d9ae3fe3c76e4a115c9ac7b93cb4e9bb698a571",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "desktop",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "key-sha256:5c0426466fad34ed062b7a52671f21c97626c4fd7e74253aa2b061c8d2fe9da8",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:4c3048d2669bd8afb2afbae42f7d91cd2efc22635931af1d764ec3520c0f3ed8",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "key-sha256:218915088d770abb8c3f8a2240a762a5b9bc80a33cb11f838a4f90f224ba78bf",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:5271d8f2c8f4edca56332bd41cbb2bba9f37b69a2d529a969a5f496b5aec94e3",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "key-sha256:218915088d770abb8c3f8a2240a762a5b9bc80a33cb11f838a4f90f224ba78bf",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:9bef89d9f9313b5c94096caa127ebdeb06ea3118b75719980033e5e3e1dad360",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "key-sha256:7032a42f9573fe6818216c0e377fd58f0da6f29df33b77a3efeccfde4e307794",
+                        "type": "string"
+                      },
+                      {
+                        "name": "key-sha256:8663b89f4f5e18f210c83b9710d55a1d4f03a4aeba5efdb603c15d47efd5f6f8",
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "windows",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "sandbox",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "projects",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "key-sha256:7d8ec2073e951fbbc7af9fd2362626ca556dfd981b23cd7e6550d94d24fd2db3",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:ed307b6ab07571c375bff98788e93e7dc9ae927eff843241beff963f9cc5ea03",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:01ae63e7cc731619ce8664670ba4c4787a13f0c3f7559b6209038bd487e9df3a",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:0630ec71de52c5654a7423eb53375da1b7d8064d2fe93b77bf7e7391e65f78ca",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:8f860540ca82ff23b25daf8c45edadea2b88c8fadca0e6770685f94fd623df57",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:b93d502e04ae93ab834990676604a0392ac5f5b14011477cba4daa984b03500d",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:83edf8d6267e8be4a8fd1eacb1d1c4e06ecb463798f1c80eabb5478a78c883d2",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:97d893acea9d5274a83c8c9d5fde384e52f785ba34f3466983ddbb937c0e9582",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:2fbba0421bf1352efbe9f5b46220a4584e0536469f6b81920b3e1428dab8eb27",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:b50a0b5d8dfdc7ea51542d55a607ba67f8aa323301f8fb7bc45c57ff008bea34",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:029134002083d44995e928ea3d3d6f207f7e4e229b94b90038df73ecb0eeac7d",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "key-sha256:d382d5560da3ff1e4261fbb8aa3954b8d9a8a9a44ec8133bc0f3ae89cf32c23d",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "trust_level",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "tui",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "screen_reader_detection_done",
+                        "type": "boolean"
+                      },
+                      {
+                        "name": "model_availability_nux",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "key-sha256:2da8faee9a3ed7401be88eab08f9f50de122763b54cdce94dced4c0d06e0ee4f",
+                            "type": "number"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "hooks",
+                    "type": "object",
+                    "fields": [
+                      {
+                        "name": "state",
+                        "type": "object",
+                        "fields": [
+                          {
+                            "name": "key-sha256:a3902b0ec2b378cec12a5f76c09240d4d7a2c554cb85c6c103152e3c21c794ba",
+                            "type": "object",
+                            "fields": [
+                              {
+                                "name": "trusted_hash",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "type": "object",
+                "fields": [
+                  {
+                    "name": "type",
+                    "type": "string"
+                  },
+                  {
+                    "name": "file",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "name": "config",
+                "type": "object",
+                "fields": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

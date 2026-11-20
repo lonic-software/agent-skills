@@ -3,9 +3,10 @@
 #
 #   install <tool> <skill>
 #
-# tool  : which coding tool to install into (currently only "claude")
+# tool  : claude, or codex for the global-default installation preview
 # skill : powerup | consult | design-doc | delivery | evolve
 #         | queue-run | queue-fleet | powerup-auto | powerup-fleet | test-filter-hook | gate-hook
+#         Codex also accepts core-preview | full-preview.
 #         "powerup" installs the whole bundle: all five skills + their agents.
 #         "powerup-auto" is that bundle plus queue-run and its wrapper.
 #         "powerup-fleet" is that bundle plus queue-run, queue-fleet and its wrapper.
@@ -26,8 +27,15 @@ repo_root="$(cd "$script_dir/.." && pwd)"
 
 die() { echo "install: $*" >&2; exit 1; }
 
-[ -n "$tool" ]  || die "no tool given (expected: claude)"
+[ -n "$tool" ]  || die "no tool given (expected: claude | codex)"
 [ -n "$skill" ] || die "no skill given (expected: powerup | consult | design-doc | delivery | evolve | queue-run | queue-fleet | powerup-auto | powerup-fleet | test-filter-hook | gate-hook)"
+
+# Codex defaults to global scope but previews only; --scope project selects a project.
+if [ "$tool" = codex ]; then
+  command -v node >/dev/null 2>&1 || die "Codex preview requires Node.js 18 or later; no installation was attempted"
+  shift 2
+  exec node "$script_dir/install-codex.cjs" --skill "$skill" "$@"
+fi
 
 # One door, OS-native behind it. pult always runs this via `sh`, so on Linux and
 # macOS the copy logic below is the whole story. On Windows (this runs under Git

@@ -51,3 +51,66 @@ commands:
         pick:
           options: [claude]
     run: "${module.dir}/bin/check-sync {tool}"
+
+  - id: codex-install
+    title: Preview or install global or project Codex skills
+    description: Preview by default. Apply only after reviewing the exact files. Existing differences are refused; use a reviewed update plan instead.
+    params:
+      scope:
+        pick:
+          options: [global, project]
+      project:
+        input: { default: "." }
+      skill:
+        pick:
+          options: [powerup-auto, powerup, consult, design-doc, delivery, evolve, queue-run, test-filter-hook, core-preview, full-preview]
+      apply:
+        flag:
+          arg: --apply
+    run: 'node ${module.dir}/bin/install-codex.cjs --scope {scope} --project {project} --skill {skill} {apply}'
+
+  - id: codex-check-sync
+    title: Check global or project Codex files
+    description: Read-only comparison. Exit 2 means missing or changed files.
+    params:
+      scope:
+        pick:
+          options: [global, project]
+      project:
+        input: { default: "." }
+      skill:
+        pick:
+          options: [powerup-auto, powerup, consult, design-doc, delivery, evolve, queue-run, test-filter-hook, core-preview, full-preview]
+    run: 'node ${module.dir}/bin/install-codex.cjs --scope {scope} --project {project} --skill {skill} --check'
+
+  - id: codex-update-plan
+    title: Prepare a Codex update with backups
+    description: Save exact old and proposed bytes in a new plan. Project files stay unchanged. Review the printed SHA-256 and file list before applying.
+    params:
+      scope:
+        pick:
+          options: [global, project]
+      project:
+        input: { default: "." }
+      skill:
+        pick:
+          options: [powerup-auto, powerup, consult, design-doc, delivery, evolve, queue-run, test-filter-hook, core-preview, full-preview]
+      plan:
+        input: {}
+    run: 'node ${module.dir}/bin/manage-codex.cjs preview --scope {scope} --project {project} --skill {skill} --plan {plan}'
+
+  - id: codex-update
+    title: Apply or roll back an approved Codex plan
+    description: Requires the exact reviewed plan and SHA-256. Refuses files changed since preview or deployment. Does not activate hooks or change configuration.
+    params:
+      project:
+        description: Base directory for a relative plan path. The approved plan identifies the installation root.
+        input: { default: "." }
+      action:
+        pick:
+          options: [apply, rollback]
+      plan:
+        input: {}
+      approved-sha256:
+        input: {}
+    run: 'node ${module.dir}/bin/manage-codex.cjs {action} --project {project} --plan {plan} --approved-sha256 {approved-sha256}'

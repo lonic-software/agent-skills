@@ -2,6 +2,23 @@
 
 Composable workflow skills for high-rigor engineering — planning, delegation, design review, and disciplined shipping — that tighten with use. Built for **Claude Code** today; the portable doctrines are written to travel to other coding tools (Codex, …) as they're ported, which is why installs are namespaced per tool (`claude`).
 
+## Codex support candidate
+
+A global-default Codex candidate (with explicit project scope) is available under `codex/` with all
+seven workflow skills, four advisor roles, two reviewer roles, separate tetel
+evidence workers, a queue controller, and optional test-output scripts.
+See the [Codex setup guide](codex/README.md) for Windows and Ubuntu commands.
+The installer previews changes by default and requires an explicit apply flag.
+It does not activate hooks or edit Codex config.toml. See codex/README.md for scopes and manual runtime/MCP configuration.
+
+Bounded native author-driven design, evidence, fresh-session implementation and
+review examples passed on Windows and Ubuntu. Managed powerup supports automatic phase
+handoff, operator questions/approvals, availability windows and measured usage
+reports. Ordinary Codex chats need the controller for automatic phase changes.
+The original Claude mods are not installed as Codex extensions. Complete behavioral parity,
+cost savings and quality gains are not claimed.
+The descriptions below describe Claude Code unless explicitly marked as Codex.
+
 Two headlines:
 
 - **`/powerup`** — one command that switches the whole disciplined workflow on for a session.
@@ -69,7 +86,7 @@ Two of the agents in this repo (`lonic-design-attacker`, `lonic-grounder`) exist
 
 `orchestrate` and its `lonic-exec-*` executors were retired in favour of the main session authoring the work itself; see *You are the author* in `powerup`.
 
-Everything lives under `claude/` because even the doctrine-heavy skills reference Claude Code constructs (the `/code-review` command, the advisor agent, the memory system). The **engineering principles** inside `design-doc` / `delivery` / `evolve` carry over to any agent framework; the **mechanics** don't. If this repo ever grows a non-Claude implementation, those doctrines are the parts worth porting.
+The complete Claude Code implementation lives under `claude/`. Its skills use Claude Code constructs such as `/code-review`, advisor agents, and memory. The Codex development implementation lives under `codex/`; it preserves the shared engineering rules and adapts supported client mechanics. See its setup guide for the current scope and limits.
 
 ## The agents
 
