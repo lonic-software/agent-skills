@@ -62,7 +62,7 @@ depends on the time, read it with `TZ=<zone> date`; you have no clock.
 
 - **Inside a window**, a question for the user does not end the chain. Notify (*Getting the user's
   attention*), ask with AskUserQuestion, and continue on the answer. This covers a decision
-  mid-item, an "ask first" or parked row reached in the queue, and the *Always ask* list; the answer
+  mid-item, an "ask first" or parked row reached in the queue, and the asks of *Decision authority*; the answer
   authorizes only what it names. Write the answer into the queue entry before going on, so no later
   session asks it again. Each question is asked once per run: a "no" or "not now" stands for the
   rest of the run and joins the handoff's standing exclusions. AskUserQuestion has no timeout, so
@@ -70,7 +70,7 @@ depends on the time, read it with `TZ=<zone> date`; you have no clock.
   closes.
 - **Outside every window, nothing waits on the user.** An item that needs a decision is **parked**:
   brought to resumable state (§2), its queue entry marked `blocked on user — Q: <the question in
-  full>`, and the user notified once. Parking is an item boundary: go to §2 step 5. The next session
+  full>`, and the user notified once. Parking is an item boundary: go to §2 step 6. The next session
   takes the next item that is not blocked on the user.
 
 Confirm the resolved parameters back to the user in one or two lines, windows included, then start.
@@ -84,12 +84,15 @@ Confirm the resolved parameters back to the user in one or two lines, windows in
    wins. Take the **first unfinished item not blocked on the user**. Items the queue or memory marks
    as parked or "ask first" are asked about inside an availability window (§1d) and skipped outside
    one; note skipped ones for the final report.
-3. **Do the item** under the project's own workflow, to its natural end: merged (if authorized), or a
+3. **Check the item's size at intake** (design-doc's *Slice size*), before any design opens, and
+   write the result as one line in the item's pass log. An item over it is split first; the split
+   is yours to make (*Decision authority*), and the parts enter the queue at the item's rank.
+4. **Do the item** under the project's own workflow, to its natural end: merged (if authorized), or a
    PR left open with review done (if not).
-4. **Update the queue**: tick the item, or mark it in progress or blocked with a one-line reason. File
+5. **Update the queue**: tick the item, or mark it in progress or blocked with a one-line reason. File
    any follow-up work you discovered into the queue, so it isn't lost in a handoff. Move the
    project's issue tracker with it where the user's tracker preference says to (delivery §C).
-5. **Check usage again** (§3). Under the threshold: hand off (§4). At or over: stop (§5).
+6. **Check usage again** (§3). Under the threshold: hand off (§4). At or over: stop (§5).
 
 **Items too large for a session.** If an item clearly spans several phases (design, then slices), a
 *phase boundary* counts as an item boundary. Finish the phase, leave everything durable (committed,
@@ -115,7 +118,9 @@ stop after the current item instead of chaining blind.
 
 ## 4. Handoff
 
-Call `mcp__phase-handoff__handoff` as the **last action** of the session, then end the turn. The
+Call `mcp__phase-handoff__handoff` as the **last action** of the session, then end the turn, except
+while the user is talking (powerup's phase-boundary rule): then write the prompt, say it is ready, and
+wait for their "go". The
 prompt must stand alone, because it is all the next session knows. Start it with the same command that
 started this run (`/queue-run`, or a wrapper such as `/powerup-auto`; `/powerup:queue-run` and
 `/powerup:powerup-auto` when installed as the `powerup` plugin) so the same skills load again,
@@ -141,7 +146,7 @@ If the handoff tool is unavailable, stop (§5) and print the ready-to-paste prom
 
 Stop when any of these holds: the threshold is reached, the queue has no unblocked items left (an
 item parked as blocked on the user counts as blocked, §1d), or something is broken in a way the chain shouldn't guess
-past (CI infrastructure down, auth expired, review non-convergence: the review ledger owes a direction verdict, delivery §C, that the run cannot give itself, such as a cut).
+past (CI infrastructure down, auth expired, review non-convergence: the review ledger owes a direction verdict, delivery §C, that *Decision authority* gives to the user).
 
 Run `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark clear` at the stop, whichever command started the
 chain, so a later unrelated compaction in this tree injects nothing.
@@ -155,17 +160,40 @@ The final report covers:
 - **Resume line:** a ready-to-paste `/queue-run …` prompt, with the threshold left as a blank for the
   user to fill in, since it will differ next time.
 
-## Always ask, even mid-chain
+## Decision authority
 
-Merging is the only outward action this skill authorizes on its own, and only per §1c; tracker
-writes are authorized by the user's tracker preference alone (delivery §C). Merging covers only **the
-change for the item you are working**. Any other change, such as a PR someone else opened, a fix you
-noticed on the way or a change you were asked to look at, is filed or left for the user, never merged
-by you, even when it is small and green. Still stop and ask before:
+Intent: a run goes unattended, and the user is in the loop only for what matters. This section is
+the single owner of who decides what. Other skills cite it rather than restate it.
+
+**Always ask, even mid-chain.** Merging is the only outward action this skill authorizes on its own,
+and only per §1c; tracker writes are authorized by the user's tracker preference alone (delivery
+§C). Merging covers only **the change for the item you are working**. Any other change, such as a PR
+someone else opened, a fix you noticed on the way or a change you were asked to look at, is filed or
+left for the user, never merged by you, even when it is small and green. Still stop and ask before:
 releases or publishing, deploys, anything touching live infrastructure, destructive git (force-push,
 history rewrites, deleting branches you didn't create), and anything the project's instructions mark
-as needing the user. Inside an availability window, ask and continue (§1d). Outside one, do not
-ask: park the item (§1d).
+as needing the user.
+
+**Ask the user** about a decision in the work itself when it:
+- removes or changes something that works today. "Something relied on" means a command, a flag, a
+  default, an exit code or a `--json` shape, and nothing broader;
+- adds product surface (a new command or flag), or decides whether a feature is built at all;
+- widens what is accepted silently, deleted or trusted (trust, security, data loss);
+- makes any other practical trade-off, such as a default that is slower but safer;
+- drops work: a cut that removes it, or a deferral to a ticket that waits for demand;
+- is one the agent and the advisor disagree on, after one consultation at the next tier up.
+
+**The agent and the advisor decide alone** everything else, record it in the item's pass log, and
+list it in the final report:
+- splits (design-doc's slice size), order, and the internal mechanism;
+- deferrals to a ticket that is queued without a demand gate, and cuts whose moved work is queued
+  that way, so that the end result is unchanged once every slice ships;
+- strict improvements within the ticket's intent: a crash becomes a coded error, a dead end gets a
+  way out, a wrong message is fixed, a fail-open is closed. Tightening what is accepted, deleted or
+  trusted is one of these.
+
+The ask list wins: a decision that fits both lists is asked. Inside an availability window, ask and
+continue (§1d). Outside one, do not ask: park the item (§1d) and work on another.
 
 ## Getting the user's attention
 

@@ -93,6 +93,22 @@ doc approaches the size of the diff it will describe. Either is the same signal 
 from escalating review rounds — stop, cut the doc back to decisions and observables, and move the
 mechanism to the spike list or the implementation checklist.
 
+**Slice size.** This is measured, not judged, and it applies at every level: a sub-ticket gets no
+exemption.
+- **One fault, or one user-visible behaviour change, per slice.**
+- **Single faults first.** Each fault is its own item with its own way out. Combinations of faults
+  are never designed one by one: together they get one generic way out that is always true, such as
+  restoring from a backup or cloning again. A recovery for one specific combination is its own item,
+  and it waits for demand.
+- **At most three state dimensions.** When the design opens, list the contract's quantified
+  variables by name, and have the advisor count the list. More than three means split.
+- **Size tripwires.** A claim over about 8k characters, or more than about five modification
+  targets, means split.
+
+It is checked at intake, before the design opens, and the check is written down as one recorded
+line. The scope gate checks it again whenever the design's scope grows. A split is the agent's
+decision (queue-run, *Decision authority*).
+
 This skill exists because of one repeatedly-observed failure: a design doc states something about
 the code as a step in an argument, nobody notices it is a checkable fact rather than reasoning,
 and it survives several rounds of adversarial review intact because reviewers argue with the

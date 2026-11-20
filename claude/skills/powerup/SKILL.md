@@ -128,7 +128,11 @@ re-reads. So:
   action and end the turn — its description says what `prompt` must be; add that the prompt starts
   with `/powerup` and names the files the next phase reads first, in order. The user gets a countdown
   to cancel; then the session clears and the prompt opens the next one. If the tool is not
-  registered, tell the user it is a boundary and give that prompt instead. `autoCompactWindow` (300k)
+  registered, tell the user it is a boundary and give that prompt instead. **Not while the user
+  is talking:** if they sent a message in this turn or the last few, or a question to them is open,
+  do not call `handoff`. Write the brief, say the handoff is ready, and wait for their "go"; twice a
+  handoff cleared the session before the user could read the reply (user, 2026-11-20). In an
+  unattended stretch, with no user message since the last handoff, boundaries hand off as above. `autoCompactWindow` (300k)
   is only the safety net for a session that runs long anyway. A finding that exists only in context
   is one boundary from gone.
 - **Handoffs stay inside the item you were given.** Under bare `/powerup`, the chain exists so one

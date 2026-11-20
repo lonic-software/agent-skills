@@ -317,11 +317,12 @@ starts — never a batch.
     makes the checked domain equal it, both named;
   - **contract**: a clause the code keeps answering is wrong or missing, so reopen it in the design
     loop, with an attack pass before more code;
-  - **cut**: land the bounded part and move the rest out. A cut changes scope, so it is the user's
-    decision (queue-run §1d).
+  - **cut**: land the bounded part and move the rest out. Who decides it is queue-run's *Decision
+    authority*: the agent and the advisor alone when the rest moves to a queued ticket with no demand
+    gate, the user when the cut drops work or defers it until demand.
 
   Record the answer with `review-ledger verdict <kind> --note "<the bound, the clause, or the
-  user's decision>"`. **The ratchet:** once a class recurs after a converging verdict, converging
+  decision and who made it>"`. **The ratchet:** once a class recurs after a converging verdict, converging
   is off the menu, and the ledger refuses it. **"A root fix inside the PR" is the tell.** It is the
   answer the author reaches for at every trigger, which is why the author does not pick. Rounds
   still end on the finding class (§B); the ledger never declares a loop done, it only moves the

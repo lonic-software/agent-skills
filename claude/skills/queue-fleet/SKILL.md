@@ -95,7 +95,7 @@ Traps seen, as evidence for the rules below:
 Review, rounds and fixes all happen **before** `turn enter`; never run a review round inside the
 turn. The turn is for **your claimed item's change only**: a change for anything else, such as
 another slot's PR, one the user opened, or a side fix, is filed or left for the user, never merged
-by you (queue-run's "Always ask"). Inside it:
+by you (queue-run's *Decision authority*). Inside it:
 
 1. Read the change's state back — from the forge, or from the default branch where there is none.
    If an earlier holder of this slot left it half-merged, finish from what is there.
@@ -145,7 +145,7 @@ session (SendMessage, naming the slot) and notify the user.
   the claim line is what bounds spend, not the depth of the pick. (A fixed look-ahead window was
   tried and removed: it never changed which row was picked, only made a slot idle when a row it
   could have claimed sat just past the window.)
-- **§2 step 4, the queue doc:** "in progress" lives in the claims, not the doc. Write the doc only to
+- **§2 step 5, the queue doc:** "in progress" lives in the claims, not the doc. Write the doc only to
   tick, park or file. Every write is read-apply-retry: read the current revision, apply your one
   change, and on a revision-mismatch rejection read again and reapply. Never overwrite another
   slot's change.

@@ -27,7 +27,8 @@ Record the run under this command's name, as above, not queue-fleet's.
   the merge. Powerup governs how the item is done.
 - **Handoff prompts start with `/powerup-fleet`** (`/powerup:powerup-fleet` under the plugin install),
   the fleet's command. This overrides powerup's and powerup-auto's rule. The prompt names the slot, the claimed item and
-  its phase, and the files the next phase reads first.
+  its phase, and the files the next phase reads first. Powerup's "not while the user is talking"
+  holds in a slot too: an attached user who is talking gets the brief and a wait for "go".
 - **Boundaries are as in powerup-auto.** An item boundary and a closed design always hand off. Any
   other phase boundary follows powerup's break-even weighing. Check usage and `fleet budget pace`
   before every handoff.
