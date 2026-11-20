@@ -42,9 +42,9 @@ async function fire($: EngineInterface) {
   }
 }
 
-async function countDown($: EngineInterface) {
+async function countDown($: EngineInterface, seconds = COUNTDOWN_SECONDS) {
   stop()
-  await update($, pending, p => p && { ...p, secondsLeft: COUNTDOWN_SECONDS })
+  await update($, pending, p => p && { ...p, secondsLeft: seconds })
   tick = $.clock.every(1000, () => {
     void (async () => {
       const next = await update($, pending, p =>
@@ -54,6 +54,23 @@ async function countDown($: EngineInterface) {
       else if ((next.secondsLeft ?? 1) <= 0) await fire($)
     })()
   })
+}
+
+// Nothing draws the session (a background session nobody has open): nobody can
+// cancel, so the countdown would only wait. Fire at once.
+async function unwatched($: EngineInterface) {
+  return (await $.session.surfaces()).length === 0
+}
+
+// The countdown's timer lives in this process, the pending handoff in the
+// store. A session restarted mid-countdown (a background session respawned on
+// a new version, then resumed) holds the handoff but no timer: pick it up again
+// where it stopped, or fire at once if nobody is watching.
+async function resume($: EngineInterface) {
+  const handoff = await read($, pending)
+  if (handoff === null || handoff.secondsLeft === null) return
+  if (await unwatched($)) await fire($)
+  else await countDown($, Math.max(1, handoff.secondsLeft))
 }
 
 const k = (tokens: number) => `${Math.round(tokens / 1000)}k`
@@ -189,7 +206,15 @@ export const register: Register = on => {
       name: 'budget',
       description: 'Context, session cost, rate limits and their pace: /budget [R tokens] [breakdown]',
     })
-    return next(e)
+    const started = await next(e)
+    await resume($)
+    return started
+  })
+
+  on('session.attach', async ($, e, next) => {
+    const attached = await next(e)
+    await resume($)
+    return attached
   })
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
@@ -234,7 +259,7 @@ export const register: Register = on => {
     if (e.agentId !== undefined) return done
     const handoff = await read($, pending)
     if (handoff !== null && handoff.secondsLeft === null) {
-      if (e.reason === 'answer') await countDown($)
+      if (e.reason === 'answer') await ((await unwatched($)) ? fire($) : countDown($))
       else await cancel($, `turn ended (${e.reason})`)
     }
     return done

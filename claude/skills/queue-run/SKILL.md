@@ -171,10 +171,14 @@ ask: park the item (§1d).
 
 The user does not watch the chain. Whenever the run needs them, send a `PushNotification` (load it
 with ToolSearch `select:PushNotification` if it is deferred) **before** ending the turn or calling
-AskUserQuestion. That covers every stop in §5, every ask above, and a question asked mid-item. One
+AskUserQuestion, with `status: "proactive"`. That covers every stop in §5, every ask above, a
+question asked mid-item, and an action the permission system denied that the run needed. **Send it
+even when the user seems to be at the terminal:** an open terminal, or a recent message from them,
+does not mean they are watching the session, so never skip the notification on that judgement. One
 line, under 200 characters, leading with what they must act on, e.g. "ISSUE-63: decision needed —
 index rebuild cost on large repos" or "queue-run stopped at 80% weekly: 3 merged, 1 PR open".
 
 A parked item (§1d) is notified once, when it is parked, so the question is waiting when the user
 looks. Do not notify at handoffs, item merges or routine progress; the chain continuing needs nothing from
-them. A "not sent" result means they are at the terminal already, so carry on.
+them. If the tool answers "not sent", carry on, and say in the turn's final message that it was not
+sent, so a skipped notification is visible rather than assumed delivered.
