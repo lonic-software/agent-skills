@@ -68,17 +68,17 @@ switch ($Skill) {
     'powerup' {
         $skills = $bundleSkills
         $agents = $advisors + $designPasses
-        $hooks = @('skills-after-compact.sh', 'gate.sh')
+        $hooks = @('skills-after-compact.sh', 'gate.sh', 'tool-gate.sh')
     }
     'powerup-auto' {
         $skills = $bundleSkills + @('queue-run', 'powerup-auto')
         $agents = $advisors + $designPasses
-        $hooks = @('skills-after-compact.sh', 'gate.sh')
+        $hooks = @('skills-after-compact.sh', 'gate.sh', 'tool-gate.sh')
     }
     'powerup-fleet' {
         $skills = $bundleSkills + @('queue-run', 'queue-fleet', 'powerup-fleet')
         $agents = $advisors + $designPasses
-        $hooks = @('skills-after-compact.sh', 'gate.sh')
+        $hooks = @('skills-after-compact.sh', 'gate.sh', 'tool-gate.sh')
     }
     'queue-fleet' {
         $skills = @('queue-run', 'queue-fleet', 'delivery')
@@ -158,6 +158,15 @@ if ($hooks -contains 'gate.sh') {
     Write-Host '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
     Write-Host "    { `"type`": `"command`", `"command`": `"$gateCmd`" }"
     Write-Host '  ] } ] }'
+    Write-Host ''
+}
+if ($hooks -contains 'tool-gate.sh') {
+    $tgCmd = 'bash ' + ((Join-Path $dstHooks 'tool-gate.sh') -replace '\\', '/')
+    Write-Host 'Enforces the design scope gate, the design-ledger ratchet and the availability window once wired in - add to the same PreToolUse list (needs jq and Git Bash):'
+    Write-Host ''
+    Write-Host '  { "matcher": "mcp__.*tetel__render|Agent|AskUserQuestion", "hooks": ['
+    Write-Host "    { `"type`": `"command`", `"command`": `"$tgCmd`" }"
+    Write-Host '  ] }'
     Write-Host ''
 }
 if ($Skill -eq 'powerup') {

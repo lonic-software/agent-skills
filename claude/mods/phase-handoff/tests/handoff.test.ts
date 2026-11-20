@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 const TOOL = 'mcp__phase-handoff__handoff' as const
 const done = { answer: 'ok', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' as const }
 
-function record(on: Parameters<Parameters<typeof test>[1] & ((...a: never[]) => unknown)>[1]) {
+function record(on: Parameters<Parameters<typeof test>[1] & ((...a: never[]) => unknown)>[1], surfaced = true) {
   const commands: string[] = []
   const prompts: string[] = []
   on('command.run', ($, e) => {
@@ -11,6 +11,7 @@ function record(on: Parameters<Parameters<typeof test>[1] & ((...a: never[]) => 
     return { text: '' }
   })
   on('turn.complete', () => ({ text: '' }))
+  if (surfaced) on('session.surfaces', (() => ({ value: ['terminal'] })) as never)
   on('prompt.submit', ($, e) => {
     prompts.push(e.text)
     return { text: e.text }
@@ -112,4 +113,160 @@ test('context reports each rate limit against the elapsed share of its window', 
   expect(text).toContain('Pace five_hour: 40% used vs 80% of the window elapsed (resets in 1h0m): under pace (0.50x); at this rate 50% by the reset.')
   expect(text).toContain('Pace seven_day: 30% used vs 14% of the window elapsed (resets in 6d0h): OVER pace (2.10x); at this rate 210% by the reset.')
   expect(text).not.toContain('Pace spend_limit')
+})
+
+type On = Parameters<Parameters<typeof test>[1] & ((...a: never[]) => unknown)>[1]
+
+// A clock whose periods the test resolves one second at a time, and whose
+// pending periods a dead process drops: the timer stops, the stored handoff stays.
+function hostClock(on: On) {
+  let waiting: Array<(r: unknown) => void> = []
+  on('clock.every', (() => new Promise(r => waiting.push(r))) as never)
+  const settle = () => new Promise(r => setTimeout(r, 0))
+  return {
+    async seconds(n: number) {
+      for (let i = 0; i < n; i++) {
+        const now = waiting; waiting = []
+        now.forEach(r => r({ value: undefined }))
+        await settle(); await settle()
+      }
+    },
+    die() { waiting = [] },
+  }
+}
+
+const surfaces = (on: On, list: string[]) => on('session.surfaces', (() => ({ value: list })) as never)
+const host = (on: On) => {
+  on('tool.register', (() => ({ value: undefined })) as never)
+  on('command.register', (() => ({ value: undefined })) as never)
+  on('session.start', (($: unknown, e: { cwd: string }) => ({ cwd: e.cwd })) as never)
+  on('session.attach', (($: unknown, e: { clientId: string }) => ({ clientId: e.clientId })) as never)
+}
+
+test('a session restarted mid-countdown resumes it at start', async ($, on) => {
+  const clock = hostClock(on)
+  const seen = record(on as never, false)
+  surfaces(on, ['terminal']); host(on)
+  await $.tool.call({ tool: TOOL, prompt: 'next' } as never)
+  await $.turn.complete(done)
+  await clock.seconds(5)
+  clock.die()
+  await clock.seconds(60)
+  expect(seen.commands).toEqual([])
+  await $.session.start({ cwd: '/w', surface: 'terminal', isInteractive: true })
+  await clock.seconds(14)
+  expect(seen.commands).toEqual([])
+  await clock.seconds(1)
+  expect(seen.commands).toEqual(['/clear'])
+  expect(seen.prompts).toEqual(['next'])
+})
+
+test('a client attaching to a stalled countdown resumes it', async ($, on) => {
+  const clock = hostClock(on)
+  const seen = record(on as never, false)
+  surfaces(on, ['terminal']); host(on)
+  await $.tool.call({ tool: TOOL, prompt: 'next' } as never)
+  await $.turn.complete(done)
+  clock.die()
+  await clock.seconds(60)
+  expect(seen.commands).toEqual([])
+  await $.session.attach({ surface: 'desktop', clientId: 'desktop:default' } as never)
+  await clock.seconds(20)
+  expect(seen.commands).toEqual(['/clear'])
+})
+
+test('a restarted session nobody watches fires at once', async ($, on) => {
+  const clock = hostClock(on)
+  const seen = record(on as never, false)
+  const list = ['terminal']
+  surfaces(on, list); host(on)
+  await $.tool.call({ tool: TOOL, prompt: 'next' } as never)
+  await $.turn.complete(done)
+  clock.die()
+  list.length = 0
+  await $.session.start({ cwd: '/w', surface: null, isInteractive: false })
+  expect(seen.commands).toEqual(['/clear'])
+})
+
+test('with nothing drawing the session, the handoff fires at once', async ($, on) => {
+  mock.clock(on)
+  const seen = record(on as never, false)
+  surfaces(on, [])
+  await $.tool.call({ tool: TOOL, prompt: 'next' } as never)
+  await $.turn.complete(done)
+  expect(seen.commands).toEqual(['/clear'])
+})
+
+test('a start with no handoff pending does nothing', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never, false)
+  surfaces(on, []); host(on)
+  await $.session.start({ cwd: '/w', surface: null, isInteractive: false })
+  await clock.advance(60_000)
+  expect(seen.commands).toEqual([])
+})
+
+const user = { kind: 'composer' } as const
+
+test('a handoff called while the user is talking is held, and /handoff now starts it', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never)
+  await $.prompt.submit({ text: 'what did slice 2 change?', origin: user } as never)
+  const ran = await $.tool.call({ tool: TOOL, prompt: '/powerup slice 3' } as never)
+  expect(ran.deny).toContain('waiting for go')
+  await $.turn.complete(done)
+  await clock.advance(60_000)
+  expect(seen.commands).toEqual([])
+  await $.command.run({ command: 'handoff', args: 'now', origin: user } as never)
+  await clock.advance(1_000)
+  expect(seen.commands.filter(c => c !== '/handoff now')).toEqual(['/clear', '/powerup slice 3'])
+})
+
+test('a "go" from the user lets the next handoff through', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never)
+  await $.prompt.submit({ text: 'looks good', origin: user } as never)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toContain('Held')
+  await $.prompt.submit({ text: 'go', origin: user } as never)
+  const ran = await $.tool.call({ tool: TOOL, prompt: 'next' } as never)
+  expect(ran.deny).toBeUndefined()
+  await $.turn.complete(done)
+  await clock.advance(20_000)
+  expect(seen.commands).toEqual(['/clear'])
+})
+
+test('a typed slash command counts as the user talking', async ($, on) => {
+  mock.clock(on)
+  record(on as never)
+  await $.command.run({ command: 'powerup-fleet', args: 'slot-1', origin: user } as never)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toContain('Held')
+})
+
+test('ten quiet minutes after the user spoke, a handoff is scheduled as usual', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never)
+  await $.prompt.submit({ text: 'carry on', origin: user } as never)
+  await clock.advance(10 * 60_000)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toBeUndefined()
+  await $.turn.complete(done)
+  await clock.advance(20_000)
+  expect(seen.commands).toEqual(['/clear'])
+})
+
+test('a prompt a plugin submitted is not the user talking', async ($, on) => {
+  mock.clock(on)
+  record(on as never)
+  await $.prompt.submit({ text: '/powerup slice 3' } as never)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toBeUndefined()
+})
+
+test('with nothing drawing the session, a recent prompt does not hold the handoff', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never, false)
+  surfaces(on, [])
+  await $.prompt.submit({ text: 'hi', origin: user } as never)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toBeUndefined()
+  await $.turn.complete(done)
+  await clock.advance(1_000)
+  expect(seen.commands).toEqual(['/clear'])
 })

@@ -48,6 +48,10 @@ two and never deletes the memory — its `MEMORY.md` index line gets a "promoted
 marker, the convention the index already uses (e.g. "SHIPPED as PR #68"). Skill wins on conflict —
 what lets an obsolete rule be removed safely later instead of becoming undeletable dogma.
 
+**`rationale.md` beside a skill holds its evidence**: the incidents and measurements behind its
+rules, kept out of the text every session reads. Read it when changing that skill, and put a new
+rule's evidence there, leaving a one-line pointer beside the rule.
+
 ## Tools: reuse, then promote
 
 Helper scripts follow the same split as rules: a scratchpad copy is case law, and it gets wiped. A

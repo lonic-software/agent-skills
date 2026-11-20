@@ -93,6 +93,26 @@ doc approaches the size of the diff it will describe. Either is the same signal 
 from escalating review rounds — stop, cut the doc back to decisions and observables, and move the
 mechanism to the spike list or the implementation checklist.
 
+**Slice size.** This is measured, not judged, and it applies at every level: a sub-ticket gets no
+exemption.
+- **One fault, or one user-visible behaviour change, per slice.**
+- **Single faults first.** Each fault is its own item with its own way out. Combinations of faults
+  are never designed one by one: together they get one generic way out that is always true, such as
+  restoring from a backup or cloning again. A recovery for one specific combination is its own item,
+  and it waits for demand.
+- **At most three state dimensions.** When the design opens, list the contract's quantified
+  variables by name, and have the advisor count the list. More than three means split.
+- **Size tripwires.** A claim over about 8k characters, or more than about five modification
+  targets, means split.
+
+It is checked at intake, before the design opens, and the check is written down as one recorded
+line: `${CLAUDE_SKILL_DIR}/design-ledger open --item <id> --workspace <ws> --dims "<the quantified
+variables>" --scope "<target:/surface:/file: tokens>"`, which refuses more than three
+dimensions or five targets. On the tetel route the scope gate (the `tool-gate.sh` hook) checks it
+again at every render: a target outside the recorded scope waits for a `design-ledger decide`. A
+split is the agent's and the advisor's decision (queue-run, *Decision authority*). `loop-tetel.md`'s *The ratchet* says
+what the ledger records per pass.
+
 This skill exists because of one repeatedly-observed failure: a design doc states something about
 the code as a step in an argument, nobody notices it is a checkable fact rather than reasoning,
 and it survives several rounds of adversarial review intact because reviewers argue with the
@@ -171,7 +191,9 @@ under delivery §B's medium cap, and it ends by the rule below.
 **The loop, in brief** (so the routing above is actionable before `loop-tetel.md` is open): you
 author and revise; each round is an attack pass, then your revision, then a grounding pass over what
 the revision left owed; passes run synchronously and never overlap; the loop stops when the last
-attack pass returned no finding that changes what gets built, capped at four grounding rounds; a
+attack pass returned no finding that changes what gets built, and the design ledger's ratchet (four
+grounding passes, or three build-changing attack passes after a close) stops it for a recorded
+`decide`; a
 revision no attacker has seen means the next pass is an attacker; and a design that has not been
 independently grounded is never reported.
 
@@ -184,7 +206,8 @@ are real, and they route to the instruments that own them (delivery §B owns the
 into prose. **Ending the design phase does not predict a light code review.** Mechanism defects
 surface at the implementation gates *by design* — moving a defect from prose to a diff is what makes
 it real and fixable, not what makes it free. Budget the code-review rounds accordingly; their yield
-is the system working, not the stopping rule failing.
+is the system working, not the stopping rule failing — until the review ledger owes a direction
+check (delivery §C). From then on, heavy yield is the signal, not health.
 
 A closed design is ready to implement — after the checklist under **When it is ready** in
 `method.md`. The end of a design is a phase boundary: `powerup`'s phase-boundary rule owns whether to

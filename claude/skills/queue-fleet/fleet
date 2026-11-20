@@ -28,6 +28,7 @@
 #   fleet turn enter|wait|leave [--requeue]|holds|take-dead
 #   fleet budget check --usage PCT | reserve PCT --usage PCT | release | pace --five-hour PCT
 #   fleet halt <reason> | fleet unhalt | fleet exclude <item>   (exclude: a question the user declined)
+#   fleet window set "<rules>" | fleet window clear   (the user said when they are available; powerup-mark's form)
 #   fleet status
 #   fleet end                          remove the state (refused while any claim has a live owner)
 #   fleet --self-test
@@ -191,6 +192,11 @@ cmd_init() {
     || die "init needs --workers --threshold --queue --merge-authority"
   case "$workers$thr" in *[!0-9.]*) die "init: --workers and --threshold are numbers" ;; esac
   case "$command" in ""|*[!a-z0-9:-]*) die "init: --command is a slash command's name, such as queue-fleet" ;; esac
+  if [ -n "$windows" ]; then # the tool-gate hook reads them with powerup-mark; refuse a form it cannot
+    if true; then
+      windows_ok "$windows" || die "init: --windows '$windows' cannot be read; use powerup-mark's form, e.g. \"weekdays 09:00-17:00 Europe/Budapest\" or \"until 2026-11-20 23:00 Europe/Budapest\", joined with ';'"
+    fi
+  fi
   local top cfg
   top=$(git rev-parse --show-toplevel) || die "not inside a work tree"
   cfg="$top/$CONFIG_REL"
@@ -719,6 +725,21 @@ cmd_status() {
   return 0
 }
 cmd_exclude() { need_state; local i=${1:-}; [ -n "$i" ] || die "exclude <item>"; lock_state; jset "$S/run.json" '.exclusions += [$i] | .exclusions |= unique' --arg i "$i"; unlock_state; echo "excluded $i"; }
+windows_ok() { # rules → 0 when powerup-mark can read them (or is not installed)
+  local pm; pm="$(cd "$(dirname "$0")/.." && pwd)/powerup/powerup-mark"
+  [ -x "$pm" ] || return 0
+  "$pm" in-window --rules "$1" >/dev/null 2>&1; [ $? -ne 2 ]
+}
+cmd_window() {
+  need_state
+  case "${1:-}" in
+    set) local w=${2:-}; [ -n "$w" ] || die "window set \"<rules>\""
+         windows_ok "$w" || die "window: '$w' cannot be read; use powerup-mark's form, e.g. \"weekdays 09:00-17:00 Europe/Budapest\" or \"until 2026-11-20 23:00 Europe/Budapest\", joined with ';'"
+         lock_state; jset "$S/run.json" '.windows = $w' --arg w "$w"; unlock_state; echo "windows: $w" ;;
+    clear) lock_state; jset "$S/run.json" '.windows = ""' ; unlock_state; echo "windows: none (the user is away)" ;;
+    *) die "window set \"<rules>\" | window clear" ;;
+  esac
+}
 cmd_end() {
   need_state
   local f s live=""
@@ -836,6 +857,11 @@ EOF
   PIDV=$P3; expect "a new process adopts the dead slot" 0 "slot-1" "$W1" "$self" whoami
   expect "the adopter owns the old claims" 0 "already yours" "$W1" "$self" claim A-1 --usage 10
   # Halt.
+  expect "a worker records the user's window" 0 "windows: weekdays 09:00-17:00 Europe/Budapest" "$W1" "$self" window set "weekdays 09:00-17:00 Europe/Budapest"
+  expect "status shows it" 0 "windows: weekdays 09:00-17:00" "$W1" "$self" status
+  expect "an unreadable window is refused" 2 "cannot be read" "$W1" "$self" window set "until 23:00 Budapest"
+  expect "the refused one left the window as it was" 0 "windows: weekdays" "$W1" "$self" status
+  expect "window clear" 0 "the user is away" "$W1" "$self" window clear
   expect "halt" 0 "halted" "$W1" "$self" halt "auth expired"
   expect "a halted fleet claims nothing" 3 "halted" "$W1" "$self" claim B-1 --usage 10
   expect "status reports the halt" 0 "HALTED" "$W1" "$self" status
@@ -999,6 +1025,7 @@ case "$sub" in
   halt) cmd_halt "$@" ;;
   unhalt) cmd_unhalt ;;
   exclude) cmd_exclude "$@" ;;
+  window) cmd_window "$@" ;;
   status) cmd_status ;;
   end) cmd_end ;;
   --self-test) self_test; exit $? ;;

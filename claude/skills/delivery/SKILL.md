@@ -138,8 +138,7 @@ documented — routing decisions elsewhere should cite this section, not restate
   enumeration claim with no sweep behind it. Bound each run (with a watchdog where the platform has
   no `timeout`). Leave to CI only what this machine cannot run — other OSes, services it lacks, or a
   suite too long to run here, named with its measured duration so the reader can overrule the call
-  — and say which you left. The seeding incident ran filtered e2e subsets locally; CI then went red
-  on three OSes over six assertions a few-second run of the one test file would have caught.
+  — and say which you left. (Incident: `rationale.md`.)
 - **Bringing a branch up to date is not a new change.** Merging the target branch into yours
   (never a rebase, which needs a force-push) leaves your diff as it was, so it reopens neither
   review nor the local-suite rule above when it merges cleanly, or its conflicts lie only in files
@@ -174,9 +173,6 @@ documented — routing decisions elsewhere should cite this section, not restate
     blocking.
   - Design-doc reviews are exempt — they run inside the design loop (see the design-doc bullet
     below) and gate the doc's content, which CI does not check.
-  - Trap seen: a first CI run fails on only a small share of changes whose local suites ran green,
-    so waiting before every review cost about ten minutes per change to avoid a case that produces a
-    fix round anyway.
   - **Gate, enforced by the `gate.sh` hook:** a merge must pin the head it merges (on GitHub,
     `--match-head-commit <sha>`), that sha must be the change's head, and the evidence above must
     pass at it — CI checks, or a `verify-head` stamp where there is no CI. The project's
@@ -188,15 +184,15 @@ documented — routing decisions elsewhere should cite this section, not restate
     `| tail`/`| head`/`| grep` on a command whose exit status is the verdict — read the status first,
     trim afterwards.
 - **One reviewer per change, resumed across rounds.** Invoke `/code-review` **once**; drive later
-  rounds by `SendMessage` to that instance. Verified: a completed review agent resumes with its diff,
-  its mutation runs and its findings intact. A repeat `Skill` call always starts a new one. **A
+  rounds by `SendMessage` to that instance; it resumes with its diff, its mutation runs and its
+  findings intact. A repeat `Skill` call always starts a new one. **A
   reviewer's cache lasts five minutes** (the subagent default; a forked `/code-review` takes no
   per-agent TTL). A resume within that window re-reads at 0.1x; a later one rebuilds the reviewer's
   whole context at 1.25x. Read the gap from the reviewer's transcript timestamp rather than
   estimating it. Resume a small reviewer regardless. For a large one,
   compare the rebuild (about 1.25x its context) against a fresh `/code-review` carrying the full block
-  above. Measured at ~100k, the two cost about the same, so resume unless the reviewer has grown well
-  past that.
+  above. Near ~100k the two cost about the same (`rationale.md`), so resume unless the reviewer has
+  grown well past that.
 - **Later rounds scope *effort*, never permission.** Say what changed and ask it to judge the fixes
   and what they broke; never re-post the diff it already holds. Do not hand it your fix description
   as settled — that is the scoped review this section warns against two bullets down, wearing your
@@ -264,7 +260,10 @@ documented — routing decisions elsewhere should cite this section, not restate
   (the compiler, a named test, code review of the implementation diff — the §D merge gates) will
   catch it. Design-doc owns when the design phase ends; this bullet owns only where each finding
   goes. Routing happens after reporting, never by telling the reviewer where not to look — the
-  scoping rule below is unchanged.
+  scoping rule below is unchanged. **A code-review finding routes the same way** when its fix would
+  add or reverse a decision the closed design made: it reopens that clause in the design loop
+  (§C's contract answer) instead of being fixed in the diff. The test: *does the fix add a variant,
+  state, exit or step kind the design never decided?*
 - **Scoping narrows effort, never permission.** An instruction may tell a reviewer where to spend
   its budget; it must never tell it to stay silent about a defect it finds anyway. "Don't re-verify
   the citations" is legitimate; anything that would suppress reporting a real problem is not — that
@@ -298,9 +297,72 @@ starts — never a batch.
   interaction the split was meant to prevent.
 - **Diff-size conscience.** A diff too large for a reviewer to hold at once is what turns each fix
   into the next finding — this is how a batch of "closed" findings becomes three more rounds of
-  live ones. When review rounds **escalate** instead of converging (each round finding something
-  worse than the last), that is the signal to stop patching and discard the branch, rebuilding
-  contract-first in slices instead.
+  live ones.
+- **Non-convergence owes a direction check, and the author does not choose its answer.** Record
+  every code-review round with `${CLAUDE_SKILL_DIR}/review-ledger add` (`--self-test` checks it): it
+  takes the head and the diff size from git, and from you the count of semantic findings, their
+  class slugs and how many of them the previous round's fix introduced. A direction check is owed,
+  and the ledger prints `owed: direction`, when a round shows any of:
+  - a blocker class returning in the round after a fix whose sweep claimed to close it;
+  - a finding introduced by the previous round's fix;
+  - a diff that has reached 1.5x its round-1 size (after a verdict, 1.5x its size at the verdict).
+
+  Before any further fix round, a fresh advisor (consult), briefed per §B with the design and the
+  contract supplied as challengeable, never as authority, returns one of three answers:
+  - **converging**, only with the finite enumeration that bounds the class and the enforcer that
+    makes the checked domain equal it, both named;
+  - **contract**: a clause the code keeps answering is wrong or missing, so reopen it in the design
+    loop, with an attack pass before more code;
+  - **cut**: land the bounded part and move the rest out. Who decides it is queue-run's *Decision
+    authority*: the agent and the advisor alone when the rest moves to a queued ticket with no demand
+    gate, the user when the cut drops work or defers it until demand.
+
+  Record the answer with `review-ledger verdict <kind> --note "<the bound, the clause, or the
+  decision and who made it>"`. **The ratchet:** once a class recurs after a converging verdict, converging
+  is off the menu, and the ledger refuses it. **"A root fix inside the PR" is the tell.** It is the
+  answer the author reaches for at every trigger, which is why the author does not pick. Rounds
+  still end on the finding class (§B); the ledger never declares a loop done, it only moves the
+  loop to another artifact. Where the powerup marker is set, `gate.sh` refuses a merge unless the
+  last ledger round at the merged head had no semantic findings; after a mechanical update (§B),
+  `review-ledger carry` moves a zero round to the updated head, once git shows the update is a
+  merge of the default branch that left the diff as it was, or names the regenerated files. A
+  verdict answers an owed check only, never one ahead of time. (Incident: `rationale.md`.)
+- **The tracker follows the work, where the user wants it to.** A project may keep each item's
+  status in an issue tracker (Jira, GitHub issues, Linear, …) apart from the code and the queue, or
+  have none, and a user may prefer to keep it themselves. Which holds is the user's preference, kept
+  at **`~/.claude/lonic/trackers.md`**, one block per project, keyed by the origin remote normalized
+  to `host/owner/repo` (no scheme, user, port or `.git`; the main checkout's absolute path for a
+  repository with no remote), so every worktree and clone of that remote reads the same block. A fork
+  is its own project:
+
+  ```
+  github.com/acme/widgets:
+    manage: yes              # yes | no | none (the project has no tracker)
+    tracker: jira acme.atlassian.net WID
+    server: atlassian        # the connection to write it through
+    start: In Progress       # the transition (name or id) for a started item
+    done: Done               # the transition for a finished one
+    slice-comment: yes       # a comment naming the PR and merge commit at each merged slice
+  ```
+
+  - **Read the project's block when an item starts.** With no file or no block, look for a tracker
+    (the project's instructions and memory, its commit tags, a connected server for it). If there is
+    one, ask the user once and write their answer as the block, `no` included, so it is never asked
+    again. Under queue-run the question belongs in the one setup message (§1); met later, it is a §1d
+    question like any other, so outside every window the tracker is left untouched and the question
+    goes to the final report. If there is none, write nothing and touch nothing; `none` is for the
+    user to record.
+  - **`no` and `none` mean the tracker is never written.** Access is not consent: a connected server
+    that can write the tracker is no permission to write it.
+  - **`yes` means status moves when the work does, in the same turn:** the item started (in a
+    fleet, when it is claimed) → `start`; each slice merged → its comment, where `slice-comment` says
+    so; the item finished → `done`, in the same turn the queue is ticked. Filing a follow-up as a
+    ticket follows the project's own filing rules. Take transition names or ids from the block or
+    from the tracker's own list, never guessed.
+  - **A tracker write that fails is an owed action.** Name it in the handoff prompt or the final
+    report, and the next session retries it before starting new work. One retry per session; a
+    write refused for missing permission is never routed through another connection or credential,
+    and stays owed until the user grants it. (Incident: `rationale.md`.)
 
 ## D. Fix execution
 
@@ -359,9 +421,7 @@ regression test while the class stays broken.
   - **A subsumed test is deleted in the same PR.** A new test that checks everything an old one did
     replaces it.
 
-  Trap seen: the revert-check written for every clause, docs and wording included, ran a dozen
-  mutation commands per item and three sessions each hand-wrote their own runner, while the
-  suite's own run time stayed flat — the ceremony, not the suite, was the cost.
+  The ceremony, not the suite, was the measured cost (`rationale.md`).
 - **Revert-check, run and reported — both directions.** No mutation-prone clause ships
   without a test demonstrated **green with the fix in place and red when the fix — and only the fix
   — is reverted**. Revert means the mutation of the property the test exists to exclude, not removal
@@ -381,10 +441,7 @@ regression test while the class stays broken.
     it does not recognise reads NOCOMPILE every time: name the runner's failure and build-error
     lines once, in the project's `.claude/gates.json` (`test_failure_re`, `build_error_re`), rather
     than reading a NOCOMPILE as proof.
-  - Traps seen: a restore over uncommitted work destroyed it, twice; a restored file with an older
-    timestamp let the build tool run a stale binary; a non-compiling mutant was counted as red; a
-    hand-written runner read the runner's own "test failed" line as a compile error. Each was a
-    session re-inventing the runner.
+  - Each refusal above answers a session that re-invented the runner (`rationale.md`).
 - **A revert-check certifies only what its fixture can distinguish.** The rule above is necessary,
   not sufficient, and reads as more than it delivers: "red when reverted" certifies the claim only
   over the domain the fixture exercises. When the claim is that an observable is **computed from, or
@@ -419,8 +476,7 @@ regression test while the class stays broken.
   this test to go red, and is it the property?
 - **A red run certifies the assertion that produced it — name it.** "The file went red" attributes
   nothing: with neighbours in the test, any of them can supply the red while the shipped assertion
-  asserts nothing at all — the incident seeding this bullet shipped `not.toBe` on an array,
-  identity-true forever, and the revert run's red came from the line above it. The runner's failure
+  asserts nothing at all (incident: `rationale.md`). The runner's failure
   output already names the failing assertion and the value it saw; report both, the way the fixture
   bullet reports its separation. When that output names anything other than the assertion being
   certified, nothing has been certified yet: silence the neighbours for one run and show the shipped
@@ -441,7 +497,7 @@ A helper rewritten in a scratchpad each session comes back with new bugs each ti
 as a tool is fixed once. (evolve owns the promotion loop; this is its delivery-time half.)
 
 - **Look before you write.** Before writing a helper script, check the tools shipped beside the
-  skills (`${CLAUDE_SKILL_DIR}/`: `revert-check`, `verify-head`, `wait-pr-ci`, ...) and wherever the
+  skills (`${CLAUDE_SKILL_DIR}/`: `revert-check`, `verify-head`, `wait-pr-ci`, `review-ledger`, ...) and wherever the
   project declares its own (its `bin/`, or the tool list its contributing guide or CLAUDE.md names).
 - **A helper written a second time is promoted, not rewritten** — whether the first copy is in this
   session or an earlier one's scratchpad. Project-neutral: into the owning skill's folder, with a

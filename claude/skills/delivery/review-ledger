@@ -1,0 +1,395 @@
+#!/usr/bin/env bash
+# review-ledger add --semantic N [--classes a,b] [--regress N] [--base REF]
+#                               record a code-review round at HEAD (delivery §C)
+# review-ledger verdict converging|contract|cut --note "<text>"
+#                               record the answer to an owed direction check
+# review-ledger carry [--regenerated "<files>"] [--base REF]
+#                               HEAD is the last zero round's head brought up to date by a merge of
+#                               the default branch (a mechanical update, delivery §B)
+# review-ledger undo            drop the last round (a mistyped count), when nothing follows it
+# review-ledger show            the trend table and what is owed
+# review-ledger check <sha>     exit 0 when every branch ledger whose last entry is at <sha> recorded
+#                               no semantic findings there, and at least one does
+# review-ledger path            where this branch's ledger lives
+# review-ledger --self-test
+#
+# The ledger is per branch, at $(git rev-parse --git-common-dir)/review-ledger/<branch>, so it
+# survives a handoff and is read the same from every worktree. `add` takes the head and the diff
+# size from git (lines added plus removed against the merge base with --base, else the default
+# branch); the author supplies the semantic finding count, the class slugs of those findings, and
+# how many of them the previous round's fix introduced.
+#
+# A direction check is owed (delivery §C) when a round shows any of:
+#   recurrence  a class slug of this round was a class of the round before, whose fix claimed to
+#               close it, or of any round a converging verdict answered;
+#   regress     a finding was introduced by the previous round's fix;
+#   growth      the diff reached 1.5x its size at round 1 (after a verdict: at the verdict).
+# `verdict` answers an owed check, and only an owed one. The ratchet: once a class that a converging
+# verdict answered appears again, converging is refused for the rest of the branch's life.
+#
+# `check` is the merge gate's question (gate.sh). What it does not see: a ledger is keyed by branch
+# name and never retired, so a reused name inherits its history; and a ledger records only what the
+# author reports. `carry` checks from git what a mechanical update can be: every commit since the
+# reviewed head is a merge whose merged-in side is on the default branch (fetch it first), and the
+# diff size is unchanged. A plain commit, or a changed size, needs --regenerated naming the
+# regenerated mechanical files; anything else is new code and owes a review round.
+#
+# Exit: 0 ok · 1 check failed / refused · 2 usage, or a ledger that cannot be read (the gate then
+# logs and allows). Bash 3.2 compatible.
+set -u
+
+die() { echo "review-ledger: $*" >&2; exit 2; }
+refuse() { echo "review-ledger: $*" >&2; exit 1; }
+need() { [ $# -ge 2 ] || die "$1 needs a value"; }
+isnum() { case "${1:-}" in ""|*[!0-9]*) return 1 ;; esac; }
+
+common_dir() { git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || die "not inside a git repository"; }
+branch_key() {
+  local b; b=$(git symbolic-ref -q --short HEAD 2>/dev/null) || die "HEAD is detached; a ledger belongs to a branch"
+  printf '%s' "$b" | sed 's/%/%25/g; s,/,%2F,g'
+}
+branch_name() { printf '%s' "$1" | sed 's,%2F,/,g; s/%25/%/g'; }
+ledger_path() { local c k; c=$(common_dir) || exit 2; k=$(branch_key) || exit 2; printf "%s/review-ledger/%s\n" "$c" "$k"; }
+now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
+clean_text() { printf '%s' "$1" | tr '\t\n\r' '   '; }
+
+default_base() {
+  local b
+  b=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) && { echo "$b"; return; }
+  for b in main master; do git show-ref -q --verify "refs/heads/$b" && { echo "$b"; return; }; done
+  die "no default branch found; pass --base <ref>"
+}
+resolve_base() { # --base value or "" → a ref, or exit 2
+  if [ -n "$1" ]; then git rev-parse --verify -q "$1^{commit}" >/dev/null || die "--base $1 is not a commit"; echo "$1"
+  else default_base; fi
+}
+diff_size() { # base → lines added + removed, merge base to HEAD
+  local mb; mb=$(git merge-base "$1" HEAD 2>/dev/null) || die "no merge base between $1 and HEAD"
+  git diff --numstat "$mb" HEAD | awk '{ if ($1 != "-") a += $1; if ($2 != "-") a += $2 } END { print a + 0 }'
+}
+
+# Replay the ledger into shell variables. Lines (tab-separated, no field empty):
+#   round <n> <sha> <diff> <semantic> <classes|-> <regress> <triggers|-> <time>
+#   verdict <kind> <sha> <note> <time>
+#   carry <sha> <from-sha> <diff> <regenerated|-> <time>
+# Returns 1 with CORRUPT set on a line it cannot read: the ledger was edited by hand.
+replay() { # file
+  ROUNDS=0; LAST_SHA=""; LAST_CLASSES=""; LAST_DIFF=0; SINCE_CLASSES=""; CONV_CLASSES=""
+  BASELINE=0; OWED=""; OWED_WHY=""; LOCKED=""; HEAD_SHA=""; HEAD_SEM=""; CORRUPT=""
+  [ -f "$1" ] || return 0
+  local kind a b c d e f g h extra ln=0
+  while IFS='	' read -r kind a b c d e f g h extra; do
+    ln=$((ln + 1))
+    case "$kind" in
+      round)
+        { isnum "$a" && isnum "$c" && isnum "$d" && isnum "$f" && [ -n "$b" ] && [ -n "$e" ] && [ -n "$g" ] \
+          && [ -n "$h" ] && [ -z "$extra" ]; } || { CORRUPT="line $ln"; return 1; }
+        ROUNDS=$a; LAST_SHA=$b; LAST_DIFF=$c; HEAD_SHA=$b; HEAD_SEM=$d
+        if [ "$e" = "-" ]; then LAST_CLASSES=""; else LAST_CLASSES=$e; SINCE_CLASSES="${SINCE_CLASSES:+$SINCE_CLASSES,}$e"; fi
+        [ "$ROUNDS" -eq 1 ] && BASELINE=$c
+        [ -n "$CONV_CLASSES" ] && [ -n "$LAST_CLASSES" ] && [ -n "$(intersect "$LAST_CLASSES" "$CONV_CLASSES")" ] && LOCKED=1
+        if [ "$g" != "-" ]; then OWED=direction; OWED_WHY=$g; fi ;;
+      verdict)
+        { [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ -n "$d" ] && [ -z "$e" ]; } || { CORRUPT="line $ln"; return 1; }
+        OWED=""; OWED_WHY=""; BASELINE=$LAST_DIFF
+        [ "$a" = converging ] && [ -n "$SINCE_CLASSES" ] && CONV_CLASSES="${CONV_CLASSES:+$CONV_CLASSES,}$SINCE_CLASSES"
+        SINCE_CLASSES="" ;;
+      carry)
+        { [ -n "$a" ] && [ -n "$b" ] && isnum "$c" && [ -n "$d" ] && [ -n "$e" ] && [ -z "$f" ]; } || { CORRUPT="line $ln"; return 1; }
+        HEAD_SHA=$a; HEAD_SEM=0; LAST_DIFF=$c ;;
+      *) CORRUPT="line $ln"; return 1 ;;
+    esac
+  done < "$1"
+}
+replay_or_die() { replay "$1" || die "the ledger $1 cannot be read at $CORRUPT (edited by hand?); fix that line or remove the file"; }
+
+intersect() { # "a,b" "b,c" → b
+  local x out="" IFS=,
+  for x in $1; do case ",$2," in *",$x,"*) case ",$out," in *",$x,"*) ;; *) out="${out:+$out,}$x" ;; esac ;; esac; done
+  printf '%s' "$out"
+}
+
+cmd_add() {
+  local sem="" classes="" regress=0 base=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --semantic) need "$@"; sem=$2; shift 2 ;;
+      --classes) need "$@"; classes=$2; shift 2 ;;
+      --regress) need "$@"; regress=$2; shift 2 ;;
+      --base) need "$@"; base=$2; shift 2 ;;
+      *) die "add: unknown argument '$1'" ;;
+    esac
+  done
+  isnum "$sem" || die "add: --semantic <count of findings that affect the code's semantics> is required"
+  isnum "$regress" || die "add: --regress takes a count"
+  sem=$((10#$sem)); regress=$((10#$regress))
+  classes=$(printf '%s' "$classes" | tr 'A-Z' 'a-z' | tr -d ' ')
+  local ncls=0 x; local IFS=,
+  for x in $classes; do
+    case "$x" in "") continue ;; [a-z]*) ;; *) unset IFS; die "add: class slug '$x' must start with a letter" ;; esac
+    case "$x" in *[!a-z0-9-]*) unset IFS; die "add: class slugs are lowercase words joined by '-', comma-separated" ;; esac
+    ncls=$((ncls + 1))
+  done; unset IFS
+  [ "$sem" -eq 0 ] || [ "$ncls" -gt 0 ] || die "add: $sem semantic findings need --classes naming their classes, so a recurring class can be seen"
+  [ "$sem" -gt 0 ] || [ "$ncls" -eq 0 ] || die "add: classes were given for a round with no semantic findings"
+  [ "$ncls" -le "$sem" ] || die "add: more classes ($ncls) than semantic findings ($sem)"
+  [ "$regress" -le "$sem" ] || die "add: more regressions ($regress) than semantic findings ($sem)"
+  [ -z "$(git status --porcelain --untracked-files=no)" ] || refuse "the tree has uncommitted changes; a round reviews a commit, so commit first"
+  local sha; sha=$(git rev-parse --verify -q HEAD) || die "no HEAD commit"
+  local f; f=$(ledger_path) || exit $?
+  replay_or_die "$f"
+  [ "$HEAD_SHA" != "$sha" ] || refuse "HEAD $sha already has a round or a carry; a new round reviews the fix commit"
+  local b; b=$(resolve_base "$base") || exit $?
+  local size; size=$(diff_size "$b") || exit $?
+  isnum "$size" || die "the diff size against $b could not be computed"
+  local n=$((ROUNDS + 1)) trig=""
+  if [ -n "$classes" ]; then
+    local again; again=$(intersect "$classes" "${LAST_CLASSES}${CONV_CLASSES:+,$CONV_CLASSES}")
+    [ -n "$again" ] && trig="recurrence($again)"
+  fi
+  [ "$regress" -gt 0 ] && trig="${trig:+$trig,}regress($regress)"
+  if [ "$ROUNDS" -ge 1 ] && [ "$BASELINE" -gt 0 ] && [ $((size * 2)) -ge $((BASELINE * 3)) ]; then
+    trig="${trig:+$trig,}growth(${BASELINE}→${size})"
+  fi
+  mkdir -p "$(dirname "$f")"
+  printf 'round\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$n" "$sha" "$size" "$sem" "${classes:--}" "$regress" "${trig:--}" "$(now)" >> "$f"
+  cmd_show
+}
+
+cmd_verdict() {
+  local kind=${1:-} note=""; shift || true
+  case "$kind" in converging|contract|cut) ;; *) die "verdict converging|contract|cut --note \"<text>\"" ;; esac
+  while [ $# -gt 0 ]; do
+    case "$1" in --note) need "$@"; note=$2; shift 2 ;; *) die "verdict: unknown argument '$1'" ;; esac
+  done
+  [ -n "$note" ] || die "verdict: --note is required (converging: the finite enumeration that bounds the class, and its enforcer; contract: the clause reopened; cut: the scope decision and who made it (queue-run, Decision authority))"
+  local f; f=$(ledger_path) || exit $?
+  replay_or_die "$f"
+  [ "$ROUNDS" -ge 1 ] || refuse "no round recorded on this branch yet"
+  [ -n "$OWED" ] || refuse "no direction check is owed; a verdict answers one, it is not given ahead of time"
+  if [ "$kind" = converging ] && [ -n "$LOCKED" ]; then
+    refuse "converging is off the menu: a class a converging verdict answered came back. The answer is contract or cut."
+  fi
+  printf 'verdict\t%s\t%s\t%s\t%s\n' "$kind" "$LAST_SHA" "$(clean_text "$note")" "$(now)" >> "$f"
+  cmd_show
+}
+
+cmd_carry() {
+  local base="" regen=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --regenerated) need "$@"; regen=$2; shift 2 ;;
+      --base) need "$@"; base=$2; shift 2 ;;
+      *) die "carry: unknown argument '$1'" ;;
+    esac
+  done
+  local f; f=$(ledger_path) || exit $?
+  replay_or_die "$f"
+  [ -n "$HEAD_SHA" ] || refuse "no round recorded on this branch; nothing to carry"
+  [ "$HEAD_SEM" = 0 ] || refuse "the last round at $HEAD_SHA had $HEAD_SEM semantic findings; only a zero round carries"
+  [ -z "$(git status --porcelain --untracked-files=no)" ] || refuse "the tree has uncommitted changes; commit first"
+  local sha; sha=$(git rev-parse HEAD)
+  [ "$sha" != "$HEAD_SHA" ] || refuse "HEAD is the recorded head already"
+  git merge-base --is-ancestor "$HEAD_SHA" "$sha" || refuse "$HEAD_SHA is not an ancestor of HEAD; a carry is only an update on top of the reviewed head"
+  local b; b=$(resolve_base "$base") || exit $?
+  local revs c p1 p2 rest plain=0 foreign=""
+  revs=$(git log --first-parent --format='%H %P' "$HEAD_SHA..$sha")
+  while read -r c p1 p2 rest; do
+    [ -n "$c" ] || continue
+    if [ -z "$p2" ]; then plain=$((plain + 1))
+    else git merge-base --is-ancestor "$p2" "$b" || foreign="$foreign ${c:0:9}"; fi
+  done <<< "$revs"
+  [ -z "$foreign" ] || refuse "merge(s)$foreign bring in commits that are not on $b; a carry is only a merge of the default branch (fetch it first). Anything else is new code and owes a review round."
+  local size; size=$(diff_size "$b") || exit $?
+  if [ -z "$regen" ]; then
+    [ "$plain" -eq 0 ] || refuse "$plain commit(s) since the reviewed head are not merges. If they only regenerate mechanical files, name them with --regenerated \"<files>\"; otherwise they are new code and owe a review round."
+    [ "$size" = "$LAST_DIFF" ] || refuse "the diff changed from $LAST_DIFF to $size lines since the reviewed head. If that is only regenerated mechanical files, name them with --regenerated \"<files>\"; otherwise it is new code and owes a review round."
+  fi
+  echo "commits since the reviewed head:"
+  git log --first-parent --format='  %h %s%x09(parents: %p)' "$HEAD_SHA..$sha"
+  printf 'carry\t%s\t%s\t%s\t%s\t%s\n' "$sha" "$HEAD_SHA" "$size" "$(clean_text "${regen:--}")" "$(now)" >> "$f"
+  echo "carried: $HEAD_SHA → $sha"
+}
+
+cmd_undo() {
+  local f; f=$(ledger_path) || exit $?
+  [ -s "$f" ] || refuse "nothing to undo"
+  local last; last=$(tail -n 1 "$f")
+  case "$last" in round*) ;; *) refuse "the last entry is not a round; only a round is undone" ;; esac
+  local t; t="$f.tmp.$$"; sed '$d' "$f" > "$t" && mv "$t" "$f"
+  printf 'dropped the last round: %s\n' "$last" | tr '\t' ' '; cmd_show
+}
+
+cmd_show() {
+  local f; f=$(ledger_path) || exit $?
+  [ -f "$f" ] || { echo "no review ledger for this branch ($f)"; return 0; }
+  replay_or_die "$f"
+  printf '%-6s %-9s %7s %4s %4s  %-28s %s\n' round head diff sem reg classes triggers
+  local kind a b c d e f2 g h
+  while IFS='	' read -r kind a b c d e f2 g h; do
+    case "$kind" in
+      round) printf '%-6s %-9s %7s %4s %4s  %-28s %s\n' "$a" "${b:0:9}" "$c" "$d" "$f2" "$e" "$g" ;;
+      verdict) printf '  verdict %s at %s: %s\n' "$a" "${b:0:9}" "$c" ;;
+      carry) printf '  carry %s → %s (regenerated: %s)\n' "${b:0:9}" "${a:0:9}" "$d" ;;
+    esac
+  done < "$f"
+  replay "$f"
+  if [ -n "$OWED" ]; then echo "owed: direction ($OWED_WHY) — a direction check, then review-ledger verdict"; else echo "owed: nothing"; fi
+  [ -z "$LOCKED" ] || echo "ratchet: converging is off the menu"
+  return 0
+}
+
+cmd_check() {
+  local want=${1:-}; [ -n "$want" ] || die "check <sha>"
+  local full; full=$(git rev-parse --verify -q "$want^{commit}" 2>/dev/null) || full=$want
+  local d; d=$(common_dir) || exit 2; d="$d/review-ledger"
+  local f found="" bad=""
+  for f in "$d"/*; do
+    [ -f "$f" ] || continue
+    replay_or_die "$f"
+    [ "$HEAD_SHA" = "$full" ] || continue
+    found=1
+    [ "$HEAD_SEM" = 0 ] || bad="${bad:+$bad; }$HEAD_SEM semantic findings (branch $(branch_name "$(basename "$f")"))"
+  done
+  if [ -n "$bad" ]; then echo "the last review round at $full had $bad"; return 1; fi
+  [ -n "$found" ] && { echo "reviewed: the last round at $full had no semantic findings"; return 0; }
+  echo "no review round is recorded at $full (review-ledger add after the round, or carry after a mechanical update)"
+  return 1
+}
+
+self_test() {
+  local self tmp fails=0 out st
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/review-ledger-self.XXXXXX"); tmp=$(cd "$tmp" && pwd -P)
+  ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; printf '%s\n' "${2:-}" | sed 's/^/     /'; fails=$((fails + 1)); }
+  expect() { # name want-status want-text command...
+    local name=$1 ws=$2 wt=$3; shift 3
+    out=$("$@" 2>&1); st=$?
+    if [ "$st" -eq "$ws" ] && printf '%s' "$out" | grep -q -- "$wt"; then ok "$name"; else bad "$name (exit $st, wanted $ws and '$wt')" "$out"; fi
+  }
+  L() { (cd "$tmp/r" && "$self" "$@"); }
+  grow() { # lines → commit that many new lines
+    (cd "$tmp/r" && seq 1 "$1" >> f && git commit -qam "grow $1")
+  }
+  ( cd "$tmp" && git init -q -b main r && cd r && git config user.email t@example.invalid && git config user.name t \
+    && echo base > f && git add f && git commit -qm base && git checkout -q -b feat/x ) || return 1
+  grow 100
+  expect "add needs --semantic"                    2 "semantic"          L add
+  expect "findings need classes"                   2 "need --classes"    L add --semantic 2
+  expect "more classes than findings is refused"   2 "more classes"      L add --semantic 1 --classes a,b
+  expect "round 1 records the diff from git"       0 "owed: nothing"     L add --semantic 2 --classes alpha,beta
+  grep -q "^round	1	.*	100	2	alpha,beta	0	-	" "$(L path)" && ok "round 1 stores diff 100, 2 findings" || bad "round 1 stores diff 100" "$(cat "$(L path)")"
+  expect "the same head twice is refused"          1 "already has a round" L add --semantic 0
+  echo dirty >> "$tmp/r/f"
+  expect "a dirty tree is refused"                 1 "uncommitted"       L add --semantic 0
+  (cd "$tmp/r" && git checkout -q f)
+  grow 10
+  expect "a new class, no regress, small growth: nothing owed" 0 "owed: nothing" L add --semantic 1 --classes gamma
+  grow 10
+  expect "a class from the round before recurs"   0 "owed: direction (recurrence(gamma))" L add --semantic 1 --classes gamma
+  expect "check refuses a head with findings"      1 "had 1 semantic"    L check "$(git -C "$tmp/r" rev-parse HEAD)"
+  expect "converging needs a note"                 2 "note is required"  L verdict converging
+  expect "a converging verdict clears the owed check" 0 "owed: nothing"  L verdict converging --note "the five readers, enforced by an exact-set test"
+  grow 5
+  expect "a regress fires"                         0 "regress(1)"        L add --semantic 1 --classes delta --regress 1
+  expect "undo drops a mistyped round"             0 "dropped"           L undo
+  expect "the re-add is accepted"                  0 "regress(1)"        L add --semantic 1 --classes delta --regress 1
+  expect "a contract verdict"                      0 "owed: nothing"     L verdict contract --note "reopen the removal clause"
+  expect "undo refuses past a verdict"             1 "not a round"       L undo
+  grow 5
+  expect "a class recurring across a verdict is still a recurrence" 0 "recurrence(delta)" L add --semantic 1 --classes delta
+  expect "converging after a contract verdict is allowed when nothing locked it" 0 "owed: nothing" L verdict converging --note "bounded by the enum"
+  grow 5
+  expect "recurrence after converging"             0 "ratchet: converging is off the menu" L add --semantic 1 --classes delta
+  expect "the ratchet refuses converging"          1 "off the menu"      L verdict converging --note "again"
+  expect "cut is still open"                       0 "owed: nothing"     L verdict cut --note "user: land the bounded part"
+  # growth is measured from round 1, then from the size at the last verdict
+  (cd "$tmp/r" && git checkout -q -b g main) || return 1
+  grow 100
+  L add --semantic 1 --classes a >/dev/null 2>&1
+  grow 40
+  expect "1.4x is not growth"                      0 "owed: nothing"     L add --semantic 1 --classes b
+  grow 10
+  expect "1.5x is growth"                          0 "growth(100→150)"   L add --semantic 1 --classes c
+  L verdict converging --note "n" >/dev/null 2>&1
+  grow 10
+  expect "after a verdict, growth counts from the verdict's size" 0 "owed: nothing" L add --semantic 1 --classes d
+  # the merge gate's question, and carry
+  grow 1
+  expect "a zero round"                            0 "owed: nothing"     L add --semantic 0
+  local z; z=$(git -C "$tmp/r" rev-parse HEAD)
+  expect "check passes the zero round's head"      0 "no semantic"       L check "$z"
+  expect "check accepts a short sha"               0 "no semantic"       L check "${z:0:10}"
+  (cd "$tmp/r" && git checkout -q main && echo m > m && git add m && git commit -qm m && git checkout -q g && git merge -q --no-edit main) || return 1
+  local mrg; mrg=$(git -C "$tmp/r" rev-parse HEAD)
+  expect "check refuses an unrecorded head"        1 "no review round"   L check "$mrg"
+  expect "carry moves the zero verdict to the updated head" 0 "carried" L carry
+  expect "check passes the carried head"           0 "no semantic"       L check "$mrg"
+  expect "the reviewed head is no longer the last" 1 "no review round"   L check "$z"
+  grow 1
+  L add --semantic 1 --classes e >/dev/null 2>&1
+  (cd "$tmp/r" && echo n >> m && git commit -qam n)
+  expect "carry refuses after a round with findings" 1 "only a zero round" L carry
+  (cd "$tmp/r" && git checkout -q -b other main && echo o > o && git add o && git commit -qm o) || return 1
+  L add --semantic 0 >/dev/null 2>&1
+  (cd "$tmp/r" && git checkout -q --detach && echo p > p && git add p && git commit -qm p) || return 1
+  expect "a detached HEAD has no ledger"           2 "detached"          L add --semantic 0
+  expect "check reads every branch's ledger, detached or not" 0 "no semantic" L check other
+  expect "a branch with a slash keeps its own file" 0 "feat%2Fx"        sh -c "ls '$tmp/r/.git/review-ledger'"
+  # a flag with no value is a usage error, never a hang
+  W() { perl -e 'alarm 10; exec @ARGV' "$@"; }
+  expect "add --semantic with no value"            2 "needs a value"     W "$self" add --semantic
+  expect "verdict --note with no value"            2 "needs a value"     W "$self" verdict cut --note
+  # nothing is written when the diff size cannot be computed
+  (cd "$tmp/r" && git checkout -q -b s main && echo s > s && git add s && git commit -qm s) || return 1
+  expect "a bad --base is a usage error"           2 "not a commit"      L add --semantic 0 --base no-such-ref
+  [ ! -s "$(L path)" ] && ok "nothing was written for it" || bad "nothing was written for it" "$(cat "$(L path)")"
+  expect "a slug of '-' is refused"                2 "start with a letter" L add --semantic 1 --classes -
+  expect "a zero written 00 is a zero round"       0 "owed: nothing"     L add --semantic 00
+  expect "and the gate reads it as zero"           0 "no semantic"       L check s
+  expect "a verdict with nothing owed is refused"  1 "no direction check is owed" L verdict contract --note "pre-emptive"
+  # findings win when two branches' ledgers end at one head, in either name order
+  local s1; s1=$(git -C "$tmp/r" rev-parse HEAD)
+  (cd "$tmp/r" && git checkout -q -b aaa && "$self" add --semantic 1 --classes zeta >/dev/null 2>&1)
+  expect "a findings round on a name sorting first denies" 1 "branch aaa"  L check "$s1"
+  (cd "$tmp/r" && git checkout -q -b zzz && "$self" add --semantic 0 >/dev/null 2>&1; git checkout -q aaa && "$self" undo >/dev/null 2>&1 \
+     && git checkout -q -b mmm s && echo q >> s && git commit -qam q && "$self" add --semantic 0 >/dev/null 2>&1 && git checkout -q s)
+  (cd "$tmp/r" && git checkout -q zzz && printf 'round\t2\t%s\t1\t1\tzeta\t0\t-\t2026-01-01T00:00:00Z\n' "$s1" >> "$(L path)")
+  expect "a findings round on a name sorting last denies" 1 "branch zzz"  L check "$s1"
+  # the ledger cannot be read: exit 2, so the gate logs and allows
+  printf 'round\t3\t%s\t\t0\t-\t0\t-\t2026-01-01T00:00:00Z\n' "$s1" >> "$(L path)"
+  expect "a hand-edited line is a read error"      2 "cannot be read at line 3" L check "$s1"
+  sed -i.bak '$d' "$(L path)"; rm -f "$(L path).bak"
+  # the ratchet remembers every class a converging verdict answered, not only the last round's
+  (cd "$tmp/r" && git checkout -q -b k main) || return 1
+  grow 100; L add --semantic 1 --classes x >/dev/null 2>&1
+  grow 1;   L add --semantic 1 --classes x >/dev/null 2>&1
+  L verdict converging --note "bounded" >/dev/null 2>&1
+  grow 1;   expect "another class after converging owes nothing" 0 "owed: nothing" L add --semantic 1 --classes y
+  grow 1;   expect "an answered class two rounds on recurs"       0 "recurrence(x)" L add --semantic 1 --classes x
+  expect "and locks the ratchet"                   1 "off the menu"      L verdict converging --note "again"
+  # carry is only a merge of the default branch, unchanged in size, or named regeneration
+  (cd "$tmp/r" && git checkout -q -b c main) || return 1
+  grow 50; L add --semantic 0 >/dev/null 2>&1
+  (cd "$tmp/r" && echo regen >> f && git commit -qam regen)
+  expect "carry refuses a plain commit"            1 "not merges"        L carry
+  expect "carry takes it when named as regeneration" 0 "carried"         L carry --regenerated "docs/generated.md"
+  grep -q "^carry	.*	docs/generated.md	" "$(L path)" && ok "the carry stores what was regenerated" || bad "the carry stores what was regenerated" "$(cat "$(L path)")"
+  (cd "$tmp/r" && git checkout -q -b side main && echo side > side && git add side && git commit -qm side && git checkout -q c && git merge -q --no-edit side)
+  expect "carry refuses a merge of another branch" 1 "not on main"       L carry
+  rm -rf "$tmp"
+  [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }
+  echo "self-test: $fails failed"; return 1
+}
+
+case "${1:-}" in
+  add) shift; cmd_add "$@" ;;
+  verdict) shift; cmd_verdict "$@" ;;
+  carry) shift; cmd_carry "$@" ;;
+  undo) cmd_undo ;;
+  show) cmd_show ;;
+  check) shift; cmd_check "$@" ;;
+  path) ledger_path ;;
+  --self-test) self_test; exit $? ;;
+  *) sed -n '2,14p' "$0"; exit 2 ;;
+esac

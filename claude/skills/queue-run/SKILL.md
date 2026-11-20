@@ -20,7 +20,9 @@ read refreshes it the same way.
 ## 1. Resolve the run parameters (first session only)
 
 A session started by a handoff gets every parameter of this section in its prompt. In that case, do
-not ask again; go straight to §2.
+not ask again. When `powerup-mark show` lacks the prompt's availability windows (a fresh process
+clears the record), record them first, one `powerup-mark window "<rule>"` per rule; then run
+`${CLAUDE_SKILL_DIR}/../powerup/powerup-mark resolved` and go straight to §2.
 
 Otherwise, resolve them from the user's prompt, and ask only for what is missing (availability
 windows, §1d, are the exception: never asked for). Put every missing question into **one**
@@ -55,14 +57,22 @@ don't depend on the unmerged PR, and lists the open PRs at the end), or "ask eac
 chain at each merge point, so warn that it is effectively not unattended).
 
 **d. Availability windows — optional, never asked for.** The user may say when they can answer
-questions during this run: "until 23:00 Budapest", "9–17 on weekdays, Europe/Budapest". Record each
+questions during this run, at the start or at any point later, to any session of it: "until 23:00 Budapest", "9–17 on weekdays, Europe/Budapest". Record each
 as a rule plus an IANA time zone (a one-off end time becomes an absolute date and time), and carry it
-forward (§4). No window stated means the user is away for the whole run. Whenever a rule below
-depends on the time, read it with `TZ=<zone> date`; you have no clock.
+forward (§4). No window stated means the user is away for the whole run. Record each one where the
+hook reads it, as soon as the user says it, replacing what was recorded:
+`${CLAUDE_SKILL_DIR}/../powerup/powerup-mark window "<rule>"` (after `window --clear`; its header
+gives the form, e.g. `weekdays 09:00-17:00 Europe/Budapest` or `until 2026-11-20 23:00
+Europe/Budapest`) in a solo run, after the opening `powerup-mark set`; in a fleet,
+`fleet window set "<rules>"` (or `fleet window clear` when they say they are leaving), which every
+slot reads.
+`powerup-mark in-window` says whether now is inside one, and the `tool-gate.sh` hook denies
+AskUserQuestion outside them. Whenever a rule below depends on the time, read it with that command
+or `TZ=<zone> date`; you have no clock.
 
 - **Inside a window**, a question for the user does not end the chain. Notify (*Getting the user's
   attention*), ask with AskUserQuestion, and continue on the answer. This covers a decision
-  mid-item, an "ask first" or parked row reached in the queue, and the *Always ask* list; the answer
+  mid-item, an "ask first" or parked row reached in the queue, and the asks of *Decision authority*; the answer
   authorizes only what it names. Write the answer into the queue entry before going on, so no later
   session asks it again. Each question is asked once per run: a "no" or "not now" stands for the
   rest of the run and joins the handoff's standing exclusions. AskUserQuestion has no timeout, so
@@ -70,25 +80,39 @@ depends on the time, read it with `TZ=<zone> date`; you have no clock.
   closes.
 - **Outside every window, nothing waits on the user.** An item that needs a decision is **parked**:
   brought to resumable state (§2), its queue entry marked `blocked on user — Q: <the question in
-  full>`, and the user notified once. Parking is an item boundary: go to §2 step 5. The next session
+  full> — ask: "<the ask-list bullet of Decision authority, quoted>" — not agent: <one line on why
+  the nearest agent-list bullet's text does not apply>`, and the user notified once. An entry
+  missing either field is not a park: whichever session reads it decides the question, records the
+  decision, and clears the mark.
+  The queue entry is the question's only copy (§4). Parking is an item boundary: go to §2 step 6. The next session
   takes the next item that is not blocked on the user.
 
-Confirm the resolved parameters back to the user in one or two lines, windows included, then start.
+Confirm the resolved parameters back to the user in one or two lines, windows included, then run
+`${CLAUDE_SKILL_DIR}/../powerup/powerup-mark resolved` and start. Until that line is recorded the
+setup questions above are asked freely; from then on the windows gate every question (a fleet's
+`run.json` counts as resolved).
 
 ## 2. Each session: one item
 
 1. **Check usage first** (§3). If it is at or over the threshold, stop (§5). Then, if the time is
-   inside an availability window (§1d) and the queue holds entries marked `blocked on user`, ask
-   them all in one AskUserQuestion round and write the answers back before taking an item.
+   inside an availability window (§1d) and the queue holds entries marked `blocked on user`, first
+   re-test each against both lists of *Decision authority*: decide and record any that do not meet
+   an ask-list bullet's stated conditions. Ask the rest in one AskUserQuestion round and write the
+   answers back before taking an item.
 2. **Read the queue** freshly. The user may have reordered it since the last session, and their order
    wins. Take the **first unfinished item not blocked on the user**. Items the queue or memory marks
    as parked or "ask first" are asked about inside an availability window (§1d) and skipped outside
    one; note skipped ones for the final report.
-3. **Do the item** under the project's own workflow, to its natural end: merged (if authorized), or a
+3. **Check the item's size at intake** (design-doc's *Slice size*), before any design opens, and
+   record the result as the item's intake line: `design-ledger open` where a design opens
+   (design-doc's *Slice size*), else one line in the item's queue entry. An item over it is split first; the split
+   is yours to make (*Decision authority*), and the parts enter the queue at the item's rank.
+4. **Do the item** under the project's own workflow, to its natural end: merged (if authorized), or a
    PR left open with review done (if not).
-4. **Update the queue**: tick the item, or mark it in progress or blocked with a one-line reason. File
-   any follow-up work you discovered into the queue, so it isn't lost in a handoff.
-5. **Check usage again** (§3). Under the threshold: hand off (§4). At or over: stop (§5).
+5. **Update the queue**: tick the item, or mark it in progress or blocked with a one-line reason. File
+   any follow-up work you discovered into the queue, so it isn't lost in a handoff. Move the
+   project's issue tracker with it where the user's tracker preference says to (delivery §C).
+6. **Check usage again** (§3). Under the threshold: hand off (§4). At or over: stop (§5).
 
 **Items too large for a session.** If an item clearly spans several phases (design, then slices), a
 *phase boundary* counts as an item boundary. Finish the phase, leave everything durable (committed,
@@ -114,7 +138,9 @@ stop after the current item instead of chaining blind.
 
 ## 4. Handoff
 
-Call `mcp__phase-handoff__handoff` as the **last action** of the session, then end the turn. The
+Call `mcp__phase-handoff__handoff` as the **last action** of the session, then end the turn, except
+while the user is talking (powerup's phase-boundary rule): then write the prompt, say it is ready, and
+wait for their "go". The
 prompt must stand alone, because it is all the next session knows. Start it with the same command that
 started this run (`/queue-run`, or a wrapper such as `/powerup-auto`; `/powerup:queue-run` and
 `/powerup:powerup-auto` when installed as the `powerup` plugin) so the same skills load again,
@@ -126,13 +152,18 @@ and include:
 - **Availability windows:** the rules and time zone from §1d, or `none`.
 - **Standing exclusions:** anything the user said to always ask about, or to never touch, in this run,
   including questions they declined inside a window (§1d).
-- **Where things stand:** what just finished (PR numbers, merge commits), any items parked as
-  blocked on the user, and anything in flight. If
+- **Where things stand:** what just finished (PR numbers, merge commits), anything in flight, and
+  any tracker write still owed (delivery §C). If
   the next item is a continuation, include its phase and any hard-won context it needs. Otherwise, let
   the next session read the queue itself; don't pre-pick an item the user might reorder.
 
 Before calling it, make sure everything the next session needs is on disk or in the queue: commits
 pushed, the queue updated, notes written. A handoff prompt is not a substitute for durable state.
+So the prompt never restates a parked question or its status, since the queue entry is its only
+copy. It also never carries forward a list of what the final report owes. Anything owed is appended
+once to a notes file on disk, and the prompt names that file by path. Intent: a prompt that carries
+the previous prompt's lists grows every session, and a question copied as a conclusion travels
+without the reason that would let a later session re-test it.
 
 If the handoff tool is unavailable, stop (§5) and print the ready-to-paste prompt instead.
 
@@ -140,7 +171,9 @@ If the handoff tool is unavailable, stop (§5) and print the ready-to-paste prom
 
 Stop when any of these holds: the threshold is reached, the queue has no unblocked items left (an
 item parked as blocked on the user counts as blocked, §1d), or something is broken in a way the chain shouldn't guess
-past (CI infrastructure down, auth expired, repeated review non-convergence).
+past (CI infrastructure down, auth expired). Review non-convergence is not a stop: the owed direction verdict (delivery §C) is the
+agent's and a fresh advisor's, and only a cut that drops or demand-defers work goes to the user,
+inside a window asked, outside one parked (§1d) like any other question.
 
 Run `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark clear` at the stop, whichever command started the
 chain, so a later unrelated compaction in this tree injects nothing.
@@ -154,25 +187,62 @@ The final report covers:
 - **Resume line:** a ready-to-paste `/queue-run …` prompt, with the threshold left as a blank for the
   user to fill in, since it will differ next time.
 
-## Always ask, even mid-chain
+## Decision authority
 
-Merging is the only outward action this skill authorizes, and only per §1c — and only **the change
-for the item you are working**. Any other change, such as a PR someone else opened, a fix you
-noticed on the way or a change you were asked to look at, is filed or left for the user, never merged
-by you, even when it is small and green. Still stop and ask before:
+Intent: a run goes unattended, and the user is in the loop only for what matters. This section is
+the single owner of who decides what. Other skills cite it rather than restate it.
+
+**Always ask, even mid-chain.** Merging is the only outward action this skill authorizes on its own,
+and only per §1c; tracker writes are authorized by the user's tracker preference alone (delivery
+§C). Merging covers only **the change for the item you are working**. Any other change, such as a PR
+someone else opened, a fix you noticed on the way or a change you were asked to look at, is filed or
+left for the user, never merged by you, even when it is small and green. Still stop and ask before:
 releases or publishing, deploys, anything touching live infrastructure, destructive git (force-push,
 history rewrites, deleting branches you didn't create), and anything the project's instructions mark
-as needing the user. Inside an availability window, ask and continue (§1d). Outside one, do not
-ask: park the item (§1d).
+as needing the user.
+
+**Ask the user** about a decision in the work itself when it:
+- removes or changes something that works today and is relied on. "Relied on" means a part of the
+  project's public surface: whatever a user or a program outside the code base invokes, sets,
+  sees or reads. Examples are a command and its options, an API endpoint or exported signature, a
+  configuration key, a screen or flow, a default, a status or exit code, and an output, wire or
+  storage format. Internals are not it: a private function, a layout nothing outside reads, a
+  test helper;
+- adds public surface in that sense, or decides whether a feature is built at all;
+- widens what is accepted silently, deleted or trusted (trust, security, data loss);
+- makes any other practical trade-off, such as a default that is slower but safer;
+- drops work: a cut that removes it, or a deferral to a ticket that waits for demand;
+- is one the agent and the advisor disagree on, after one consultation at the next tier up.
+
+**The agent and the advisor decide alone** everything else, record it (`design-ledger decide` in a
+design, else the item's queue entry or the review ledger's verdict note), and
+list it in the final report:
+- splits (design-doc's slice size), order, and the internal mechanism;
+- deferrals to a ticket that is queued without a demand gate, and cuts whose moved work is queued
+  that way, so that the end result is unchanged once every slice ships;
+- strict improvements within the ticket's intent: a crash becomes a coded error, a dead end gets a
+  way out, a wrong message is fixed, a fail-open is closed. Tightening what is accepted, deleted or
+  trusted is one of these.
+
+A decision is on the ask list only when it meets a bullet's stated conditions; a category's name
+("drops work", "trust") standing in for those conditions is not a fit. One that meets the stated
+conditions of bullets on both lists is asked. An advisor's ruling on authority quotes the bullet it
+rests on, or it is not a ruling. A user rule about a procedural action, such as "do not move the
+ticket to Done", withholds that action only; the decision beneath it stays where these lists put it. Inside an availability window, ask and
+continue (§1d). Outside one, do not ask: park the item (§1d) and work on another.
 
 ## Getting the user's attention
 
 The user does not watch the chain. Whenever the run needs them, send a `PushNotification` (load it
 with ToolSearch `select:PushNotification` if it is deferred) **before** ending the turn or calling
-AskUserQuestion. That covers every stop in §5, every ask above, and a question asked mid-item. One
+AskUserQuestion, with `status: "proactive"`. That covers every stop in §5, every ask above, a
+question asked mid-item, and an action the permission system denied that the run needed. **Send it
+even when the user seems to be at the terminal:** an open terminal, or a recent message from them,
+does not mean they are watching the session, so never skip the notification on that judgement. One
 line, under 200 characters, leading with what they must act on, e.g. "ISSUE-63: decision needed —
 index rebuild cost on large repos" or "queue-run stopped at 80% weekly: 3 merged, 1 PR open".
 
 A parked item (§1d) is notified once, when it is parked, so the question is waiting when the user
 looks. Do not notify at handoffs, item merges or routine progress; the chain continuing needs nothing from
-them. A "not sent" result means they are at the terminal already, so carry on.
+them. If the tool answers "not sent", carry on, and say in the turn's final message that it was not
+sent, so a skipped notification is visible rather than assumed delivered.

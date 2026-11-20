@@ -18,7 +18,7 @@ instruments you cannot be — an attacker and a grounder — run around your own
 **Cost lives in carrying, and a pass stays warm for an hour.** A pass re-reads its whole context on
 every turn. The attacker and grounder definitions carry `experimental: cacheTtl: 1h`, so a resume
 within an hour of the pass's last request re-reads at 0.1x. The default for subagents is five minutes,
-which a revision round always outlasts; that cost one measured design two ~300k rebuilds. Past the hour, a fresh pass
+which a revision round always outlasts (`rationale.md`). Past the hour, a fresh pass
 (memo path and workspace name only, as below) is favoured on paper: its predecessor's verdicts are
 already records, and `check` counts it as a second independent workspace. Measure it the first time,
 since no fresh pass has been costed yet.
@@ -43,8 +43,8 @@ before observing is the failure this method exists to prevent.
   the moment you know, switch. Reading a file with `Grep` until you understand it and re-opening it
   with `look` so `fact` has something to point at records the act and loses the finding.
 - **Read in ranges, and it matters most at the start.** Anything loaded in the first ~30 tool calls is
-  re-read on every later request and charged roughly **15x** its size; the same bytes late cost ~3x.
-  Measured across two runs, the opening 30 requests carried **~73%** of the entire tool-result cost.
+  re-read on every later request and charged roughly **15x** its size; the same bytes late cost ~3x
+  (measured: `rationale.md`).
 - **When a fact refuses a direction, that is the method working.** The `--why` on the revision names
   that fact's id, so the refutation becomes load-bearing. Three signatures mean thrashing instead:
   the same decision flips twice with no new fact between the flips; you reach for `fact --revise` on a
@@ -58,14 +58,13 @@ before observing is the failure this method exists to prevent.
 **The editorial pass mints nothing.** When the last question is settled, `review` every paragraph
 beside the claims it cites, then `prose --revise` for flow only. No new facts, no new claims — if the
 document needs an assertion it lacks, that sends you back into the loop, not into prose. It also
-cannot reorder, so choose placement as you write. This is not tidiness: the highest-severity defect in
-this project's first tetel memo was a keystone claim that existed **only in prose**, under a citation
-to a claim that said something else, and it entered during exactly such a writing phase. Read the
+cannot reorder, so choose placement as you write. This is not tidiness: a keystone claim that exists
+only in prose enters during exactly such a writing phase (`rationale.md`). Read the
 block ids from `query prose` immediately before any batch of `prose --revise`; never reconstruct them
 from memory or by counting. Ids are permanent but positions are not — an inserted block keeps its own
 id wherever it lands (`P35` can sit between `P19` and `P20`), so any count is off by one past the
 first insertion, and the row number `query prose` prints is a position, not an id. A revise against
-the wrong id silently overwrites whatever block holds it; twice in one memo that replaced headings.
+the wrong id silently overwrites whatever block holds it.
 
 Then `render --out`, then `check`. Be machine-clean before spending a grounding pass.
 
@@ -93,16 +92,13 @@ Then `render --out`, then `check`. Be machine-clean before spending a grounding 
 ### Dispatch rules that are not negotiable
 
 **Spawn every pass synchronously — `run_in_background: false`.** The default runs subagents
-detached, which makes the loop unable to wait for the result it exists to read. A designer left in
-that state spent **15% of its entire budget** calling `workspaces` in a loop, polling for children it
-could not have waited for; the polls' own output then became the single largest thing in its
-context. Never poll for an agent.
+detached, which makes the loop unable to wait for the result it exists to read, and a designer in
+that state polls (`rationale.md`). Never poll for an agent.
 
-**Never run the attacker and a grounder at the same time, and run the attacker first.** They
-overlapped on 7 of 7 passes in one measured run purely because both were dispatched detached. The
-order matters on yield: an attack pass and a grounding pass cost about the same per round (measured
-attacker round 0 on two designs: 57 turns in 14 minutes, and 64 turns in 23 minutes), but the attacker
-provokes roughly 0.83 revisions per record and a grounding pass 0.06–0.47. Running the high-yield
+**Never run the attacker and a grounder at the same time, and run the attacker first.** Dispatched
+detached, they overlap. The order matters on yield: an attack pass and a grounding pass cost about
+the same per round, but the attacker provokes far more revisions per record
+(`rationale.md`). Running the high-yield
 instrument first means the grounder grades wording that has already survived attack
 — and a revision landing mid-pass strands that pass's records, because a revised claim's earlier
 gradings no longer match its digest.
@@ -114,11 +110,8 @@ no network and no credentials? When it would not — the command interrogated th
 the tree — say so when you revise, and a revision whose replacement claims cite no
 observation of that substrate is not attacked next: it is rejected and redone. Prose and
 source-reads have just been demonstrated to lack jurisdiction over that question, and dispatching
-review at its successor re-runs the demonstrated failure. Measured once: three read-mechanism claims
-asserted in prose were each refuted against the live system by a later pass — five rounds, ~4.5M
-tokens — and four scripts then settled every remaining question in twenty minutes. In that run's
-ledger of 155 records, exactly the five refutations witnessed by live-system calls were the mechanism
-failures; the ten witnessed from source were contract-level, and this rule stays silent on those.
+review at its successor re-runs the demonstrated failure (`rationale.md`). Refutations witnessed
+from source are contract-level, and this rule stays silent on those.
 
 **Give a grounder the memo path and a fresh workspace name, and nothing else.** No propositions, no
 summary of the reasoning, no note about which claims you are unsure of. It runs `brief` itself so
@@ -147,27 +140,23 @@ would now have to contradict itself to refute.
 **A designer's brief leads with the deliverable's surface; the open questions come second.** The
 question list you attach becomes the scope whether you mean it to or not — the designer answers the
 brief it is given, and grounding pulls the same way, because the half of the problem with readable
-source outcompetes the half without. One design briefed as "an admin UI" plus five unsettled
-substrate questions came back answering all five and containing no feature set, no screens, no auth
-model and no data model — and rendered exactly as clean as a complete memo, because nothing in the
-artifact distinguishes never-asked from answered. Name the sections a reader would expect the
+source outcompetes the half without, and the result renders as clean as a complete memo, because
+nothing in the artifact distinguishes never-asked from answered (`rationale.md`).
+Name the sections a reader would expect the
 finished design to contain; anything outside that surface is an explicit deferral in the brief, so a
 gap in the memo is a stated deferral rather than a silence. And a decision no source can settle — a
 stack, a product feature set — is settled with the user before dispatch: the designer has no channel
 to ask, so an unaskable question becomes an omission.
 
 **Run an attacker every round, even when the grounding came back clean** — especially then, since a
-clean grounding is exactly the state in which nothing else will question the design. The attacker
-was for a long time spawned only to re-validate a refutation's fix, which meant it ran only when a
-grounder had refuted something; across four memos nothing ever was, so the highest-yield instrument
-in the loop never ran at all. A grounder grades **each proposition as written**, so it structurally
+clean grounding is exactly the state in which nothing else will question the design
+(`rationale.md`). A grounder grades **each proposition as written**, so it structurally
 cannot see what the claims fail to establish *jointly*. The two are not substitutes.
 
 **A refutation's fix is re-validated by an attacker, not by a grounder.** A grounder grading the
 repaired sentence establishes only that the new sentence is true. It cannot see the defect class a
 refutation-fix risks — a fix that is right about the finding and wrong about a premise neither the
-finding nor the fix made explicit. That has happened and cost a round: a repair was graded
-`supports` twice, correctly, and the next attack pass showed it unsound at its destination.
+finding nor the fix made explicit (`rationale.md`).
 
 ### When the loop stops
 
@@ -184,10 +173,8 @@ here. A claim that is right in substance and over-claims in one clause will be c
 of the diff, or by the compiler, or by the test the claim names.
 
 **A dry *grounding* round is not the signal.** Grounders being out of ideas is not the design having
-settled, and the difference is expensive: on one run, pass 1 was a dry grounding round and the
-attacker after it provoked **eight** revisions; passes 5 and 7 were also dry, and their attackers
-provoked 8 and 5. Stopping at the first dry round would have discarded 24 of that run's 35 revisions.
-If a grounding round comes back dry and no attacker has seen the current text, **the next pass is an
+settled, and the difference is expensive (`rationale.md`). If a grounding round comes back dry and no
+attacker has seen the current text, **the next pass is an
 attacker, not a stop.**
 
 **A caveat is not a close.** "No attack pass has seen the answers" written into a close-out report is
@@ -199,28 +186,43 @@ report states that the final attack pass read the text being closed.
 
 **And an earlier formulation of this rule — "stop when the last round provoked no revision" — is
 unreachable, which is why it is gone.** Any round that answers a finding rewrites some wording, which
-invalidates the attacker's grading, which requires another attacker, which finds something. Measured
-on one loop: refutations fell 2 → 1 → 1 → 0 across four attack passes while qualifications did not
-fall at all, because **every revision writes new prose and new prose carries new overreach**. All
-three of that run's final qualifications were the same shape — a single clause saying *only*, *never*
-or *permanently* about a claim that was right in substance. Iterating cannot drive that to zero; it
-manufactures it.
+invalidates the attacker's grading, which requires another attacker, which finds something:
+**every revision writes new prose and new prose carries new overreach**, typically a single clause
+saying *only*, *never* or *permanently* about a claim right in substance (`rationale.md`).
+Iterating cannot drive that to zero; it manufactures it.
 
-So: refutation and target churn extend the loop. Prose accuracy does not. Once both attack passes and
-grounding passes are returning only the second kind, stop — do not run one more round to be sure. One
-memo paid for that: two consecutive dry grounding rounds, 55 records between them, nothing changed by
-either.
+So: refutation and target churn extend the loop, up to the ratchet below. Prose accuracy does not.
+Once both attack passes and grounding passes are returning only the second kind, stop — do not run
+one more round to be sure (`rationale.md`).
 
 **Make the distinction the attacker's job, not yours.** Ask each attack pass to say, per finding,
 whether it changes what gets built or only what the implementer is told. They separate the two
 readily; it is the stop decision that needs the separation stated rather than inferred.
 
-**Cap the loop at four grounding rounds.** If it is not clean by then, stop and report plainly which
-claims will not survive, what each pass said, and what the design cannot currently establish. An
-honest report of an unstable design is a result; a design reported as finished because the loop ran
-out of patience is worse than an unstable one, because it arrives with a green attached. The cap
-bounds grounding rounds — the expensive instrument — never the closing attack pass. Machine-clean at
-the cap with revisions no attacker has seen is not clean; it is unattacked text with a green
+### The ratchet
+
+**Every pass goes into the design ledger** (`design-ledger`, beside this file, opened at intake,
+SKILL.md's *Slice size*): `pass attack|ground --build yes|no` after each one, with `--build yes`
+when the pass returned a finding that changes what gets built (the attacker says which, above), and
+`close` when you judge the loop stopped by the rule above. The ledger blocks, and the `tool-gate.sh`
+hook enforces the block on the next attacker or grounder spawn and on the next render:
+- **three consecutive build-changing attack passes after a close**: the loop is not converging on
+  this scope. Rounds stop on no blocker findings, and here the blockers are not running out;
+- **four grounding passes**: the expensive instrument is capped. The closing attack pass is never
+  blocked by this cap. Machine-clean at the cap with revisions no attacker has seen is not clean; it
+  is unattacked text with a green attached;
+- **a claim over about 8k characters**, or **a modification target outside the scope recorded at
+  open**: the render is refused (SKILL.md's *Slice size*).
+
+**The way through is a recorded decision, and its default is the cut.** `decide --note "<the
+decision, who made it>"` records it. Name what the cut drops and what it costs, so the decision is
+weighed against a stated price rather than against a vague wish to finish. You and the advisor take
+it alone when queue-run's *Decision authority* lists it there (a split, a deferral to a ticket queued
+without a demand gate); a decision on its ask list goes to the user. An extension of the scope
+(`decide --widen`) must still pass the slice size check, or it is a new ticket. If no decision is
+taken, stop and report plainly which claims will not survive, what each pass said, and what the
+design cannot currently establish. An honest report of an unstable design is a result; a design
+reported as finished because the loop ran out of patience is worse, because it arrives with a green
 attached.
 
 **Machine-clean is the bar, and the human-owed partition is not a queue to empty.** `check` will

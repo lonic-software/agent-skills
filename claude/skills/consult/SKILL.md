@@ -20,6 +20,7 @@ Consult the advisor when the cost of being wrong exceeds the cost of the consult
 - **Gnarly debugging** — you've formed hypotheses but can't discriminate between them, or you've made two failed fix attempts on the same problem. Ask for debugging *strategy*, not just "find the bug".
 - **Adversarial review of subtle diffs** — correctness-critical or concurrency-touching changes where reading the diff yourself isn't sufficient confidence.
 - **Sanity-checking a plan before expensive execution** — a refactor or migration that would be costly to redo if the decomposition is wrong.
+- **The direction check** — whenever the review ledger owes one (delivery §C owns the trigger, the three answers and the ratchet). A fresh advisor, never the one that helped write the change.
 
 ## Design work: you author, the advisor attacks
 

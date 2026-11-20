@@ -22,6 +22,9 @@
 #     and a `git push` carrying a commit authored by another email is refused, authoritatively, for
 #     a repository the command names readably (cwd, or a literal or quoted -C/--git-dir path). A
 #     push to one named by an expansion is refused where cwd sets commit_email, else not checked.
+# Only where the powerup marker is set (powerup-mark, in this work tree's git dir):
+#   - a merge also needs delivery/review-ledger to show that the last code-review round recorded
+#     at the merged head had no semantic findings (delivery §C).
 # Only while $(git rev-parse --git-common-dir)/fleet/ exists (queue-fleet):
 #   - a forge merge also needs this slot to hold the merge turn (fleet turn holds), the pinned sha
 #     to be this slot's HEAD, and `fleet collisions` to pass on it (no counter both sides bumped);
@@ -42,6 +45,18 @@ deny() {
   jq -n --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}' \
     || oops "jq failed writing a deny"
   exit 0
+}
+
+# The way through for an action that needs the user. Under a run marker (powerup-auto, queue-run,
+# queue-fleet, powerup-fleet) outside the run's availability windows, nothing waits on the user:
+# the item is parked instead (queue-run §1d). powerup-mark in-window owns the window rules.
+ask_user() { # cwd → "ask the user first" or its out-of-window form
+  local gd m sd
+  gd=$(cd "$1" 2>/dev/null && git rev-parse --absolute-git-dir 2>/dev/null) && m="$gd/powerup-active" \
+    && [ -f "$m" ] && grep -qxE 'powerup-auto|queue-run|queue-fleet|powerup-fleet' "$m" || { printf 'ask the user first'; return; }
+  sd=$(sed -n 's/^skills_dir=//p' "$m" | head -n 1); [ -x "$sd/powerup/powerup-mark" ] || sd="$HOME/.claude/skills"
+  if (cd "$1" && "$sd/powerup/powerup-mark" in-window >/dev/null 2>&1); then printf 'ask the user first'
+  else printf 'ask the user first, and it is outside the run'"'"'s availability window: park the item (queue-run §1d) and take another'; fi
 }
 
 fleet_bin() {
@@ -165,8 +180,8 @@ check_git() {
       for a in ${GIT_REST[@]+"${GIT_REST[@]}"}; do
         case "$a" in
           --force|--force=*|--force-with-lease|--force-with-lease=*|--force-if-includes|-f|-[a-zA-Z]*f*) [ "$a" = "--follow-tags" ] || \
-            deny "git push with force ($a) is refused: ask the user first." ;;
-          +*) deny "git push with a +refspec ($a) is a force push and is refused: ask the user first." ;;
+            deny "git push with force ($a) is refused: $(ask_user "$cwd")." ;;
+          +*) deny "git push with a +refspec ($a) is a force push and is refused: $(ask_user "$cwd")." ;;
         esac
       done
       local want; want=$(target_want "$cwd")
@@ -175,7 +190,7 @@ check_git() {
       [ -z "$want" ] || check_push_authors "$cwd" "$want" ;;
     rebase)
       case "${GIT_REST[0]:-}" in --abort|--quit) return 0 ;; esac
-      deny "git rebase is refused: ask the user first. To bring a branch up to date, merge main into it." ;;
+      deny "git rebase is refused: $(ask_user "$cwd"). To bring a branch up to date, merge main into it." ;;
     commit)
       # git's precedence: --author, then GIT_AUTHOR_EMAIL, then user.email (-c, then config).
       local email="" want
@@ -411,6 +426,31 @@ need_stamp() { # cwd sha what
   deny "$3 is refused: $2 has no verified stamp — the complete local suites have not passed on that exact head. Run delivery/verify-head -- $how on it first."
 }
 
+ledger_bin() {
+  if [ -n "${LEDGER_BIN:-}" ]; then printf '%s\n' "$LEDGER_BIN"; return; fi
+  local d
+  for d in "$HOME/.claude/skills/delivery/review-ledger" "$(dirname "$0")/../skills/delivery/review-ledger"; do
+    [ -x "$d" ] && { printf '%s\n' "$d"; return; }
+  done
+}
+# Where the powerup marker is set, the last review round recorded at the merged head must have had
+# no semantic findings. A ledger error (exit 2, or no tool) is logged and allowed, like every error here.
+need_ledger() { # cwd sha what [repo named with -R]
+  local gd lb out st=0
+  gd=$(cd "$1" 2>/dev/null && git rev-parse --absolute-git-dir 2>/dev/null) || return 0
+  [ -f "$gd/powerup-active" ] || return 0
+  # A change in a repository named with -R whose head is not a commit here was reviewed elsewhere:
+  # this work tree's ledgers cannot speak for it.
+  if [ -n "${4:-}" ] && ! (cd "$1" && git cat-file -e "$2^{commit}" 2>/dev/null); then
+    log "$3 names $4, and $2 is not a commit here; not ledger-gated from this work tree"; return 0
+  fi
+  lb=$(ledger_bin); [ -n "$lb" ] || { log "powerup marker set but no review-ledger found; $3 not ledger-gated"; return 0; }
+  out=$(cd "$1" && "$lb" check "$2" 2>&1) || st=$?
+  [ "$st" -eq 0 ] && return 0
+  [ "$st" -eq 1 ] || { log "review-ledger check $2 failed ($st): $out; allowing"; return 0; }
+  deny "$3 is refused: $out. The loop has not converged at this head: a round with no semantic findings, recorded with delivery/review-ledger add (or carry, after a mechanical update), comes first."
+}
+
 # A forge merge: the merged head must be the reviewed head, and every verification must pass on it.
 check_forge_merge() { # cwd
   local cwd=$1 i=1 n=${#WORDS[@]} w pr="" sha="" repo="" shaflag
@@ -449,6 +489,7 @@ check_forge_merge() { # cwd
     deny "the merge is refused: change $pr's head is $head, not $sha. Verify the new head first."
   fi
   sha=$head; MERGE_SHA=$head
+  need_ledger "$cwd" "$sha" "the merge of change $pr" "$repo"
   local files_cmd files
   files_cmd=$(setting files_cmd)
   if [ -z "$files_cmd" ]; then
@@ -520,6 +561,7 @@ check_local_merge() { # cwd → sets LOCAL_MERGE when gated
   deny_protected "$cwd" "git merge of $target into $def" <<EOF
 $(cd "$cwd" 2>/dev/null && git diff --no-renames --name-only "$def...$sha" 2>/dev/null)
 EOF
+  need_ledger "$cwd" "$sha" "git merge of $target into $def"
   need_stamp "$cwd" "$sha" "git merge of $target into $def"
 }
 
@@ -683,7 +725,7 @@ EOF
   run() { # dir command [VAR=val...]
     local d=$1 c=$2; shift 2
     jq -n --arg c "$c" --arg d "$d" '{tool_name: "Bash", tool_input: {command: $c}, cwd: $d}' \
-      | env PATH="$tmp/bin:$PATH" FLEET_BIN="$tmp/fakefleet" HOME="$tmp/home" GH_HEAD=$SHA GH_CHECKS="$GREEN" "$@" bash "$self"
+      | env PATH="$tmp/bin:$PATH" FLEET_BIN="$tmp/fakefleet" LEDGER_BIN="${LEDGER:-}" HOME="$tmp/home" GH_HEAD=$SHA GH_CHECKS="$GREEN" "$@" bash "$self"
   }
   # A deny is exactly one JSON document: two concatenated ones are not a valid hook answer.
   denies() { local name=$1 want=$2; shift 2; out=$(run "$@"); if [ "$(printf '%s' "$out" | jq -s length 2>/dev/null)" = 1 ] && printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1 && printf '%s' "$out" | grep -q -- "$want"; then echo "ok   $name"; else echo "FAIL $name: ${out:-<allowed>}"; fails=$((fails + 1)); fi; }
@@ -705,6 +747,11 @@ EOF
   allows "git push -u origin x"                 "$R" "git push -u origin x"
   allows "git push --follow-tags"               "$R" "git push --follow-tags"
   denies "git rebase"                           "ask the user" "$R" "git rebase origin/main"
+  printf 'skills_dir=%s\nqueue-run\n' "$(cd "$(dirname "$0")/../skills" && pwd)" > "$R/.git/powerup-active"
+  denies "a run with no window: park, not ask"  "outside the run's availability window" "$R" "git rebase origin/main"
+  printf 'window=daily 00:00-24:00 Europe/Budapest\n' >> "$R/.git/powerup-active"
+  denies "inside a window: ask"                  "refused: ask the user first. To" "$R" "git rebase origin/main"
+  rm -f "$R/.git/powerup-active"
   allows "git rebase --abort"                   "$R" "git rebase --abort"
   # commit author
   allows "git commit with user.email set"       "$R" "git commit -m x"
@@ -894,6 +941,30 @@ EOF
   git -C "$L" checkout -q feat
   allows "no remote: merging main into a feature branch" "$L" "git merge main"
   git -C "$L" checkout -q main
+  # the review ledger: gated only where the powerup marker is set
+  LEDGER="$(cd "$(dirname "$self")/../skills/delivery" 2>/dev/null && pwd)/review-ledger"
+  [ -x "$LEDGER" ] || { echo "FAIL review-ledger not found beside the hooks ($LEDGER)"; fails=$((fails + 1)); }
+  rl() { printf 'round\t%s\t%s\t10\t%s\t%s\t0\t-\t2026-01-01T00:00:00Z\n' "$2" "$3" "$4" "$5" >> "$1"; } # file n sha sem classes
+  mkdir -p "$R/.git/review-ledger"
+  rl "$R/.git/review-ledger/feat" 1 "$SHA" 2 a,b
+  allows "ledger: no powerup marker, the ledger is not read"  "$R" "gh pr merge 12 --match-head-commit $SHA"
+  : > "$R/.git/powerup-active"
+  denies "ledger: the last round at the head had findings"    "had 2 semantic" "$R" "gh pr merge 12 --match-head-commit $SHA"
+  rl "$R/.git/review-ledger/feat" 2 "$OTHER" 0 -
+  denies "ledger: no round at the merged head"                "no review round" "$R" "gh pr merge 12 --match-head-commit $SHA"
+  rl "$R/.git/review-ledger/feat" 3 "$SHA" 0 -
+  allows "ledger: a zero last round at the head merges"       "$R" "gh pr merge 12 --match-head-commit $SHA"
+  allows "ledger: a missing tool is logged and allowed"       "$R" "gh pr merge 12 --match-head-commit $SHA" LEDGER_BIN="$tmp/no-such-ledger"
+  rl "$R/.git/review-ledger/feat" 4 "$SHA" 1 c
+  allows "ledger: another repository's head is not judged here" "$R" "gh pr merge 12 -R o/other --match-head-commit $SHA"
+  denies "ledger: without -R the same head is judged"          "had 1 semantic" "$R" "gh pr merge 12 --match-head-commit $SHA"
+  rm -rf "$R/.git/review-ledger" "$R/.git/powerup-active"
+  : > "$L/.git/powerup-active"
+  denies "ledger: a local merge with no round at its head"    "no review round" "$L" "git merge --ff-only feat"
+  mkdir -p "$L/.git/review-ledger"; rl "$L/.git/review-ledger/feat" 1 "$FEAT" 0 -
+  vc=$( { git -C "$L" show HEAD:.claude/gates.json 2>/dev/null || cat "$L/.claude/gates.json" 2>/dev/null; } | jq -r '.verify_cmd // "x"' 2>/dev/null); mkdir -p "$L/.git/verified"; printf '%s\nt\n' "${vc:-x}" > "$L/.git/verified/$FEAT"
+  allows "ledger: a local merge of a zero round's head"       "$L" "git merge --ff-only feat"
+  rm -rf "$L/.git/review-ledger" "$L/.git/powerup-active"
   # fleet
   denies "fleet: merge outside the turn"        "fleet turn enter" "$F" "gh pr merge 12 --match-head-commit $FSHA" GH_HEAD=$FSHA
   allows "fleet: merge inside the turn"         "$F" "gh pr merge 12 --match-head-commit $FSHA" GH_HEAD=$FSHA HOLDS=1
