@@ -81,7 +81,7 @@ gate_ask() { # cwd marker
   out=$(cd "$1" && "$pm" in-window 2>&1); st=$?
   case "$st" in
     0) exit 0 ;;
-    1|3) deny "outside window: park per queue-run §1d. $out. Bring the item to resumable state, mark its queue entry 'blocked on user — Q: <the question in full>', notify the user once, and take another item." ;;
+    1|3) deny "outside window: park per queue-run §1d. $out. If the user has told you when they are available, record it first (a fleet: fleet window set \"<rules>\"; a solo run: powerup-mark window \"<rule>\"), then ask. Otherwise bring the item to resumable state, mark its queue entry 'blocked on user — Q: <the question in full>', notify the user once, and take another item." ;;
     2) deny "AskUserQuestion is refused: $out. Fix the recorded window (powerup-mark window --clear, then powerup-mark window \"<rule>\"), or park per queue-run §1d." ;;
     *) oops "powerup-mark in-window exited $st: $out" ;;
   esac

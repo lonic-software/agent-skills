@@ -156,7 +156,9 @@ session (SendMessage, naming the slot) and notify the user.
   until they answer. A background worker's question is seen only in `fleet status`, `claude agents`
   or its attached session, so notify the user (naming the slot) whenever you ask. Outside a
   window there is no asking (the hook denies AskUserQuestion): park, and notify once, as §1d says.
-  The windows are `run.json`'s, in the form `powerup-mark` reads.
+  The windows are `run.json`'s, in the form `powerup-mark` reads. When the user tells any worker
+  when they are available, that worker records it at once with `fleet window set "<rules>"` (or
+  `fleet window clear`); it holds for every slot, since it is the same user.
 - **§3, usage:** the 5-hour window is no longer ignored. Pace on it with `fleet budget pace`.
 - **§4, handoff:** the prompt starts with the fleet's command (`fleet status` prints it), and names
   the slot and the claimed item in flight. The run parameters are in `run.json`, so it does not need to repeat them.
