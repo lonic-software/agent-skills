@@ -264,7 +264,10 @@ documented — routing decisions elsewhere should cite this section, not restate
   (the compiler, a named test, code review of the implementation diff — the §D merge gates) will
   catch it. Design-doc owns when the design phase ends; this bullet owns only where each finding
   goes. Routing happens after reporting, never by telling the reviewer where not to look — the
-  scoping rule below is unchanged.
+  scoping rule below is unchanged. **A code-review finding routes the same way** when its fix would
+  add or reverse a decision the closed design made: it reopens that clause in the design loop
+  (§C's contract answer) instead of being fixed in the diff. The test: *does the fix add a variant,
+  state, exit or step kind the design never decided?*
 - **Scoping narrows effort, never permission.** An instruction may tell a reviewer where to spend
   its budget; it must never tell it to stay silent about a defect it finds anyway. "Don't re-verify
   the citations" is legitimate; anything that would suppress reporting a real problem is not — that
@@ -298,9 +301,38 @@ starts — never a batch.
   interaction the split was meant to prevent.
 - **Diff-size conscience.** A diff too large for a reviewer to hold at once is what turns each fix
   into the next finding — this is how a batch of "closed" findings becomes three more rounds of
-  live ones. When review rounds **escalate** instead of converging (each round finding something
-  worse than the last), that is the signal to stop patching and discard the branch, rebuilding
-  contract-first in slices instead.
+  live ones.
+- **Non-convergence owes a direction check, and the author does not choose its answer.** Record
+  every code-review round with `${CLAUDE_SKILL_DIR}/review-ledger add` (`--self-test` checks it): it
+  takes the head and the diff size from git, and from you the count of semantic findings, their
+  class slugs and how many of them the previous round's fix introduced. A direction check is owed,
+  and the ledger prints `owed: direction`, when a round shows any of:
+  - a blocker class returning in the round after a fix whose sweep claimed to close it;
+  - a finding introduced by the previous round's fix;
+  - a diff that has reached 1.5x its round-1 size (after a verdict, 1.5x its size at the verdict).
+
+  Before any further fix round, a fresh advisor (consult), briefed per §B with the design and the
+  contract supplied as challengeable, never as authority, returns one of three answers:
+  - **converging**, only with the finite enumeration that bounds the class and the enforcer that
+    makes the checked domain equal it, both named;
+  - **contract**: a clause the code keeps answering is wrong or missing, so reopen it in the design
+    loop, with an attack pass before more code;
+  - **cut**: land the bounded part and move the rest out. A cut changes scope, so it is the user's
+    decision (queue-run §1d).
+
+  Record the answer with `review-ledger verdict <kind> --note "<the bound, the clause, or the
+  user's decision>"`. **The ratchet:** once a class recurs after a converging verdict, converging
+  is off the menu, and the ledger refuses it. **"A root fix inside the PR" is the tell.** It is the
+  answer the author reaches for at every trigger, which is why the author does not pick. Rounds
+  still end on the finding class (§B); the ledger never declares a loop done, it only moves the
+  loop to another artifact. Where the powerup marker is set, `gate.sh` refuses a merge unless the
+  last ledger round at the merged head had no semantic findings; after a mechanical update (§B),
+  `review-ledger carry` moves a zero round to the updated head, once git shows the update is a
+  merge of the default branch that left the diff as it was, or names the regenerated files. A
+  verdict answers an owed check only, never one ahead of time. Trap seen: eight rounds whose
+  blocker counts never reached zero for long (3, 4, 3, 2, 1, 3, 0, 1), with the diff growing every
+  round to almost seven times its first size. The escalation signal fired three times, and each
+  time the remedy was restated as the root fix, inside the PR, framed as needing no design reopen.
 
 ## D. Fix execution
 
@@ -441,7 +473,7 @@ A helper rewritten in a scratchpad each session comes back with new bugs each ti
 as a tool is fixed once. (evolve owns the promotion loop; this is its delivery-time half.)
 
 - **Look before you write.** Before writing a helper script, check the tools shipped beside the
-  skills (`${CLAUDE_SKILL_DIR}/`: `revert-check`, `verify-head`, `wait-pr-ci`, ...) and wherever the
+  skills (`${CLAUDE_SKILL_DIR}/`: `revert-check`, `verify-head`, `wait-pr-ci`, `review-ledger`, ...) and wherever the
   project declares its own (its `bin/`, or the tool list its contributing guide or CLAUDE.md names).
 - **A helper written a second time is promoted, not rewritten** — whether the first copy is in this
   session or an earlier one's scratchpad. Project-neutral: into the owning skill's folder, with a
