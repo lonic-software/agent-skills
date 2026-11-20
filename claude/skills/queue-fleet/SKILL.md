@@ -154,8 +154,9 @@ session (SendMessage, naming the slot) and notify the user.
   `fleet exclude <item>`. **Leave the merge turn before asking** (`fleet turn leave --requeue`): a
   session waiting on the user is still a live owner, so a held turn would stop every slot's merge
   until they answer. A background worker's question is seen only in `fleet status`, `claude agents`
-  or its attached session, so notify the user (naming the slot) whenever you ask, inside a window
-  or not.
+  or its attached session, so notify the user (naming the slot) whenever you ask. Outside a
+  window there is no asking (the hook denies AskUserQuestion): park, and notify once, as §1d says.
+  The windows are `run.json`'s, in the form `powerup-mark` reads.
 - **§3, usage:** the 5-hour window is no longer ignored. Pace on it with `fleet budget pace`.
 - **§4, handoff:** the prompt starts with the fleet's command (`fleet status` prints it), and names
   the slot and the claimed item in flight. The run parameters are in `run.json`, so it does not need to repeat them.

@@ -65,8 +65,9 @@ mechanism and one pass is never enough — but a round count is not the rule and
 
 **The stopping rule is: no blocker findings remain.** A blocker is **for a design** a finding that
 changes *what gets built*; **for code** a finding that affects the *semantics* of the code. Everything
-else is recorded and fixed but buys no further round. `design-doc`'s "When the loop stops" (in its
-`loop-tetel.md`) owns the design side in full — do not restate it here. A reviewer always returns *something*; the count is
+else is recorded and fixed but buys no further round. `design-doc`'s "When the loop stops" and "The ratchet" (in its
+`loop-tetel.md`) own the design side in full, including when a non-converging loop is cut — do not
+restate them here. A reviewer always returns *something*; the count is
 noise and the class is the signal.
 
 The waste was never the rounds. It was **conflating "fresh agent" with "independent round."**
@@ -131,7 +132,9 @@ re-reads. So:
   registered, tell the user it is a boundary and give that prompt instead. **Not while the user
   is talking:** if they sent a message in this turn or the last few, or a question to them is open,
   do not call `handoff`. Write the brief, say the handoff is ready, and wait for their "go"; twice a
-  handoff cleared the session before the user could read the reply (user, 2026-11-20). In an
+  handoff cleared the session before the user could read the reply (user, 2026-11-20). The mod
+  enforces it: a `handoff` within ten minutes of a prompt or command the user typed is held, not
+  counted down, and starts on their `/handoff now`; after a "go", call it again. In an
   unattended stretch, with no user message since the last handoff, boundaries hand off as above. `autoCompactWindow` (300k)
   is only the safety net for a session that runs long anyway. A finding that exists only in context
   is one boundary from gone.

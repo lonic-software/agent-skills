@@ -191,6 +191,13 @@ cmd_init() {
     || die "init needs --workers --threshold --queue --merge-authority"
   case "$workers$thr" in *[!0-9.]*) die "init: --workers and --threshold are numbers" ;; esac
   case "$command" in ""|*[!a-z0-9:-]*) die "init: --command is a slash command's name, such as queue-fleet" ;; esac
+  if [ -n "$windows" ]; then # the tool-gate hook reads them with powerup-mark; refuse a form it cannot
+    local pm; pm="$(cd "$(dirname "$0")/.." && pwd)/powerup/powerup-mark"
+    if [ -x "$pm" ]; then
+      "$pm" in-window --rules "$windows" >/dev/null 2>&1
+      [ $? -ne 2 ] || die "init: --windows '$windows' cannot be read; use powerup-mark's form, e.g. \"weekdays 09:00-17:00 Europe/Budapest\" or \"until 2026-11-20 23:00 Europe/Budapest\", joined with ';'"
+    fi
+  fi
   local top cfg
   top=$(git rev-parse --show-toplevel) || die "not inside a work tree"
   cfg="$top/$CONFIG_REL"

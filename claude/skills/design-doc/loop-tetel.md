@@ -206,8 +206,9 @@ three of that run's final qualifications were the same shape — a single clause
 or *permanently* about a claim that was right in substance. Iterating cannot drive that to zero; it
 manufactures it.
 
-So: refutation and target churn extend the loop. Prose accuracy does not. Once both attack passes and
-grounding passes are returning only the second kind, stop — do not run one more round to be sure. One
+So: refutation and target churn extend the loop, up to the ratchet below. Prose accuracy does not.
+Once both attack passes and grounding passes are returning only the second kind, stop — do not run
+one more round to be sure. One
 memo paid for that: two consecutive dry grounding rounds, 55 records between them, nothing changed by
 either.
 
@@ -215,12 +216,30 @@ either.
 whether it changes what gets built or only what the implementer is told. They separate the two
 readily; it is the stop decision that needs the separation stated rather than inferred.
 
-**Cap the loop at four grounding rounds.** If it is not clean by then, stop and report plainly which
-claims will not survive, what each pass said, and what the design cannot currently establish. An
-honest report of an unstable design is a result; a design reported as finished because the loop ran
-out of patience is worse than an unstable one, because it arrives with a green attached. The cap
-bounds grounding rounds — the expensive instrument — never the closing attack pass. Machine-clean at
-the cap with revisions no attacker has seen is not clean; it is unattacked text with a green
+### The ratchet
+
+**Every pass goes into the design ledger** (`design-ledger`, beside this file, opened at intake,
+SKILL.md's *Slice size*): `pass attack|ground --build yes|no` after each one, with `--build yes`
+when the pass returned a finding that changes what gets built (the attacker says which, above), and
+`close` when you judge the loop stopped by the rule above. The ledger blocks, and the `tool-gate.sh`
+hook enforces the block on the next attacker or grounder spawn and on the next render:
+- **three consecutive build-changing attack passes after a close**: the loop is not converging on
+  this scope. Rounds stop on no blocker findings, and here the blockers are not running out;
+- **four grounding passes**: the expensive instrument is capped. The closing attack pass is never
+  blocked by this cap. Machine-clean at the cap with revisions no attacker has seen is not clean; it
+  is unattacked text with a green attached;
+- **a claim over about 8k characters**, or **a modification target outside the scope recorded at
+  open**: the render is refused (SKILL.md's *Slice size*).
+
+**The way through is a recorded decision, and its default is the cut.** `decide --note "<the
+decision, who made it>"` records it. Name what the cut drops and what it costs, so the decision is
+weighed against a stated price rather than against a vague wish to finish. You and the advisor take
+it alone when queue-run's *Decision authority* lists it there (a split, a deferral to a ticket queued
+without a demand gate); a decision on its ask list goes to the user. An extension of the scope
+(`decide --widen`) must still pass the slice size check, or it is a new ticket. If no decision is
+taken, stop and report plainly which claims will not survive, what each pass said, and what the
+design cannot currently establish. An honest report of an unstable design is a result; a design
+reported as finished because the loop ran out of patience is worse, because it arrives with a green
 attached.
 
 **Machine-clean is the bar, and the human-owed partition is not a queue to empty.** `check` will

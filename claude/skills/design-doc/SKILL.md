@@ -106,8 +106,12 @@ exemption.
   targets, means split.
 
 It is checked at intake, before the design opens, and the check is written down as one recorded
-line. The scope gate checks it again whenever the design's scope grows. A split is the agent's
-decision (queue-run, *Decision authority*).
+line: `${CLAUDE_SKILL_DIR}/design-ledger open --item <id> --workspace <ws> --dims "<the quantified
+variables>" --scope "<target:/cmd:/flag:/exit:/file: tokens>"`, which refuses more than three
+dimensions or five targets. On the tetel route the scope gate (the `tool-gate.sh` hook) checks it
+again at every render: a target outside the recorded scope waits for a `design-ledger decide`. A
+split is the agent's decision (queue-run, *Decision authority*). `loop-tetel.md`'s *The ratchet* says
+what the ledger records per pass.
 
 This skill exists because of one repeatedly-observed failure: a design doc states something about
 the code as a step in an argument, nobody notices it is a checkable fact rather than reasoning,

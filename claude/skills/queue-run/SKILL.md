@@ -57,8 +57,13 @@ chain at each merge point, so warn that it is effectively not unattended).
 **d. Availability windows — optional, never asked for.** The user may say when they can answer
 questions during this run: "until 23:00 Budapest", "9–17 on weekdays, Europe/Budapest". Record each
 as a rule plus an IANA time zone (a one-off end time becomes an absolute date and time), and carry it
-forward (§4). No window stated means the user is away for the whole run. Whenever a rule below
-depends on the time, read it with `TZ=<zone> date`; you have no clock.
+forward (§4). No window stated means the user is away for the whole run. Record each one where the
+hook reads it: `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark window "<rule>"` (its header gives the
+form, e.g. `weekdays 09:00-17:00 Europe/Budapest` or `until 2026-11-20 23:00 Europe/Budapest`) in a
+solo run, after the opening `powerup-mark set`; a fleet records them in `run.json` at `fleet init`.
+`powerup-mark in-window` says whether now is inside one, and the `tool-gate.sh` hook denies
+AskUserQuestion outside them. Whenever a rule below depends on the time, read it with that command
+or `TZ=<zone> date`; you have no clock.
 
 - **Inside a window**, a question for the user does not end the chain. Notify (*Getting the user's
   attention*), ask with AskUserQuestion, and continue on the answer. This covers a decision
