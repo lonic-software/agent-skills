@@ -75,6 +75,10 @@ gate_agent() { # cwd marker subagent_type
 
 gate_ask() { # cwd marker
   grep -qxE 'powerup-auto|queue-run|queue-fleet|powerup-fleet' "$2" || exit 0
+  # Setup (queue-run §1) asks freely: the windows gate only once the parameters are resolved, which
+  # a fleet's run.json or the marker's resolved line records.
+  local gcd; gcd=$(cd "$1" && git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+  grep -qx 'params=resolved' "$2" || { [ -n "$gcd" ] && [ -f "$gcd/fleet/run.json" ]; } || exit 0
   local sd pm out st
   sd=$(skills_dir "$2"); pm="$sd/powerup/powerup-mark"
   [ -x "$pm" ] || oops "no powerup-mark at $pm; AskUserQuestion not window-gated"
@@ -82,7 +86,7 @@ gate_ask() { # cwd marker
   case "$st" in
     0) exit 0 ;;
     1|3) deny "outside window: park per queue-run §1d. $out. If the user has told you when they are available, record it first (a fleet: fleet window set \"<rules>\"; a solo run: powerup-mark window \"<rule>\"), then ask. Otherwise bring the item to resumable state, mark its queue entry 'blocked on user — Q: <the question in full>', notify the user once, and take another item." ;;
-    2) deny "AskUserQuestion is refused: $out. Fix the recorded window (powerup-mark window --clear, then powerup-mark window \"<rule>\"), or park per queue-run §1d." ;;
+    2) deny "AskUserQuestion is refused: $out. Fix the recorded window (a fleet: fleet window set \"<rules>\"; a solo run: powerup-mark window --clear, then powerup-mark window \"<rule>\"), or park per queue-run §1d." ;;
     *) oops "powerup-mark in-window exited $st: $out" ;;
   esac
 }
@@ -157,6 +161,8 @@ self_test() {
   check "a decision lets the attacker through"     allow "" Agent '{"subagent_type":"lonic-design-attacker"}'
   # windows, under a run marker
   (cd "$tmp/r" && "$PM" set queue-run >/dev/null)
+  check "setup questions pass before resolved"     allow "" AskUserQuestion '{}'
+  (cd "$tmp/r" && "$PM" resolved >/dev/null)
   check "a run with no window denies a question"   deny "outside window: park per queue-run §1d" AskUserQuestion '{}'
   (cd "$tmp/r" && "$PM" window "daily 00:00-24:00 Europe/Budapest" >/dev/null)
   check "inside a window a question is allowed"    allow "" AskUserQuestion '{}'
@@ -164,6 +170,9 @@ self_test() {
   check "after the window a question is denied"    deny "outside window" AskUserQuestion '{}'
   (cd "$tmp/r" && mkdir -p .git/fleet && printf '{"windows":"until 23:00 Budapest"}' > .git/fleet/run.json)
   check "a fleet window that cannot be read denies, naming it" deny "cannot be read" AskUserQuestion '{}'
+  check "and names the fleet's remedy"             deny "fleet window set" AskUserQuestion '{}'
+  (cd "$tmp/r" && "$PM" set queue-run >/dev/null && sed -i.bak '/^params=resolved$/d' "$("$PM" path)" && printf '{"windows":""}' > .git/fleet/run.json)
+  check "a fleet's run.json counts as resolved"    deny "outside window" AskUserQuestion '{}'
   rm -rf "$tmp"
   [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }
   echo "self-test: $fails failed"; return 1

@@ -31,7 +31,8 @@ not reword a command to slip past it):
   target inside the recorded scope (or widened by a `decide`), and no claim over ~8k characters;
 - the design ledger's ratchet: after three build-changing attack passes following a close, or four
   grounding passes, the next attacker or grounder spawn (and render) waits for a `decide`;
-- under a run, AskUserQuestion outside the availability window is denied: park (queue-run §1d).
+- under a run, once its parameters are resolved (`powerup-mark resolved`, or a fleet's run.json),
+  AskUserQuestion outside the availability window is denied: park (queue-run §1d).
 
 **Enforced by the `phase-handoff` mod:** a `handoff` within ten minutes of a prompt the user typed
 is held until `/handoff now` (powerup's "not while the user is talking").

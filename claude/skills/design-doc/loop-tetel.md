@@ -97,7 +97,7 @@ that state polls (`rationale.md`). Never poll for an agent.
 
 **Never run the attacker and a grounder at the same time, and run the attacker first.** Dispatched
 detached, they overlap. The order matters on yield: an attack pass and a grounding pass cost about
-the same per round, but the attacker provokes several times more revisions per record
+the same per round, but the attacker provokes far more revisions per record
 (`rationale.md`). Running the high-yield
 instrument first means the grounder grades wording that has already survived attack
 — and a revision landing mid-pass strands that pass's records, because a revised claim's earlier

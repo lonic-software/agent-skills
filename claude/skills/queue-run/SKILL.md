@@ -20,7 +20,7 @@ read refreshes it the same way.
 ## 1. Resolve the run parameters (first session only)
 
 A session started by a handoff gets every parameter of this section in its prompt. In that case, do
-not ask again; go straight to §2.
+not ask again: run `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark resolved` and go straight to §2.
 
 Otherwise, resolve them from the user's prompt, and ask only for what is missing (availability
 windows, §1d, are the exception: never asked for). Put every missing question into **one**
@@ -81,7 +81,10 @@ or `TZ=<zone> date`; you have no clock.
   full>`, and the user notified once. Parking is an item boundary: go to §2 step 6. The next session
   takes the next item that is not blocked on the user.
 
-Confirm the resolved parameters back to the user in one or two lines, windows included, then start.
+Confirm the resolved parameters back to the user in one or two lines, windows included, then run
+`${CLAUDE_SKILL_DIR}/../powerup/powerup-mark resolved` and start. Until that line is recorded the
+setup questions above are asked freely; from then on the windows gate every question (a fleet's
+`run.json` counts as resolved).
 
 ## 2. Each session: one item
 
@@ -93,7 +96,8 @@ Confirm the resolved parameters back to the user in one or two lines, windows in
    as parked or "ask first" are asked about inside an availability window (§1d) and skipped outside
    one; note skipped ones for the final report.
 3. **Check the item's size at intake** (design-doc's *Slice size*), before any design opens, and
-   write the result as one line in the item's pass log. An item over it is split first; the split
+   record the result as the item's intake line: `design-ledger open` where a design opens
+   (design-doc's *Slice size*), else one line in the item's queue entry. An item over it is split first; the split
    is yours to make (*Decision authority*), and the parts enter the queue at the item's rank.
 4. **Do the item** under the project's own workflow, to its natural end: merged (if authorized), or a
    PR left open with review done (if not).
@@ -154,7 +158,9 @@ If the handoff tool is unavailable, stop (§5) and print the ready-to-paste prom
 
 Stop when any of these holds: the threshold is reached, the queue has no unblocked items left (an
 item parked as blocked on the user counts as blocked, §1d), or something is broken in a way the chain shouldn't guess
-past (CI infrastructure down, auth expired, review non-convergence: the review ledger owes a direction verdict, delivery §C, that *Decision authority* gives to the user).
+past (CI infrastructure down, auth expired). Review non-convergence is not a stop: the owed direction verdict (delivery §C) is the
+agent's and a fresh advisor's, and only a cut that drops or demand-defers work goes to the user,
+inside a window asked, outside one parked (§1d) like any other question.
 
 Run `${CLAUDE_SKILL_DIR}/../powerup/powerup-mark clear` at the stop, whichever command started the
 chain, so a later unrelated compaction in this tree injects nothing.
@@ -191,7 +197,8 @@ as needing the user.
 - drops work: a cut that removes it, or a deferral to a ticket that waits for demand;
 - is one the agent and the advisor disagree on, after one consultation at the next tier up.
 
-**The agent and the advisor decide alone** everything else, record it in the item's pass log, and
+**The agent and the advisor decide alone** everything else, record it (`design-ledger decide` in a
+design, else the item's queue entry or the review ledger's verdict note), and
 list it in the final report:
 - splits (design-doc's slice size), order, and the internal mechanism;
 - deferrals to a ticket that is queued without a demand gate, and cuts whose moved work is queued

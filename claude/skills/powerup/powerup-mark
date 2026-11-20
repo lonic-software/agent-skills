@@ -5,6 +5,8 @@
 # powerup-mark show             print the record
 # powerup-mark window "<rule>"  record an availability window for a solo run (queue-run §1d)
 # powerup-mark window --clear   forget them
+# powerup-mark resolved         record that the run's parameters are settled (queue-run §1): from
+#                               then on the windows gate AskUserQuestion; before it, setup asks freely
 # powerup-mark in-window [--rules "<r1; r2>"]
 #                               exit 0 inside a window, 1 outside, 3 when none is recorded, 2 when a
 #                               rule cannot be read. A fleet's windows (run.json) win over the record.
@@ -14,7 +16,8 @@
 #   <days> HH:MM-HH:MM <IANA zone>   days: daily, weekdays, weekends, a range (mon-fri) or a list
 #                                    (mon,wed,fri); the end is exclusive; 22:00-02:00 wraps midnight
 #   until YYYY-MM-DD HH:MM <IANA zone>
-# and several are joined with ";". `set` keeps the recorded windows, so a handoff's re-`set` does
+# and several are joined with ";" in `--rules` and a fleet's run.json; `window` records one rule
+# per call. `set` keeps the recorded windows and the resolved line, so a handoff's re-`set` does
 # not drop them.
 #
 # The record lets the skills-after-compact hook re-inject the gate card and the re-read list after
@@ -122,6 +125,8 @@ self_test() {
   ( cd "$tmp" && git init -q r && cd r && "$self" set queue-run >/dev/null && "$self" window "daily 09:00-17:00 Europe/Budapest" >/dev/null \
     && "$self" set queue-run >/dev/null && grep -q '^window=daily 09:00-17:00 Europe/Budapest$' "$("$self" path)" ) \
     && echo "ok   set keeps the recorded window" || { echo "FAIL set keeps the recorded window"; fails=$((fails + 1)); }
+  ( cd "$tmp/r" && "$self" resolved >/dev/null && "$self" set queue-run >/dev/null && grep -qx 'params=resolved' "$("$self" path)" ) \
+    && echo "ok   set keeps the resolved line" || { echo "FAIL set keeps the resolved line"; fails=$((fails + 1)); }
   ( cd "$tmp/r" && "$self" window "until 23:00 Budapest" >/dev/null 2>&1 ); st=$?
   [ "$st" -eq 2 ] && echo "ok   an unreadable rule is refused at record time" || { echo "FAIL an unreadable rule is refused at record time ($st)"; fails=$((fails + 1)); }
   ( cd "$tmp/r" && mkdir -p .git/fleet && printf '{"windows":""}' > .git/fleet/run.json && "$self" in-window >/dev/null 2>&1 ); st=$?
@@ -140,10 +145,15 @@ case "${1:-}" in
       case "$s" in *[!a-z-]*|"") echo "powerup-mark: bad skill name '$s'" >&2; exit 2 ;; esac
     done
     skills_dir=$(cd "$(dirname "$0")/.." && pwd)
-    { printf 'skills_dir=%s\n' "$skills_dir"; printf '%s\n' "$@"; grep '^window=' "$p" 2>/dev/null || true; } > "$p.tmp" && mv "$p.tmp" "$p"
+    { printf 'skills_dir=%s\n' "$skills_dir"; printf '%s\n' "$@"; grep -E '^(window=|params=resolved$)' "$p" 2>/dev/null || true; } > "$p.tmp" && mv "$p.tmp" "$p"
     echo "powerup-mark: $* -> $p"
     ;;
   clear) rm -f "$(marker_path)"; echo "powerup-mark: cleared" ;;
+  resolved)
+    p=$(marker_path)
+    [ -f "$p" ] || { echo "powerup-mark: no record here; run powerup-mark set first" >&2; exit 2; }
+    grep -qx 'params=resolved' "$p" || printf 'params=resolved\n' >> "$p"
+    echo "powerup-mark: run parameters resolved; the availability windows now gate questions" ;;
   path) marker_path "${2:-$PWD}" ;;
   show) cat "$(marker_path)" 2>/dev/null || echo "(none)" ;;
   window)

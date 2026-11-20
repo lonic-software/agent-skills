@@ -110,7 +110,7 @@ line: `${CLAUDE_SKILL_DIR}/design-ledger open --item <id> --workspace <ws> --dim
 variables>" --scope "<target:/cmd:/flag:/exit:/file: tokens>"`, which refuses more than three
 dimensions or five targets. On the tetel route the scope gate (the `tool-gate.sh` hook) checks it
 again at every render: a target outside the recorded scope waits for a `design-ledger decide`. A
-split is the agent's decision (queue-run, *Decision authority*). `loop-tetel.md`'s *The ratchet* says
+split is the agent's and the advisor's decision (queue-run, *Decision authority*). `loop-tetel.md`'s *The ratchet* says
 what the ledger records per pass.
 
 This skill exists because of one repeatedly-observed failure: a design doc states something about
@@ -191,7 +191,9 @@ under delivery §B's medium cap, and it ends by the rule below.
 **The loop, in brief** (so the routing above is actionable before `loop-tetel.md` is open): you
 author and revise; each round is an attack pass, then your revision, then a grounding pass over what
 the revision left owed; passes run synchronously and never overlap; the loop stops when the last
-attack pass returned no finding that changes what gets built, capped at four grounding rounds; a
+attack pass returned no finding that changes what gets built, and the design ledger's ratchet (four
+grounding passes, or three build-changing attack passes after a close) stops it for a recorded
+`decide`; a
 revision no attacker has seen means the next pass is an attacker; and a design that has not been
 independently grounded is never reported.
 
