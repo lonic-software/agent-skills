@@ -80,7 +80,11 @@ or `TZ=<zone> date`; you have no clock.
   closes.
 - **Outside every window, nothing waits on the user.** An item that needs a decision is **parked**:
   brought to resumable state (§2), its queue entry marked `blocked on user — Q: <the question in
-  full>`, and the user notified once. Parking is an item boundary: go to §2 step 6. The next session
+  full> — ask: "<the ask-list bullet of Decision authority, quoted>" — not agent: <one line on why
+  the nearest agent-list bullet's text does not apply>`, and the user notified once. An entry
+  missing either field is not a park: whichever session reads it decides the question, records the
+  decision, and clears the mark.
+  The queue entry is the question's only copy (§4). Parking is an item boundary: go to §2 step 6. The next session
   takes the next item that is not blocked on the user.
 
 Confirm the resolved parameters back to the user in one or two lines, windows included, then run
@@ -91,8 +95,10 @@ setup questions above are asked freely; from then on the windows gate every ques
 ## 2. Each session: one item
 
 1. **Check usage first** (§3). If it is at or over the threshold, stop (§5). Then, if the time is
-   inside an availability window (§1d) and the queue holds entries marked `blocked on user`, ask
-   them all in one AskUserQuestion round and write the answers back before taking an item.
+   inside an availability window (§1d) and the queue holds entries marked `blocked on user`, first
+   re-test each against both lists of *Decision authority*: decide and record any that do not meet
+   an ask-list bullet's stated conditions. Ask the rest in one AskUserQuestion round and write the
+   answers back before taking an item.
 2. **Read the queue** freshly. The user may have reordered it since the last session, and their order
    wins. Take the **first unfinished item not blocked on the user**. Items the queue or memory marks
    as parked or "ask first" are asked about inside an availability window (§1d) and skipped outside
@@ -146,13 +152,18 @@ and include:
 - **Availability windows:** the rules and time zone from §1d, or `none`.
 - **Standing exclusions:** anything the user said to always ask about, or to never touch, in this run,
   including questions they declined inside a window (§1d).
-- **Where things stand:** what just finished (PR numbers, merge commits), any items parked as
-  blocked on the user, anything in flight, and any tracker write still owed (delivery §C). If
+- **Where things stand:** what just finished (PR numbers, merge commits), anything in flight, and
+  any tracker write still owed (delivery §C). If
   the next item is a continuation, include its phase and any hard-won context it needs. Otherwise, let
   the next session read the queue itself; don't pre-pick an item the user might reorder.
 
 Before calling it, make sure everything the next session needs is on disk or in the queue: commits
 pushed, the queue updated, notes written. A handoff prompt is not a substitute for durable state.
+So the prompt never restates a parked question or its status, since the queue entry is its only
+copy. It also never carries forward a list of what the final report owes. Anything owed is appended
+once to a notes file on disk, and the prompt names that file by path. Intent: a prompt that carries
+the previous prompt's lists grows every session, and a question copied as a conclusion travels
+without the reason that would let a later session re-test it.
 
 If the handoff tool is unavailable, stop (§5) and print the ready-to-paste prompt instead.
 
@@ -213,7 +224,11 @@ list it in the final report:
   way out, a wrong message is fixed, a fail-open is closed. Tightening what is accepted, deleted or
   trusted is one of these.
 
-The ask list wins: a decision that fits both lists is asked. Inside an availability window, ask and
+A decision is on the ask list only when it meets a bullet's stated conditions; a category's name
+("drops work", "trust") standing in for those conditions is not a fit. One that meets the stated
+conditions of bullets on both lists is asked. An advisor's ruling on authority quotes the bullet it
+rests on, or it is not a ruling. A user rule about a procedural action, such as "do not move the
+ticket to Done", withholds that action only; the decision beneath it stays where these lists put it. Inside an availability window, ask and
 continue (§1d). Outside one, do not ask: park the item (§1d) and work on another.
 
 ## Getting the user's attention
