@@ -107,7 +107,7 @@ exemption.
 
 It is checked at intake, before the design opens, and the check is written down as one recorded
 line: `${CLAUDE_SKILL_DIR}/design-ledger open --item <id> --workspace <ws> --dims "<the quantified
-variables>" --scope "<target:/cmd:/flag:/exit:/file: tokens>"`, which refuses more than three
+variables>" --scope "<target:/surface:/file: tokens>"`, which refuses more than three
 dimensions or five targets. On the tetel route the scope gate (the `tool-gate.sh` hook) checks it
 again at every render: a target outside the recorded scope waits for a `design-ledger decide`. A
 split is the agent's and the advisor's decision (queue-run, *Decision authority*). `loop-tetel.md`'s *The ratchet* says

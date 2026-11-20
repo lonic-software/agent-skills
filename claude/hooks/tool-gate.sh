@@ -49,7 +49,7 @@ gate_render() { # cwd marker workspace
   case "$st" in
     0) exit 0 ;;
     1) deny "${out#design-ledger: }" ;;
-    3) deny "render of workspace $3 is refused: no design ledger is open for it. Check the item's size first (design-doc, Slice size), then: $ledger open --item <id> --workspace $3 --dims \"<the contract's quantified variables>\" --scope \"<target:/cmd:/flag:/exit:/file: tokens>\"" ;;
+    3) deny "render of workspace $3 is refused: no design ledger is open for it. Check the item's size first (design-doc, Slice size), then: $ledger open --item <id> --workspace $3 --dims \"<the contract's quantified variables>\" --scope \"<target:/surface:/file: tokens>\"" ;;
     *) oops "design-ledger render-check exited $st for $3: $out" ;;
   esac
 }
@@ -145,7 +145,7 @@ self_test() {
   check "an attacker with no ledger is denied"     deny "no design ledger is open in this work tree" Agent '{"subagent_type":"lonic-design-attacker"}'
   check "other agents are not gated"               allow "" Agent '{"subagent_type":"lonic-advisor-medium"}'
   check "bare powerup: questions are not gated"    allow "" AskUserQuestion '{}'
-  (cd "$tmp/r" && "$DL" open --item X-1 --workspace ws1 --dims "a,b" --scope "target:heal_meta cmd:heal" >/dev/null)
+  (cd "$tmp/r" && "$DL" open --item X-1 --workspace ws1 --dims "a,b" --scope "target:heal_meta surface:sync" >/dev/null)
   check "a render in scope is allowed"             allow "" mcp__tetel__render '{"workspace":"ws1"}'
   check "a plugin-prefixed tetel render is gated too" allow "" mcp__plugin_tetel_tetel__render '{"workspace":"ws1"}'
   memo heal_meta write_head > "$tmp/memo.md"

@@ -191,9 +191,13 @@ history rewrites, deleting branches you didn't create), and anything the project
 as needing the user.
 
 **Ask the user** about a decision in the work itself when it:
-- removes or changes something that works today. "Something relied on" means a command, a flag, a
-  default, an exit code or a `--json` shape, and nothing broader;
-- adds product surface (a new command or flag), or decides whether a feature is built at all;
+- removes or changes something that works today and is relied on. "Relied on" means a part of the
+  project's public surface: whatever a user or a program outside the code base invokes, sets,
+  sees or reads. Examples are a command and its options, an API endpoint or exported signature, a
+  configuration key, a screen or flow, a default, a status or exit code, and an output, wire or
+  storage format. Internals are not it: a private function, a layout nothing outside reads, a
+  test helper;
+- adds public surface in that sense, or decides whether a feature is built at all;
 - widens what is accepted silently, deleted or trusted (trust, security, data loss);
 - makes any other practical trade-off, such as a default that is slower but safer;
 - drops work: a cut that removes it, or a deferral to a ticket that waits for demand;
