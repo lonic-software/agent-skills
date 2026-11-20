@@ -162,7 +162,7 @@ cmd_verdict() {
   while [ $# -gt 0 ]; do
     case "$1" in --note) need "$@"; note=$2; shift 2 ;; *) die "verdict: unknown argument '$1'" ;; esac
   done
-  [ -n "$note" ] || die "verdict: --note is required (converging: the finite enumeration that bounds the class, and its enforcer; contract: the clause reopened; cut: the user's scope decision)"
+  [ -n "$note" ] || die "verdict: --note is required (converging: the finite enumeration that bounds the class, and its enforcer; contract: the clause reopened; cut: the scope decision and who made it (queue-run, Decision authority))"
   local f; f=$(ledger_path) || exit $?
   replay_or_die "$f"
   [ "$ROUNDS" -ge 1 ] || refuse "no round recorded on this branch yet"
