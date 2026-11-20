@@ -42,8 +42,7 @@ empty — "there is no X" — takes its tag from what closes the set:
 
 When a pass reports a member missing, the answer is the bound, not the member. Appending the
 finding leaves the set `ASSUMED` and puts the claim out of proof again for a reviewer who can find
-the next absence but never the last one — one memo spent five consecutive rounds that way while its
-decisions had stopped moving. Replace the list with the predicate and the command that enumerates
+the next absence but never the last one (`rationale.md`). Replace the list with the predicate and the command that enumerates
 it (on the tetel route, a `run` the claim's fact witnesses), or narrow the claim to what the sweep
 returned and say so.
 
@@ -86,9 +85,7 @@ documentation, not parked under a label. Reserve UNKNOWN for what has nothing le
 production workload characteristic, or an external-system claim whose documentation you tried and
 could not fetch — and say which it is.
 
-Expect resolving them to change the design, not merely to confirm it. When a real instance of this
-was chased down, the "unknown" turned out to hide a third code path whose failure mode was worse
-than the defect the doc was written to fix.
+Expect resolving them to change the design, not merely to confirm it (`rationale.md`).
 
 The most dangerous claims are the ones that feel too obvious to check — visibility modifiers,
 call-site counts, "there are no other callers," "this is already private," "that path is

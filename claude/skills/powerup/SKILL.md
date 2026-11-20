@@ -38,13 +38,9 @@ handoff prompt, use the form that started this session.
 
 ## You are the author, not an orchestrator
 
-**This reverses the previous arrangement, deliberately, on a measured result, though not for the
-reason first recorded.** Delegating mutation to executors was adopted to save cost and did the
-opposite. The first diagnosis was cold starts. A later measurement (2026-09-18, three orchestrate-era
-sessions) found that spawn-time cache writes were ≈0% of executor cost and re-reads were ≈86%.
-Executors lived ~177 turns each and reached a context of 206k at the median and 967k at the maximum,
-while the orchestrator grew beside them (median 370k). Delegation moved the growing context; it did
-not bound it. The authoring rule stands on the grounds below. The cost rule is *Bound every context*.
+**Delegating mutation to executors was tried and did not save cost:** delegation moved the
+growing context, it did not bound it (the measurement is in `rationale.md`). The authoring rule
+stands on the grounds below. The cost rule is *Bound every context*.
 
 **You are the warm cache.** Your context persists across the session and is already primed with the
 repository, its conventions and the history of the work. Every fresh subagent pays full price to build
@@ -76,27 +72,24 @@ The waste was never the rounds. It was **conflating "fresh agent" with "independ
   keeps an agent's context, but a resume re-reads it at 0.1x only while the agent's prompt cache is
   alive; after that it rebuilds the whole context at write price. **Subagents default to a 5-minute
   cache, and the main thread gets an hour** (Claude Code docs, *How Claude Code uses prompt caching*;
-  confirmed in two design sessions' transcripts: resumes ≤4.3 minutes after the agent's last request were warm,
-  ≥6.4 minutes rebuilt, e.g. ~300k for the attacker, twice). So:
+  confirmed in transcripts, `rationale.md`). So:
   - **Only the design attacker and the grounder carry `experimental: cacheTtl: 1h`**: they are the
     agents resumed after a revision, which fits inside an hour. A 1-hour write costs 2x instead of
     1.25x, so it pays only for an agent resumed after more than five minutes. Everything else stays
     at 5 minutes: all four advisor tiers (mostly one-off consultations), reviewers (usually one
-    round, and a forked `/code-review` takes no per-agent setting). Do not widen it: a measured
-    blanket 1-hour TTL for subagents was 8.6% *worse* (anthropics/claude-code#74318), because most
-    subagent cache reuse happens within seconds.
+    round, and a forked `/code-review` takes no per-agent setting). Do not widen it: most subagent
+    cache reuse happens within seconds, so a blanket 1-hour TTL measured worse (`rationale.md`).
   - **Before resuming, read the gap:** the timestamp of the agent's last assistant line in its
     transcript (`<session>/subagents/agent-<id>.jsonl`) against `date`. You have no clock of your own.
   - **Once an agent is cold** (past its TTL), resume only when the rebuild, about 1.25x its context
     (2x on a 1-hour agent), is less than what a fresh agent would read to answer the same question.
-    Measured for reviewers around 100k: a cold-resumed round cost 160–260k and a fresh round 190–310k,
-    so resume. A fresh replacement is briefed as a fresh agent, not with a delta. A grounder gets the
+    For a reviewer around 100k the two are about equal, so resume (`rationale.md`). A fresh replacement is briefed as a fresh agent, not with a delta. A grounder gets the
     memo path and a workspace name and nothing else; a reviewer gets the full block delivery §B
     requires.
   - Never ping an agent to keep it warm.
 
-  Verified both ways: a completed `/code-review` agent resumes with its diff, mutation runs and
-  findings intact, and a repeat `Skill` or `Agent` call starts a new agent.
+  A completed `/code-review` agent resumes with its diff, mutation runs and findings intact; a
+  repeat `Skill` or `Agent` call starts a new agent.
 
 - **Round 2 onward is scoped to the delta.** "Here is what I changed in response; judge the fixes and
   what they broke." Never re-post material the agent already has. A fresh replacement is briefed as
@@ -112,9 +105,8 @@ The waste was never the rounds. It was **conflating "fresh agent" with "independ
 
 **Bound every context: the expense is carrying, not establishing.** Cost is roughly the number of
 turns times the context each turn re-reads, summed over every agent alive. A cache read is 0.1x base
-input, but a 300k context re-read on each of 100 turns is 3M input-equivalent. In one measured design session, re-reads were
-~80% of the session, and all agent cache writes together were roughly an eighth of the main thread's
-re-reads. So:
+input, but a 300k context re-read on each of 100 turns is 3M input-equivalent; re-reads, not
+cache writes, dominate a session (`rationale.md`). So:
 
 - **An agent's job is short and returns something small.** Delegation pays when an agent reads a
   bounded amount and hands back a conclusion: a search, one slice's review, one grounding pass. It
@@ -131,8 +123,8 @@ re-reads. So:
   to cancel; then the session clears and the prompt opens the next one. If the tool is not
   registered, tell the user it is a boundary and give that prompt instead. **Not while the user
   is talking:** if they sent a message in this turn or the last few, or a question to them is open,
-  do not call `handoff`. Write the brief, say the handoff is ready, and wait for their "go"; twice a
-  handoff cleared the session before the user could read the reply (user, 2026-11-20). The mod
+  do not call `handoff`. Write the brief, say the handoff is ready, and wait for their "go"
+  (incident: `rationale.md`). The mod
   enforces it: a `handoff` within ten minutes of a prompt or command the user typed is held, not
   counted down, and starts on their `/handoff now`; after a "go", call it again. In an
   unattended stretch, with no user message since the last handoff, boundaries hand off as above. `autoCompactWindow` (300k)
