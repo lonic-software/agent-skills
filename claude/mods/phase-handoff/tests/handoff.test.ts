@@ -205,3 +205,68 @@ test('a start with no handoff pending does nothing', async ($, on) => {
   await clock.advance(60_000)
   expect(seen.commands).toEqual([])
 })
+
+const user = { kind: 'composer' } as const
+
+test('a handoff called while the user is talking is held, and /handoff now starts it', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never)
+  await $.prompt.submit({ text: 'what did slice 2 change?', origin: user } as never)
+  const ran = await $.tool.call({ tool: TOOL, prompt: '/powerup slice 3' } as never)
+  expect(ran.deny).toContain('waiting for go')
+  await $.turn.complete(done)
+  await clock.advance(60_000)
+  expect(seen.commands).toEqual([])
+  await $.command.run({ command: 'handoff', args: 'now', origin: user } as never)
+  await clock.advance(1_000)
+  expect(seen.commands.filter(c => c !== '/handoff now')).toEqual(['/clear', '/powerup slice 3'])
+})
+
+test('a "go" from the user lets the next handoff through', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never)
+  await $.prompt.submit({ text: 'looks good', origin: user } as never)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toContain('Held')
+  await $.prompt.submit({ text: 'go', origin: user } as never)
+  const ran = await $.tool.call({ tool: TOOL, prompt: 'next' } as never)
+  expect(ran.deny).toBeUndefined()
+  await $.turn.complete(done)
+  await clock.advance(20_000)
+  expect(seen.commands).toEqual(['/clear'])
+})
+
+test('a typed slash command counts as the user talking', async ($, on) => {
+  mock.clock(on)
+  record(on as never)
+  await $.command.run({ command: 'powerup-fleet', args: 'slot-1', origin: user } as never)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toContain('Held')
+})
+
+test('ten quiet minutes after the user spoke, a handoff is scheduled as usual', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never)
+  await $.prompt.submit({ text: 'carry on', origin: user } as never)
+  await clock.advance(10 * 60_000)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toBeUndefined()
+  await $.turn.complete(done)
+  await clock.advance(20_000)
+  expect(seen.commands).toEqual(['/clear'])
+})
+
+test('a prompt a plugin submitted is not the user talking', async ($, on) => {
+  mock.clock(on)
+  record(on as never)
+  await $.prompt.submit({ text: '/powerup slice 3' } as never)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toBeUndefined()
+})
+
+test('with nothing drawing the session, a recent prompt does not hold the handoff', async ($, on) => {
+  const clock = mock.clock(on)
+  const seen = record(on as never, false)
+  surfaces(on, [])
+  await $.prompt.submit({ text: 'hi', origin: user } as never)
+  expect((await $.tool.call({ tool: TOOL, prompt: 'next' } as never)).deny).toBeUndefined()
+  await $.turn.complete(done)
+  await clock.advance(1_000)
+  expect(seen.commands).toEqual(['/clear'])
+})

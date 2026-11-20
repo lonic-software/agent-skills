@@ -3,6 +3,19 @@
 # powerup-mark clear            remove the record (run at a stop)
 # powerup-mark path             print where the record lives
 # powerup-mark show             print the record
+# powerup-mark window "<rule>"  record an availability window for a solo run (queue-run §1d)
+# powerup-mark window --clear   forget them
+# powerup-mark in-window [--rules "<r1; r2>"]
+#                               exit 0 inside a window, 1 outside, 3 when none is recorded, 2 when a
+#                               rule cannot be read. A fleet's windows (run.json) win over the record.
+# powerup-mark --self-test
+#
+# A window rule is one of
+#   <days> HH:MM-HH:MM <IANA zone>   days: daily, weekdays, weekends, a range (mon-fri) or a list
+#                                    (mon,wed,fri); the end is exclusive; 22:00-02:00 wraps midnight
+#   until YYYY-MM-DD HH:MM <IANA zone>
+# and several are joined with ";". `set` keeps the recorded windows, so a handoff's re-`set` does
+# not drop them.
 #
 # The record lets the skills-after-compact hook re-inject the gate card and the re-read list after
 # an auto-compaction, which re-attaches only Skill-tool skills and drops files those skills read.
@@ -23,6 +36,100 @@ marker_path() {
   fi
 }
 
+
+day_num() { case "$1" in mon) echo 1 ;; tue) echo 2 ;; wed) echo 3 ;; thu) echo 4 ;; fri) echo 5 ;; sat) echo 6 ;; sun) echo 7 ;; *) return 1 ;; esac; }
+zone_ok() { [ -n "$1" ] && [ -f "/usr/share/zoneinfo/$1" ]; }
+hhmm() { case "$1" in [0-2][0-9]:[0-5][0-9]) local h=${1%%:*}; [ "$((10#$h))" -le 23 ] || [ "$1" = 24:00 ] || return 1; echo "${1%%:*}${1##*:}" ;; *) return 1 ;; esac; }
+days_has() { # days-spec today(1-7) → 0 when today is in it; 2 when unreadable
+  local spec=$1 d=$2 part a b
+  case "$spec" in daily) return 0 ;; weekdays) spec=mon-fri ;; weekends) spec=sat-sun ;; esac
+  local IFS=,; for part in $spec; do
+    case "$part" in
+      *-*) a=$(day_num "${part%-*}") && b=$(day_num "${part#*-}") || return 2
+           if [ "$a" -le "$b" ]; then [ "$d" -ge "$a" ] && [ "$d" -le "$b" ] && return 0
+           else { [ "$d" -ge "$a" ] || [ "$d" -le "$b" ]; } && return 0; fi ;;
+      *) a=$(day_num "$part") || return 2; [ "$d" = "$a" ] && return 0 ;;
+    esac
+  done
+  return 1
+}
+rule_in() { # rule [now-override "YYYYmmddHHMM u"] → 0 inside, 1 outside, 2 unreadable
+  local r; r=$(printf '%s' "$1" | sed 's/^ *//; s/ *$//'); set -f; set -- $r; set +f
+  if [ "${1:-}" = until ]; then
+    [ $# -eq 4 ] && zone_ok "$4" || return 2
+    case "$2" in [0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]) ;; *) return 2 ;; esac
+    local t; t=$(hhmm "$3") || return 2
+    local now; now=${PM_NOW:-$(TZ="$4" date '+%Y%m%d%H%M %u')}; now=${now%% *}
+    [ "$now" -lt "$(printf '%s' "$2" | tr -d -)$t" ] && return 0; return 1
+  fi
+  [ $# -eq 3 ] && zone_ok "$3" || return 2
+  case "$2" in *-*) ;; *) return 2 ;; esac
+  local s e; s=$(hhmm "${2%-*}") && e=$(hhmm "${2#*-}") || return 2
+  local now; now=${PM_NOW:-$(TZ="$3" date '+%Y%m%d%H%M %u')}
+  local dow=${now##* } hm; hm=${now%% *}; hm=${hm:8:4}
+  days_has "$1" "$dow"; local dh=$?; [ "$dh" -eq 2 ] && return 2
+  if [ "$s" -lt "$e" ]; then [ "$dh" -eq 0 ] && [ "$hm" -ge "$s" ] && [ "$hm" -lt "$e" ] && return 0; return 1; fi
+  # wraps midnight: the part after midnight belongs to the previous day's window
+  [ "$dh" -eq 0 ] && [ "$hm" -ge "$s" ] && return 0
+  local prev=$(( dow == 1 ? 7 : dow - 1 )); days_has "$1" "$prev"; [ $? -eq 0 ] && [ "$hm" -lt "$e" ] && return 0
+  return 1
+}
+rules_in() { # "r1; r2" → 0 inside any, 1 outside all, 2 a rule unreadable, 3 none
+  local rules=$1 r st any="" IFS=';'
+  for r in $rules; do
+    [ -n "$(printf '%s' "$r" | tr -d ' ')" ] || continue
+    any=1; unset IFS; rule_in "$r"; st=$?; IFS=';'
+    [ "$st" -eq 2 ] && { unset IFS; echo "powerup-mark: window rule '$(printf '%s' "$r" | sed 's/^ *//')' cannot be read (see powerup-mark's header for the form)" >&2; return 2; }
+    [ "$st" -eq 0 ] && { unset IFS; echo "inside a window ($(printf '%s' "$r" | sed 's/^ *//'))"; return 0; }
+  done
+  unset IFS
+  [ -n "$any" ] || { echo "no availability window is recorded: the user is away for the whole run"; return 3; }
+  echo "outside every window ($rules)"; return 1
+}
+recorded_rules() { # → the fleet's windows when a fleet exists, else this tree's record
+  local gcd; gcd=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+  if [ -n "$gcd" ] && [ -f "$gcd/fleet/run.json" ]; then
+    command -v jq >/dev/null 2>&1 || { echo "powerup-mark: jq is needed to read the fleet's windows" >&2; return 2; }
+    jq -r '.windows // ""' "$gcd/fleet/run.json"; return
+  fi
+  sed -n 's/^window=//p' "$(marker_path)" 2>/dev/null | tr '\n' ';'
+}
+
+self_test() {
+  local self fails=0 st tmp
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  t() { # name want-status now rules
+    local out; out=$(PM_NOW="$3" "$self" in-window --rules "$4" 2>&1); st=$?
+    if [ "$st" -eq "$2" ]; then echo "ok   $1"; else echo "FAIL $1 (exit $st, wanted $2): $out"; fails=$((fails + 1)); fi
+  }
+  # PM_NOW is "YYYYmmddHHMM <ISO weekday>"; 2026-11-20 is a Friday (5)
+  t "inside a weekday window"           0 "202611201000 5" "weekdays 09:00-17:00 Europe/Budapest"
+  t "the end is exclusive"              1 "202611201700 5" "weekdays 09:00-17:00 Europe/Budapest"
+  t "before the start"                  1 "202611200859 5" "mon-fri 09:00-17:00 Europe/Budapest"
+  t "a weekend day is outside weekdays" 1 "202611211000 6" "weekdays 09:00-17:00 Europe/Budapest"
+  t "a day list"                        0 "202611211000 6" "mon,sat 09:00-17:00 Europe/Budapest"
+  t "a wrapping range (fri-mon) on sun" 0 "202611221000 7" "fri-mon 09:00-17:00 Europe/Budapest"
+  t "past midnight belongs to the day before" 0 "202611210100 6" "fri 22:00-02:00 Europe/Budapest"
+  t "and not to a day outside"          1 "202611220100 7" "fri 22:00-02:00 Europe/Budapest"
+  t "until, before"                     0 "202611202259 5" "until 2026-11-20 23:00 Europe/Budapest"
+  t "until, at"                         1 "202611202300 5" "until 2026-11-20 23:00 Europe/Budapest"
+  t "any rule of several"               0 "202611202000 5" "weekdays 09:00-17:00 Europe/Budapest; daily 19:00-23:00 Europe/Budapest"
+  t "no rule"                           3 "202611201000 5" ""
+  t "an unknown zone"                   2 "202611201000 5" "daily 09:00-17:00 Mars/Olympus"
+  t "free text"                         2 "202611201000 5" "until 23:00 Budapest"
+  t "a bad day"                         2 "202611201000 5" "workdays 09:00-17:00 Europe/Budapest"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/powerup-mark-self.XXXXXX")
+  ( cd "$tmp" && git init -q r && cd r && "$self" set queue-run >/dev/null && "$self" window "daily 09:00-17:00 Europe/Budapest" >/dev/null \
+    && "$self" set queue-run >/dev/null && grep -q '^window=daily 09:00-17:00 Europe/Budapest$' "$("$self" path)" ) \
+    && echo "ok   set keeps the recorded window" || { echo "FAIL set keeps the recorded window"; fails=$((fails + 1)); }
+  ( cd "$tmp/r" && "$self" window "until 23:00 Budapest" >/dev/null 2>&1 ); st=$?
+  [ "$st" -eq 2 ] && echo "ok   an unreadable rule is refused at record time" || { echo "FAIL an unreadable rule is refused at record time ($st)"; fails=$((fails + 1)); }
+  ( cd "$tmp/r" && mkdir -p .git/fleet && printf '{"windows":""}' > .git/fleet/run.json && "$self" in-window >/dev/null 2>&1 ); st=$?
+  [ "$st" -eq 3 ] && echo "ok   a fleet's empty windows win over the record" || { echo "FAIL a fleet's empty windows win over the record ($st)"; fails=$((fails + 1)); }
+  rm -rf "$tmp"
+  [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }; echo "self-test: $fails failed"; return 1
+}
+
 case "${1:-}" in
   set)
     shift
@@ -33,11 +140,22 @@ case "${1:-}" in
       case "$s" in *[!a-z-]*|"") echo "powerup-mark: bad skill name '$s'" >&2; exit 2 ;; esac
     done
     skills_dir=$(cd "$(dirname "$0")/.." && pwd)
-    { printf 'skills_dir=%s\n' "$skills_dir"; printf '%s\n' "$@"; } > "$p.tmp" && mv "$p.tmp" "$p"
+    { printf 'skills_dir=%s\n' "$skills_dir"; printf '%s\n' "$@"; grep '^window=' "$p" 2>/dev/null || true; } > "$p.tmp" && mv "$p.tmp" "$p"
     echo "powerup-mark: $* -> $p"
     ;;
   clear) rm -f "$(marker_path)"; echo "powerup-mark: cleared" ;;
   path) marker_path "${2:-$PWD}" ;;
   show) cat "$(marker_path)" 2>/dev/null || echo "(none)" ;;
-  *) sed -n '2,6p' "$0"; exit 2 ;;
+  window)
+    p=$(marker_path)
+    [ -f "$p" ] || { echo "powerup-mark: no record here; run powerup-mark set first" >&2; exit 2; }
+    if [ "${2:-}" = --clear ]; then grep -v '^window=' "$p" > "$p.tmp"; mv "$p.tmp" "$p"; echo "powerup-mark: windows cleared"; exit 0; fi
+    [ -n "${2:-}" ] || { echo "powerup-mark: window \"<rule>\"" >&2; exit 2; }
+    PM_NOW="202601010000 1" rule_in "$2"; [ $? -eq 2 ] && { echo "powerup-mark: window rule '$2' cannot be read (see powerup-mark's header for the form)" >&2; exit 2; }
+    printf 'window=%s\n' "$2" >> "$p"; echo "powerup-mark: window $2" ;;
+  in-window)
+    if [ "${2:-}" = --rules ]; then rules=${3:-}; else rules=$(recorded_rules) || exit 2; fi
+    rules_in "$rules"; exit $? ;;
+  --self-test) self_test; exit $? ;;
+  *) sed -n '2,13p' "$0"; exit 2 ;;
 esac

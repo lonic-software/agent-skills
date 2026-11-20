@@ -9,6 +9,22 @@ const CONTEXT_TOOL = 'mcp__phase-handoff__context'
 
 const pending = atom({ plugin: 'phase-handoff', key: 'pending' } as const, null)
 
+// The user is talking when they sent something in the last QUIET_MS (powerup's
+// "not while the user is talking"): then a handoff the agent calls is held, not
+// counted down, so the session is never cleared under a reply they have not
+// read. A handoff fires prompts with a plugin origin, so a chain's own opening
+// never counts; the opening command the user typed does.
+const QUIET_MS = 10 * 60_000
+let lastUser: { at: number; text: string } | undefined
+
+type Origin = { kind: string } | undefined
+const fromUser = (o: Origin) => o?.kind === 'composer' || o?.kind === 'bridge'
+const isGo = (text: string) => /^\s*go\b/i.test(text)
+
+async function heard($: EngineInterface, text: string) {
+  lastUser = { at: await $.clock.now(), text }
+}
+
 let tick: { cancel: () => void } | undefined
 
 function stop() {
@@ -31,6 +47,7 @@ async function fire($: EngineInterface) {
   stop()
   const handoff = await read($, pending)
   if (handoff === null) return
+  lastUser = undefined
   await update($, pending, () => null)
 
   await $.command.run({ command: 'clear' })
@@ -68,7 +85,7 @@ async function unwatched($: EngineInterface) {
 // where it stopped, or fire at once if nobody is watching.
 async function resume($: EngineInterface) {
   const handoff = await read($, pending)
-  if (handoff === null || handoff.secondsLeft === null) return
+  if (handoff === null || handoff.secondsLeft === null || handoff.held) return
   if (await unwatched($)) await fire($)
   else await countDown($, Math.max(1, handoff.secondsLeft))
 }
@@ -231,6 +248,18 @@ export const register: Register = on => {
       reason: typeof input.reason === 'string' ? input.reason : '',
       secondsLeft: null,
     }
+    if (lastUser !== undefined && !isGo(lastUser.text) && !(await unwatched($))) {
+      const ago = (await $.clock.now()) - lastUser.at
+      if (ago < QUIET_MS) {
+        await update($, pending, () => ({ ...handoff, held: true }))
+        return {
+          deny:
+            `Held, not scheduled: the user sent a message ${span(ago)} ago, so they are still talking. ` +
+            'Brief written; waiting for go. Say in one line that the handoff is ready and end your turn. ' +
+            'It starts when they run /handoff now; if they answer "go" instead, call handoff again.',
+        }
+      }
+    }
     await update($, pending, () => handoff)
     const leaving = await $.session.usage().then(u => u.context.tokens, () => undefined)
     return {
@@ -258,7 +287,7 @@ export const register: Register = on => {
     const done = await next(e)
     if (e.agentId !== undefined) return done
     const handoff = await read($, pending)
-    if (handoff !== null && handoff.secondsLeft === null) {
+    if (handoff !== null && handoff.secondsLeft === null && !handoff.held) {
       if (e.reason === 'answer') await ((await unwatched($)) ? fire($) : countDown($))
       else await cancel($, `turn ended (${e.reason})`)
     }
@@ -267,7 +296,17 @@ export const register: Register = on => {
 
   // Anything the person types while a handoff waits means they are still here.
   on('prompt.submit', async ($, e, next) => {
-    if (e.origin.kind === 'composer') await cancel($, 'you sent a prompt')
+    if (fromUser(e.origin)) {
+      await heard($, e.text)
+      await cancel($, 'you sent a prompt')
+    }
+    return next(e)
+  }).catch(($, e, next) => (next.called ? undefined : next(e)))
+
+  // A slash command the user typed is them talking too; /handoff itself is how
+  // they answer a held handoff, so it does not restart the quiet period.
+  on('command.run', async ($, e, next) => {
+    if (e.command !== 'handoff' && fromUser(e.origin)) await heard($, `/${e.command} ${e.args}`)
     return next(e)
   }).catch(($, e, next) => (next.called ? undefined : next(e)))
 
@@ -297,8 +336,9 @@ export const register: Register = on => {
     const { Box, Button, Text } = $.ui.resolve(e)
     const firstLine = handoff.prompt.split('\n')[0] ?? ''
     const preview = firstLine.length > 90 ? `${firstLine.slice(0, 89)}…` : firstLine
-    const when =
-      handoff.secondsLeft === null ? 'after this turn' : `in ${handoff.secondsLeft}s`
+    const when = handoff.held
+      ? 'held: you are talking (s or /handoff now starts it)'
+      : handoff.secondsLeft === null ? 'after this turn' : `in ${handoff.secondsLeft}s`
 
     return (
       <Box flexDirection="column">

@@ -47,6 +47,18 @@ deny() {
   exit 0
 }
 
+# The way through for an action that needs the user. Under a run marker (powerup-auto, queue-run,
+# queue-fleet, powerup-fleet) outside the run's availability windows, nothing waits on the user:
+# the item is parked instead (queue-run §1d). powerup-mark in-window owns the window rules.
+ask_user() { # cwd → "ask the user first" or its out-of-window form
+  local gd m sd
+  gd=$(cd "$1" 2>/dev/null && git rev-parse --absolute-git-dir 2>/dev/null) && m="$gd/powerup-active" \
+    && [ -f "$m" ] && grep -qxE 'powerup-auto|queue-run|queue-fleet|powerup-fleet' "$m" || { printf 'ask the user first'; return; }
+  sd=$(sed -n 's/^skills_dir=//p' "$m" | head -n 1); [ -x "$sd/powerup/powerup-mark" ] || sd="$HOME/.claude/skills"
+  if (cd "$1" && "$sd/powerup/powerup-mark" in-window >/dev/null 2>&1); then printf 'ask the user first'
+  else printf 'ask the user first, and it is outside the run'"'"'s availability window: park the item (queue-run §1d) and take another'; fi
+}
+
 fleet_bin() {
   if [ -n "${FLEET_BIN:-}" ]; then printf '%s\n' "$FLEET_BIN"; return; fi
   local d
@@ -168,8 +180,8 @@ check_git() {
       for a in ${GIT_REST[@]+"${GIT_REST[@]}"}; do
         case "$a" in
           --force|--force=*|--force-with-lease|--force-with-lease=*|--force-if-includes|-f|-[a-zA-Z]*f*) [ "$a" = "--follow-tags" ] || \
-            deny "git push with force ($a) is refused: ask the user first." ;;
-          +*) deny "git push with a +refspec ($a) is a force push and is refused: ask the user first." ;;
+            deny "git push with force ($a) is refused: $(ask_user "$cwd")." ;;
+          +*) deny "git push with a +refspec ($a) is a force push and is refused: $(ask_user "$cwd")." ;;
         esac
       done
       local want; want=$(target_want "$cwd")
@@ -178,7 +190,7 @@ check_git() {
       [ -z "$want" ] || check_push_authors "$cwd" "$want" ;;
     rebase)
       case "${GIT_REST[0]:-}" in --abort|--quit) return 0 ;; esac
-      deny "git rebase is refused: ask the user first. To bring a branch up to date, merge main into it." ;;
+      deny "git rebase is refused: $(ask_user "$cwd"). To bring a branch up to date, merge main into it." ;;
     commit)
       # git's precedence: --author, then GIT_AUTHOR_EMAIL, then user.email (-c, then config).
       local email="" want
@@ -735,6 +747,11 @@ EOF
   allows "git push -u origin x"                 "$R" "git push -u origin x"
   allows "git push --follow-tags"               "$R" "git push --follow-tags"
   denies "git rebase"                           "ask the user" "$R" "git rebase origin/main"
+  printf 'skills_dir=%s\nqueue-run\n' "$(cd "$(dirname "$0")/../skills" && pwd)" > "$R/.git/powerup-active"
+  denies "a run with no window: park, not ask"  "outside the run's availability window" "$R" "git rebase origin/main"
+  printf 'window=daily 00:00-24:00 Europe/Budapest\n' >> "$R/.git/powerup-active"
+  denies "inside a window: ask"                  "refused: ask the user first. To" "$R" "git rebase origin/main"
+  rm -f "$R/.git/powerup-active"
   allows "git rebase --abort"                   "$R" "git rebase --abort"
   # commit author
   allows "git commit with user.email set"       "$R" "git commit -m x"

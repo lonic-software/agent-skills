@@ -1,0 +1,371 @@
+#!/usr/bin/env bash
+# design-ledger open --item <id> --workspace <tetel workspace> --dims "<a,b,c>" --scope "<tokens>"
+#                          record the intake line: the contract's quantified variables (at most
+#                          three) and the scope (design-doc, Slice size)
+# design-ledger pass attack|ground --build yes|no
+#                          record one attack or grounding pass; --build yes when it returned a
+#                          finding that changes what gets built
+# design-ledger close      record that the author judged the loop stopped (loop-tetel, When the loop stops)
+# design-ledger decide --note "<decision, who decided>" [--widen "<tokens>"]
+#                          the way through a block; with --widen, the scope grows
+# design-ledger status [--item <id>]
+# design-ledger gate attack|ground|render [--workspace <ws>]
+#                          the hook's question: exit 0 when that step may run, 1 when it is blocked
+# design-ledger render-check --workspace <ws>
+#                          read a rendered memo on stdin; exit 1 when a target is outside the open
+#                          scope, a claim is over the size tripwire, or the ratchet blocks
+# design-ledger point <item>   work an item opened in another tree from this one (a handoff)
+# design-ledger path [--item <id>]
+# design-ledger --self-test
+#
+# One ledger per item, at $(git rev-parse --git-common-dir)/design-ledger/<item>, so it survives a
+# handoff and reads the same from every worktree. `open` also points this work tree at the item
+# ($(git rev-parse --absolute-git-dir)/design-ledger-current), which is what a hook reads, so two
+# fleet slots never share one.
+#
+# Scope tokens are space-separated: target:<symbol> (a tetel modification target), cmd:<name>,
+# flag:<--name>, exit:<code>, file:<path>. render-check compares target: tokens with the memo's
+# Modification targets table; the other kinds are recorded for the reader and the advisor, and the
+# author widens them with `decide --widen`, since no rendered memo states them in a form a script
+# can compare.
+#
+# Blocks (loop-tetel, The ratchet):
+#   ratchet     three consecutive attack passes with --build yes after a close: attack, ground and
+#               render are blocked;
+#   ground-cap  four grounding passes: ground is blocked; the closing attack pass is never blocked
+#               by it;
+#   size        (render-check only) a claim over CLAIM_MAX characters, or more than TARGET_MAX targets.
+# `decide` clears the ratchet and the cap and reopens the loop (a new close is needed). It does not
+# lift a size block: the memo has to be cut.
+#
+# What it does not see: passes are what the author records, as with delivery/review-ledger. The
+# render gate is what makes a resumed pass (SendMessage, which no hook sees) wait on the record: the
+# text the pass would read cannot be rendered while blocked.
+#
+# Exit: 0 ok · 1 refused / blocked · 2 usage, or a ledger that cannot be read · 3 no ledger open.
+# Bash 3.2 compatible.
+set -u
+
+CLAIM_MAX=${DESIGN_LEDGER_CLAIM_MAX:-8000}
+TARGET_MAX=5
+DIM_MAX=3
+GROUND_MAX=4
+RATCHET=3
+
+die() { echo "design-ledger: $*" >&2; exit 2; }
+refuse() { echo "design-ledger: $*" >&2; exit 1; }
+need() { [ $# -ge 2 ] || die "$1 needs a value"; }
+now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
+clean_text() { printf '%s' "$1" | tr '\t\n\r' '   '; }
+
+common_dir() { git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || die "not inside a git repository"; }
+git_dir() { git rev-parse --absolute-git-dir 2>/dev/null || die "not inside a git repository"; }
+item_key() { printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_'; }
+current_item() { local p; p="$(git_dir)/design-ledger-current"; [ -f "$p" ] && head -n 1 "$p"; }
+ledger_file() { # item or "" (this tree's current) → path, or exit 3
+  local it=${1:-}
+  [ -n "$it" ] || it=$(current_item)
+  [ -n "$it" ] || { echo "design-ledger: no design is open in this work tree (design-ledger open first)" >&2; exit 3; }
+  printf '%s/design-ledger/%s\n' "$(common_dir)" "$(item_key "$it")"
+}
+ledger_for_workspace() { # ws → path of the ledger opened for it, or exit 3
+  local d f ws; d="$(common_dir)/design-ledger"
+  for f in "$d"/*; do
+    [ -f "$f" ] || continue
+    ws=$(awk -F'\t' '$1 == "open" { print $3; exit }' "$f")
+    [ "$ws" = "$1" ] && { printf '%s\n' "$f"; return 0; }
+  done
+  echo "design-ledger: no design ledger is open for workspace '$1' (design-ledger open --workspace $1 first)" >&2
+  exit 3
+}
+
+count_words() { local n=0 x; for x in $1; do n=$((n + 1)); done; echo "$n"; } # zsh-safe: runs under bash
+count_dims() { printf '%s' "$1" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -c .; }
+targets_of() { local x; for x in $1; do case "$x" in target:*) printf '%s\n' "${x#target:}" ;; esac; done; }
+check_tokens() {
+  local x
+  for x in $1; do
+    case "$x" in
+      target:?*|cmd:?*|flag:?*|exit:?*|file:?*) ;;
+      *) die "scope token '$x' is not one of target:<symbol> cmd:<name> flag:<--name> exit:<code> file:<path>" ;;
+    esac
+  done
+}
+
+# Replay. Lines (tab-separated, no field empty):
+#   open <item> <workspace> <dims> <scope> <time>
+#   pass <attack|ground> <yes|no> <time>
+#   close <time>
+#   decide <note> <widen|-> <time>
+replay() { # file
+  ITEM=""; WS=""; DIMS=""; SCOPE=""; CLOSED=""; RUN=0; GROUNDS=0; ATTACKS=0; CORRUPT=""
+  [ -f "$1" ] || { CORRUPT="missing"; return 1; }
+  local kind a b c d e extra ln=0
+  while IFS='	' read -r kind a b c d e extra; do
+    ln=$((ln + 1))
+    case "$kind" in
+      open)
+        { [ "$ln" -eq 1 ] && [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ -n "$d" ] && [ -n "$e" ] && [ -z "$extra" ]; } \
+          || { CORRUPT="line $ln"; return 1; }
+        ITEM=$a; WS=$b; DIMS=$c; SCOPE=$d ;;
+      pass)
+        { [ "$ln" -gt 1 ] && [ -n "$c" ] && [ -z "$d" ]; } || { CORRUPT="line $ln"; return 1; }
+        case "$a:$b" in
+          attack:yes) ATTACKS=$((ATTACKS + 1)); [ -n "$CLOSED" ] && RUN=$((RUN + 1)) ;;
+          attack:no) ATTACKS=$((ATTACKS + 1)); RUN=0 ;;
+          ground:yes|ground:no) GROUNDS=$((GROUNDS + 1)) ;;
+          *) CORRUPT="line $ln"; return 1 ;;
+        esac ;;
+      close)
+        { [ "$ln" -gt 1 ] && [ -n "$a" ] && [ -z "$b" ]; } || { CORRUPT="line $ln"; return 1; }
+        CLOSED=1 ;;
+      decide)
+        { [ "$ln" -gt 1 ] && [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ -z "$d" ]; } || { CORRUPT="line $ln"; return 1; }
+        CLOSED=""; RUN=0; GROUNDS=0
+        [ "$b" = "-" ] || SCOPE="$SCOPE $b" ;;
+      *) CORRUPT="line $ln"; return 1 ;;
+    esac
+  done < "$1"
+  [ -n "$ITEM" ] || { CORRUPT="no open line"; return 1; }
+}
+replay_or_die() { replay "$1" || die "the ledger $1 cannot be read at $CORRUPT (edited by hand?); fix that line or remove the file"; }
+
+block_reason() { # step → reason, or nothing
+  if [ "$RUN" -ge "$RATCHET" ]; then
+    echo "ratchet: $RUN consecutive attack passes after a close changed what gets built. The way through is a recorded decision whose default is the cut, with its cost (design-ledger decide --note \"<decision, who decided>\"), taken under queue-run's Decision authority"
+    return
+  fi
+  if [ "$1" = ground ] && [ "$GROUNDS" -ge "$GROUND_MAX" ]; then
+    echo "grounding cap: $GROUNDS grounding passes. Report which claims will not survive, or record a decision (design-ledger decide); the closing attack pass is not blocked"
+  fi
+}
+
+cmd_open() {
+  local item="" ws="" dims="" scope=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --item) need "$@"; item=$2; shift 2 ;;
+      --workspace) need "$@"; ws=$2; shift 2 ;;
+      --dims) need "$@"; dims=$2; shift 2 ;;
+      --scope) need "$@"; scope=$2; shift 2 ;;
+      *) die "open: unknown argument '$1'" ;;
+    esac
+  done
+  [ -n "$item" ] && [ -n "$ws" ] && [ -n "$dims" ] && [ -n "$scope" ] \
+    || die "open needs --item, --workspace, --dims (the contract's quantified variables, by name) and --scope"
+  case "$ws" in *[!A-Za-z0-9._-]*) die "open: workspace names are letters, digits, '.', '_', '-'" ;; esac
+  scope=$(clean_text "$scope"); dims=$(clean_text "$dims")
+  check_tokens "$scope"
+  local nd; nd=$(count_dims "$dims")
+  [ "$nd" -le "$DIM_MAX" ] || refuse "$nd state dimensions ($dims); at most $DIM_MAX. Split the item first (design-doc, Slice size)"
+  local nt; nt=$(targets_of "$scope" | grep -c .)
+  [ "$nt" -le "$TARGET_MAX" ] || refuse "$nt modification targets; at most about $TARGET_MAX. Split the item first (design-doc, Slice size)"
+  local f; f=$(ledger_file "$item") || exit $?
+  [ ! -s "$f" ] || refuse "a ledger for $item already exists ($f); a design opens once"
+  local other; other=$( (ledger_for_workspace "$ws") 2>/dev/null ) && refuse "workspace $ws already belongs to the ledger $other"
+  mkdir -p "$(dirname "$f")"
+  printf 'open\t%s\t%s\t%s\t%s\t%s\n' "$(clean_text "$item")" "$ws" "$dims" "$scope" "$(now)" > "$f"
+  printf '%s\n' "$item" > "$(git_dir)/design-ledger-current"
+  echo "intake: $item, $nd dimension(s) ($dims), $nt target(s); scope: $scope"
+}
+
+point_here() { # item: open in another tree, worked here (a handoff into another slot)
+  printf '%s\n' "$1" > "$(git_dir)/design-ledger-current"
+}
+
+append() { # line, item-or-""
+  local f; f=$(ledger_file "${2:-}") || exit $?
+  replay_or_die "$f"
+  printf '%s\n' "$1" >> "$f"
+}
+
+cmd_pass() {
+  local kind=${1:-} build="" item=""; shift || true
+  case "$kind" in attack|ground) ;; *) die "pass attack|ground --build yes|no" ;; esac
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --build) need "$@"; build=$2; shift 2 ;;
+      --item) need "$@"; item=$2; shift 2 ;;
+      *) die "pass: unknown argument '$1'" ;;
+    esac
+  done
+  case "$build" in yes|no) ;; *) die "pass: --build yes|no (yes: a finding changes what gets built)" ;; esac
+  append "$(printf 'pass\t%s\t%s\t%s' "$kind" "$build" "$(now)")" "$item"
+  cmd_status ${item:+--item "$item"}
+}
+
+cmd_close() {
+  local item=""; [ "${1:-}" = --item ] && { need "$@"; item=$2; }
+  append "$(printf 'close\t%s' "$(now)")" "$item"
+  cmd_status ${item:+--item "$item"}
+}
+
+cmd_decide() {
+  local note="" widen="" item=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --note) need "$@"; note=$2; shift 2 ;;
+      --widen) need "$@"; widen=$2; shift 2 ;;
+      --item) need "$@"; item=$2; shift 2 ;;
+      *) die "decide: unknown argument '$1'" ;;
+    esac
+  done
+  [ -n "$note" ] || die "decide: --note \"<the decision and who made it>\" is required (queue-run, Decision authority)"
+  widen=$(clean_text "$widen")
+  if [ -n "$widen" ]; then
+    check_tokens "$widen"
+    local f; f=$(ledger_file "$item") || exit $?
+    replay_or_die "$f"
+    local nt; nt=$(targets_of "$SCOPE $widen" | sort -u | grep -c .)
+    [ "$nt" -le "$TARGET_MAX" ] || refuse "widening to $nt targets fails the slice size check (at most about $TARGET_MAX); the decision is a new ticket, not an extension"
+  fi
+  append "$(printf 'decide\t%s\t%s\t%s' "$(clean_text "$note")" "${widen:--}" "$(now)")" "$item"
+  cmd_status ${item:+--item "$item"}
+}
+
+cmd_status() {
+  local item=""; [ "${1:-}" = --item ] && { need "$@"; item=$2; }
+  local f; f=$(ledger_file "$item") || exit $?
+  [ -f "$f" ] || { echo "no design ledger for ${item:-this tree} ($f)"; return 0; }
+  replay_or_die "$f"
+  echo "item $ITEM · workspace $WS · dims $DIMS"
+  echo "scope:$SCOPE" | sed 's/:  */: /'
+  echo "attack passes $ATTACKS · grounding passes $GROUNDS/$GROUND_MAX · ${CLOSED:+closed, }build-changing attacks since the close $RUN/$RATCHET"
+  local r; r=$(block_reason ground)
+  if [ -n "$r" ]; then echo "blocked: $r"; else echo "blocked: nothing"; fi
+}
+
+cmd_gate() {
+  local step=${1:-} ws=""; shift || true
+  case "$step" in attack|ground|render) ;; *) die "gate attack|ground|render [--workspace <ws>]" ;; esac
+  [ "${1:-}" = --workspace ] && { need "$@"; ws=$2; }
+  local f
+  if [ -n "$ws" ]; then f=$(ledger_for_workspace "$ws") || exit $?; else f=$(ledger_file "") || exit $?; fi
+  [ -f "$f" ] || { echo "design-ledger: the ledger this tree points at is gone ($f)" >&2; exit 3; }
+  replay_or_die "$f"
+  local r; r=$(block_reason "$step")
+  [ -z "$r" ] || refuse "$ITEM: $r"
+  echo "$ITEM: $step may run"
+}
+
+cmd_render_check() {
+  local ws=""; [ "${1:-}" = --workspace ] && { need "$@"; ws=$2; }
+  [ -n "$ws" ] || die "render-check --workspace <ws> < rendered.md"
+  local f; f=$(ledger_for_workspace "$ws") || exit $?
+  replay_or_die "$f"
+  local memo; memo=$(cat)
+  local r; r=$(block_reason render)
+  [ -z "$r" ] || refuse "$ITEM: $r"
+  local targets big
+  targets=$(printf '%s\n' "$memo" | awk '/^## Modification targets/{f=1;next} /^## /{f=0} f && /^\| `/{ s=$0; sub(/^\| `/,"",s); sub(/`.*/,"",s); print s }')
+  big=$(printf '%s\n' "$memo" | awk -v max="$CLAIM_MAX" '/^## Evidence ledger/{f=1;next} /^## /{f=0}
+    f && /^\| C[0-9]+ \| / { s=$0; id=$2; sub(/^\| C[0-9]+ \| /,"",s); sub(/ \| [^|]*\|[ ]*$/,"",s); if (length(s) > max) printf "%s (%d chars) ", id, length(s) }')
+  [ -z "$big" ] || refuse "$ITEM: claim(s) over the ~$CLAIM_MAX-character size tripwire: ${big% }. Split the claim, or the item (design-doc, Slice size)"
+  local allowed out="" t n=0
+  allowed=$(targets_of "$SCOPE")
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    n=$((n + 1))
+    printf '%s\n' "$allowed" | grep -qxF -- "$t" || out="${out:+$out, }$t"
+  done <<EOF
+$targets
+EOF
+  [ -z "$out" ] || refuse "$ITEM: target(s) outside the scope recorded at open: $out. Record a decision first: design-ledger decide --note \"<decision, who>\" --widen \"target:<symbol>\" (an extension must pass the slice size check), or make it a new ticket"
+  [ "$n" -le "$TARGET_MAX" ] || refuse "$ITEM: $n modification targets; at most about $TARGET_MAX (design-doc, Slice size)"
+  echo "$ITEM: render may run ($n target(s) in scope, no claim over $CLAIM_MAX chars)"
+}
+
+self_test() {
+  local self tmp fails=0 out st
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/design-ledger-self.XXXXXX"); tmp=$(cd "$tmp" && pwd -P)
+  ok() { echo "ok   $1"; }; bad() { echo "FAIL $1"; printf '%s\n' "${2:-}" | sed 's/^/     /'; fails=$((fails + 1)); }
+  expect() { # name want-status want-text command...
+    local name=$1 ws=$2 wt=$3; shift 3
+    out=$("$@" 2>&1); st=$?
+    if [ "$st" -eq "$ws" ] && printf '%s' "$out" | grep -q -- "$wt"; then ok "$name"; else bad "$name (exit $st, wanted $ws and '$wt')" "$out"; fi
+  }
+  L() { (cd "$tmp/r" && "$self" "$@"); }
+  S() { (cd "$tmp/s" && "$self" "$@"); }
+  memo() { # targets... → a rendered memo on stdout; CLAIM sets the first claim's text
+    printf '# M\n\n## 1. Defect\n\ntext\n\n## Modification targets\n\n| target | censused by |\n|---|---|\n'
+    local t; for t in "$@"; do printf '| `%s` | F1 |\n' "$t"; done
+    printf '\n## Evidence ledger\n\nClaims.\n\n| ID | Proposition | Status |\n|---|---|---|\n'
+    printf '| C1 | %s | grounded |\n| C2 | short | open |\n\n## Facts\n\n| x |\n' "${CLAIM:-a claim}"
+  }
+  RC() { memo "$@" | L render-check --workspace ws1; }
+  ( cd "$tmp" && git init -q -b main r && cd r && git commit -q --allow-empty -m base \
+    && git worktree add -q --detach "$tmp/s" ) >/dev/null 2>&1 || { echo "setup failed"; return 1; }
+
+  expect "status with nothing open"                 3 "no design is open" L status
+  expect "open needs its fields"                    2 "open needs"        L open --item X-1 --workspace ws1
+  expect "a bad scope token is refused"             2 "not one of"        L open --item X-1 --workspace ws1 --dims a --scope "heal"
+  expect "four dimensions are refused"              1 "4 state dimensions" L open --item X-1 --workspace ws1 --dims "a, b, c, d" --scope "cmd:heal"
+  expect "six targets are refused"                  1 "6 modification targets" L open --item X-1 --workspace ws1 --dims a --scope "target:a target:b target:c target:d target:e target:f"
+  [ ! -e "$tmp/r/.git/design-ledger/X-1" ] && ok "a refused open writes nothing" || bad "a refused open writes nothing"
+  expect "open records the intake line"             0 "intake: X-1, 3 dimension" L open --item X-1 --workspace ws1 --dims "ref, copy, office" --scope "cmd:heal exit:21 target:heal_meta target:mend_copy"
+  expect "a second open is refused"                 1 "opens once"        L open --item X-1 --workspace ws2 --dims a --scope "cmd:heal"
+  expect "another item cannot take the workspace"   1 "already belongs"   S open --item X-2 --workspace ws1 --dims a --scope "cmd:heal"
+  expect "the other slot sees no design of its own" 3 "no design is open" S status
+  expect "status shows the scope"                   0 "target:heal_meta"  L status
+  expect "attack may run"                           0 "attack may run"    L gate attack
+  expect "render-check passes targets in scope"     0 "render may run (2" RC heal_meta mend_copy
+  expect "a target outside the scope is refused"    1 "outside the scope recorded at open: write_head" RC heal_meta write_head
+  out=$(cd "$tmp/r" && CLAIM=$(head -c 8100 /dev/zero | tr '\0' x) memo heal_meta | "$self" render-check --workspace ws1 2>&1); st=$?
+  [ "$st" -eq 1 ] && printf '%s' "$out" | grep -q "C1 (8100 chars)" && ok "a claim over 8k is refused" || bad "a claim over 8k is refused (exit $st)" "$out"
+  out=$(cd "$tmp/r" && CLAIM=$(head -c 7900 /dev/zero | tr '\0' x) memo heal_meta | "$self" render-check --workspace ws1 2>&1) \
+    && ok "a 7.9k claim passes" || bad "a 7.9k claim passes" "$out"
+  expect "widening past the size check is refused"  1 "new ticket"        L decide --note "agent+advisor: extend" --widen "target:a target:b target:c target:d"
+  expect "a decision needs a note"                  2 "note"              L decide --widen "target:write_head"
+  expect "a decision widens the scope"              0 "target:write_head" L decide --note "agent+advisor: in the ticket's intent" --widen "target:write_head"
+  expect "the widened target now renders"           0 "render may run (3" RC heal_meta write_head mend_copy
+  # the ratchet: three build-changing attacks after a close
+  L pass attack --build yes >/dev/null 2>&1; L pass attack --build yes >/dev/null 2>&1; L pass attack --build yes >/dev/null 2>&1
+  expect "build attacks before a close do not count" 0 "attack may run"   L gate attack
+  L close >/dev/null 2>&1
+  L pass attack --build yes >/dev/null 2>&1; L pass attack --build yes >/dev/null 2>&1
+  expect "two after a close still run"              0 "attack may run"    L gate attack
+  L pass attack --build no >/dev/null 2>&1
+  L pass attack --build yes >/dev/null 2>&1; L pass attack --build yes >/dev/null 2>&1
+  expect "a no-build pass resets the count"         0 "attack may run"    L gate attack
+  expect "the third consecutive one blocks"         0 "blocked: ratchet"  L pass attack --build yes
+  expect "attack is blocked"                        1 "ratchet"           L gate attack
+  expect "grounding is blocked"                     1 "ratchet"           L gate ground
+  expect "render is blocked by workspace"           1 "ratchet"           L gate render --workspace ws1
+  expect "render-check is blocked"                  1 "ratchet"           RC heal_meta
+  expect "a decision is the way through"            0 "blocked: nothing"  L decide --note "agent+advisor: cut C14 to slice 5, ticket queued un-gated"
+  expect "attack runs again"                        0 "attack may run"    L gate attack
+  # the grounding cap blocks grounding only
+  L pass ground --build no >/dev/null 2>&1; L pass ground --build no >/dev/null 2>&1; L pass ground --build yes >/dev/null 2>&1
+  expect "three grounding passes run"               0 "ground may run"    L gate ground
+  L pass ground --build no >/dev/null 2>&1
+  expect "the fifth grounding pass is blocked"      1 "grounding cap"     L gate ground
+  expect "the closing attack pass is not"           0 "attack may run"    L gate attack
+  expect "a bad pass kind is a usage error"         2 "attack|ground"     L pass review --build no
+  expect "a bad build value is a usage error"       2 "yes|no"            L pass attack --build maybe
+  # the other tree works the same item after pointing at it (a handoff into another slot)
+  expect "gate by workspace works from another tree" 1 "grounding cap"    S gate ground --workspace ws1
+  expect "an unknown workspace has no ledger"        3 "no design ledger is open" L gate render --workspace nope
+  # a hand-edited ledger is a read error
+  printf 'pass\tattack\tperhaps\t2026-01-01T00:00:00Z\n' >> "$tmp/r/.git/design-ledger/X-1"
+  expect "a hand-edited line is a read error"       2 "cannot be read at line" L gate attack
+  W() { perl -e 'alarm 10; exec @ARGV' "$@"; }
+  expect "a flag with no value is a usage error"    2 "needs a value"     W "$self" decide --note
+  rm -rf "$tmp"
+  [ "$fails" -eq 0 ] && { echo "self-test: all passed"; return 0; }
+  echo "self-test: $fails failed"; return 1
+}
+
+case "${1:-}" in
+  open) shift; cmd_open "$@" ;;
+  pass) shift; cmd_pass "$@" ;;
+  close) shift; cmd_close "$@" ;;
+  decide) shift; cmd_decide "$@" ;;
+  status) shift; cmd_status "$@" ;;
+  gate) shift; cmd_gate "$@" ;;
+  render-check) shift; cmd_render_check "$@" ;;
+  point) shift; [ -n "${1:-}" ] || die "point <item>"; f=$(ledger_file "$1") || exit $?; [ -f "$f" ] || refuse "no ledger for $1"; point_here "$1"; echo "this tree now works $1" ;;
+  path) shift; [ "${1:-}" = --item ] && { need "$@"; ledger_file "$2"; exit $?; }; ledger_file "" ;;
+  --self-test) self_test; exit $? ;;
+  *) sed -n '2,21p' "$0"; exit 2 ;;
+esac
