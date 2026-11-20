@@ -51,8 +51,11 @@ unmonitored automatic chain.
 
 ## One item in each session
 
-Read the queue freshly. Take the first unfinished, unblocked item. Within an
-availability window, ask about decision-dependent items and record each answer.
+Read the queue at the start of each session, whether it is a file inside or
+outside the project or a tracker. The user may have reordered it since the
+last session. Follow their current order and take the first unfinished,
+unblocked item. Within an availability window, ask about decision-dependent
+items and record each answer.
 Outside it, park them and continue only to independent, authorized work. A decline
 remains an exclusion for the run. A parked prerequisite blocks its dependents.
 
