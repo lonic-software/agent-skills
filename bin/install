@@ -75,17 +75,17 @@ case "$skill" in
   powerup)
     skills=("${bundle_skills[@]}")
     agents=("${bundle_agents[@]}")
-    hooks=(skills-after-compact.sh gate.sh)
+    hooks=(skills-after-compact.sh gate.sh tool-gate.sh)
     ;;
   powerup-auto)
     skills=("${bundle_skills[@]}" queue-run powerup-auto)
     agents=("${bundle_agents[@]}")
-    hooks=(skills-after-compact.sh gate.sh)
+    hooks=(skills-after-compact.sh gate.sh tool-gate.sh)
     ;;
   powerup-fleet)
     skills=("${bundle_skills[@]}" queue-run queue-fleet powerup-fleet)
     agents=("${bundle_agents[@]}")
-    hooks=(skills-after-compact.sh gate.sh)
+    hooks=(skills-after-compact.sh gate.sh tool-gate.sh)
     ;;
   queue-fleet)
     skills=(queue-run queue-fleet delivery)
@@ -156,6 +156,14 @@ for h in ${hooks[@]+"${hooks[@]}"}; do
     echo '  "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": ['
     echo "    { \"type\": \"command\", \"command\": \"bash $dst_hooks/gate.sh\" }"
     echo '  ] } ] }'
+    echo
+  fi
+  if [ "$h" = "tool-gate.sh" ]; then
+    echo "Enforces the design scope gate, the design-ledger ratchet and the availability window once wired in — add to the same PreToolUse list (needs jq):"
+    echo
+    echo '  { "matcher": "mcp__.*tetel__render|Agent|AskUserQuestion", "hooks": ['
+    echo "    { \"type\": \"command\", \"command\": \"bash $dst_hooks/tool-gate.sh\" }"
+    echo '  ] }'
     echo
   fi
 done
